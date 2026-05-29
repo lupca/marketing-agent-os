@@ -6,37 +6,50 @@ Tài liệu này hướng dẫn chi tiết cách thiết lập, chạy thử ngh
 
 ---
 
-## 1. Kiến Trúc Luồng Vận Hành (Department SOP Flow)
+## 1. Kiến Trúc Luồng Vận Hành & Bản Nâng Cấp v2.1 (Department SOP Flow)
 
-Quy trình tự trị tuân thủ nghiêm ngặt theo **SOP 4 bước cứng** để đảm bảo tính kỷ luật và tối ưu chi phí:
+Hệ thống được nâng cấp lên **phiên bản v2.1** tích hợp **Semantic Router** bằng Vector và **Researcher Agent** chạy ngầm để tối ưu hóa việc phân loại ý định cửa ngõ và nghiên cứu chính sách quảng cáo tự trị:
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Sếp as CEO / CMO (Chainlit UI)
-    participant Supervisor as Triage Router
+    participant Supervisor as Triage Node (Semantic Router)
+    participant Researcher as Ban Nghiên Cứu (Researcher Agent)
     participant Biz as Ban Kinh Doanh (Analyst / Performance)
     participant DB as PostgreSQL (pgvector)
     participant Creative as Ban Sáng Tạo (Strategist / Copywriter / Guardian)
 
-    Sếp->>Supervisor: Gửi yêu cầu lên kịch bản mới
-    Note over Supervisor: Triage phân loại Intent cứng là 'create_campaign'
+    %% BƯỚC 1: TRIAGE
+    Sếp->>Supervisor: Nhập tin nhắn / Yêu cầu
+    Note over Supervisor: Tính tương đồng Cosine ngữ nghĩa qua vector bge-m3
     
-    Supervisor->>Biz: Kích hoạt Analyst Node (CPA Anchor)
-    Biz->>DB: Truy vấn Giá bán & Giá vốn sản phẩm
-    Note over Biz: Tính toán CPA Target (30% Biên lợi nhuận)<br/>& Ngân sách Thử nghiệm tối đa
-    
-    Biz->>Creative: Kích hoạt Creative Graph (Truyền CPA Target & Budget)
-    Note over Creative: Strategist: Quét RAG lấy insight tâm lý & bài học tránh lập lại<br/>Copywriter: Viết kịch bản ép trong khung CPA Target<br/>Guardian: Chấm điểm Matrix 100 điểm nghiêm ngặt
-    
-    alt Điểm số < 80/100
-        Note over Creative: Brand Guardian từ chối!<br/>Tự động trả lại Copywriter kèm feedback sửa đổi.
-    else Điểm số >= 80/100
-        Creative-->>Sếp: Gửi kịch bản đạt chuẩn và dừng chờ duyệt (CMO Interrupt)
+    alt Yêu cầu tra cứu tri thức / Luật quảng cáo (Intent: research)
+        Supervisor->>Researcher: Chuyển tiếp luồng đến Researcher Node
+        Researcher->>DB: Gọi Tool chọc DB truy xuất chính sách (pgvector)
+        Researcher-->>Sếp: Phản hồi báo cáo nghiên cứu chi tiết dưới định danh [Ban Nghiên Cứu]
+        
+    alt Tạo chiến dịch quảng cáo mới (Intent: create_campaign)
+        Supervisor->>Biz: Kích hoạt Analyst Node (CPA Anchor)
+        Biz->>DB: Truy vấn Giá bán & Giá vốn sản phẩm
+        Note over Biz: Tính toán CPA Target (30% Biên lợi nhuận) & Ngân sách thử nghiệm
+        
+        Biz->>Creative: Kích hoạt Creative Graph (Truyền CPA Target & Budget)
+        Note over Creative: Strategist giao việc sang Researcher Agent!
+        Creative->>Researcher: Gọi run_research (yêu cầu báo cáo tri thức & bài học thất bại)
+        Researcher-->>Creative: Trả về bản tóm tắt tri thức khách hàng & anti-patterns
+        
+        Note over Creative: Copywriter: Viết kịch bản ép trong khung CPA Target<br/>Guardian: Chấm điểm Matrix 100 điểm nghiêm ngặt
+        
+        alt Điểm số < 80/100
+            Note over Creative: Brand Guardian từ chối!<br/>Tự động trả lại Copywriter kèm feedback sửa đổi.
+        else Điểm số >= 80/100
+            Creative-->>Sếp: Gửi kịch bản đạt chuẩn và dừng chờ duyệt (CMO Interrupt)
+        end
+        
+        Sếp->>Supervisor: Bấm [Duyệt và Đăng 🚀]
+        Supervisor->>DB: Lưu kịch bản với trạng thái 'scheduled' thành công!
     end
-    
-    Sếp->>Supervisor: Bấm [Duyệt và Đăng 🚀]
-    Supervisor->>DB: Lưu kịch bản với trạng thái 'scheduled' thành công!
 ```
 
 ---

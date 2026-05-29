@@ -110,5 +110,46 @@ class TestMultiAgentWorkflow(unittest.TestCase):
         
         print("[WORKFLOW TEST COMPLETED SUCCESSFULLY!]")
 
+    def test_research_routing_workflow(self):
+        """Simulate the general policy query and verify that it routes to Researcher Node and runs RAG QA."""
+        print(f"\n[START RESEARCH ROUTING TEST] Thread ID: {self.thread_id}")
+        
+        config = {
+            "configurable": {
+                "thread_id": self.thread_id,
+                "workspace_id": SEED_WORKSPACE_ID,
+                "product_id": SEED_PRODUCT_ID
+            }
+        }
+        
+        initial_state = {
+            "messages": [HumanMessage(content="Quảng cáo bị Facebook quét từ khóa cấm là gì?")],
+            "current_channel": "#phong-sang-tao",
+            "workspace_id": SEED_WORKSPACE_ID,
+            "product_id": SEED_PRODUCT_ID,
+            "sop_stage": "triage",
+            "feedback_log": [],
+            "killed_variants_feedback": []
+        }
+        
+        # Step through LangGraph
+        print("Stepping through LangGraph Nodes for Research intent...")
+        stages_hit = []
+        for event in graph.stream(initial_state, config=config, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                print(f" -> Completed Node: '{node_name}'")
+                stages_hit.append(node_name)
+                
+                if node_name == "researcher_agent":
+                    self.assertIn("messages", node_update)
+                    report_msg = node_update["messages"][-1].content
+                    self.assertTrue(len(report_msg) > 50)
+                    self.assertIn("Facebook", report_msg)
+                    print(f"    [SUCCESS] Researcher synthesized report successfully:\n{report_msg[:200]}...")
+                    
+        self.assertIn("triage", stages_hit)
+        self.assertIn("researcher_agent", stages_hit)
+        print("[RESEARCH ROUTING TEST COMPLETED SUCCESSFULLY!]")
+
 if __name__ == "__main__":
     unittest.main()

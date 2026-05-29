@@ -290,12 +290,27 @@ async def on_message(message: cl.Message):
                 # Scoring validation
                 logs = node_update.get("feedback_log", [])
                 await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{logs[-1]}`").send()
+                
+            elif node_name == "researcher_agent":
+                new_msgs = node_update.get("messages", [])
+                if new_msgs:
+                    report = new_msgs[-1].content
+                    research_msg = (
+                        f"🎯 **[Ban Nghiên Cứu - Researcher]**\n\n"
+                        f"{report}"
+                    )
+                    await cl.Message(content=research_msg).send()
 
     # 3. Detect if graph is paused or finished
     current_state = graph.get_state(config)
     
     # Handle casual chat (END state) gracefully on UI
     if not current_state.next:
+        # Check if this was a research query which was already handled
+        intent = current_state.values.get("intent_classification") if current_state.values else "chat"
+        if intent == "research":
+            return
+            
         # If the graph has finished (e.g., small talk categorized as END / 'chat')
         # We query the LLM directly or show a standard friendly message
         from core.ollama_client import generate_text

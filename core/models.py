@@ -302,4 +302,15 @@ class RAGKnowledgebase(Base):
     embedding = Column(VECTOR_TYPE)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+# 21. Model: IntentRoutingKnowledge
+class IntentRoutingKnowledge(Base):
+    __tablename__ = "intent_routing_knowledge"
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
+    intent_category = Column(String(50), nullable=False)
+    utterance = Column(Text, nullable=False)
+    embedding = Column(VECTOR_TYPE)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 

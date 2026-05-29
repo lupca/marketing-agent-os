@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from db.connection import SessionLocal
 from core.models import ProductService
 from core.ollama_client import generate_text
-from core.rag import inject_antipatterns_to_prompt, retrieve_knowledge_reranked
+from graphs.researcher import run_research
 from graphs.state import AgencyState
 from reference.prompt.prompts import (
     ANGLE_STRATEGIST_PROMPT,
@@ -45,19 +45,24 @@ def strategist_node(state: AgencyState) -> dict:
     product_name = product.name if product else "Sản phẩm AI"
     product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
     
-    # 2. Retrieve positive insights from RAG (user uploads + psychological)
-    logger.info("Retrieving positive marketing insights from RAG...")
-    user_docs = retrieve_knowledge_reranked(
-        db, 
-        workspace_id, 
-        f"chiến lược marketing khách hàng nỗi đau cho {product_name}", 
-        categories=["psychology", "user_upload"], 
-        limit=2
-    )
-    insights_str = "\n".join([d.get("content", "") for d in user_docs]) if user_docs else "Khách hàng muốn tăng ROI, giảm CPA Ads."
+    # 2. SOP Phân vai: Giao việc / Gọi Researcher Agent để lấy Báo cáo Insight Khách hàng
+    logger.info("Giao việc / Gọi Researcher Agent để lấy Báo cáo Insight Khách hàng...")
+    try:
+        insights_str = run_research(workspace_id, f"chiến lược marketing khách hàng nỗi đau cho {product_name}")
+    except Exception as e:
+        logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo Insight Khách hàng: {e}")
+        db.close()
+        raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo từ Researcher: {e}") from e
     
-    # 3. SOP DISCIPLINE: Inject failed anti-patterns using Python code
-    logger.info("Injecting failed anti-patterns dynamically...")
+    # 3. SOP Phân vai: Giao việc / Gọi Researcher Agent để lấy Báo cáo Bài học thất bại (Anti-patterns)
+    logger.info("Giao việc / Gọi Researcher Agent để lấy Báo cáo Bài học thất bại (Anti-patterns)...")
+    try:
+        anti_patterns_report = run_research(workspace_id, f"mẫu quảng cáo thất bại sai lầm sản phẩm {product_name}")
+    except Exception as e:
+        logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo Bài học thất bại: {e}")
+        db.close()
+        raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo bài học thất bại từ Researcher: {e}") from e
+        
     system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
     
     base_prompt = ANGLE_STRATEGIST_PROMPT.format(
@@ -78,12 +83,15 @@ def strategist_node(state: AgencyState) -> dict:
         language="Vietnamese"
     )
     
-    # Inject anti-patterns block to prompt
-    final_prompt = inject_antipatterns_to_prompt(db, workspace_id, product_name, base_prompt)
+    # Build final prompt by injecting report from Researcher
+    final_prompt = (
+        f"## BÁO CÁO BÀI HỌC THẤT BẠI CẦN TRÁNH (TỔNG HỢP BỞI BAN NGHIÊN CỨU - CẤM LẶP LẠI):\n"
+        f"{anti_patterns_report}\n\n"
+        f"{base_prompt}\n"
+        f"**Tài liệu tri thức bổ sung thu thập từ Researcher Agent:**\n"
+        f"{insights_str}\n"
+    )
     db.close()
-    
-    # Append instructions to incorporate positive RAG insights
-    final_prompt += f"\n**Tài liệu tri thức bổ sung thu thập từ RAG:**\n{insights_str}\n"
     
     # 4. Generate Strategy via Ollama
     logger.info("Generating marketing angle strategy from Ollama...")

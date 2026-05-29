@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal, is_mock
-from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService
+from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService, RAGKnowledgebase, IntentRoutingKnowledge
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_seeder")
@@ -142,7 +142,106 @@ def seed_database(db: Session):
     else:
         logger.info("Product Service already exists.")
         
+    # 6. Seed Default RAG Knowledgebase entries for Facebook / TikTok Ad Policy
+    from core.rag import store_knowledge
+    
+    policies_exist = db.query(RAGKnowledgebase).filter_by(category="policies").first()
+    if not policies_exist:
+        logger.info("Seeding Facebook and TikTok advertising policy guidelines...")
+        fb_policy = (
+            "Chính sách Quảng cáo Facebook (Meta Ads Policy) về Từ khóa cấm và Hạn chế:\n"
+            "- Các từ khóa cấm tuyệt đối liên quan đến cam kết phi thực tế: 'cam kết 100%', 'trị dứt điểm', 'thuốc trị', 'tăng cân', 'giảm cân', 'vĩnh viễn', 'hoàn tiền', 'chữa trị', 'bác sĩ khuyên dùng', 'hiệu quả tức thì'.\n"
+            "- Các lĩnh vực bị hạn chế đặc biệt: Tiền mã hóa (cryptocurrency), tài chính cá nhân/cho vay, sản phẩm người lớn, các vấn đề xã hội/chính trị, hình ảnh so sánh Trước/Sau (Before/After) khi sử dụng sản phẩm giảm cân/mỹ phẩm.\n"
+            "- Cơ chế hoạt động: Facebook sử dụng các mô hình AI NLP (Xử lý ngôn ngữ tự nhiên) để quét văn bản trong bài viết quảng cáo, tiêu đề, mô tả và công cụ OCR (Nhận dạng ký tự quang học) để đọc chữ xuất hiện trên ảnh hoặc video. Bất kỳ sự vi phạm nào cũng dẫn đến việc từ chối phê duyệt quảng cáo (ad rejection) hoặc vô hiệu hóa tài khoản quảng cáo của bạn (banned ad account)."
+        )
+        
+        tiktok_policy = (
+            "Chính sách Quảng cáo TikTok (TikTok Ads Policy) về Từ khóa cấm và Hạn chế:\n"
+            "- Các từ ngữ bị cấm hoặc hạn chế tối đa: 'nhất', 'số 1', 'tuyệt đối', '100%', 'hoàn hảo', 'cam đoan', 'điều trị', 'cam kết sạch mụn'.\n"
+            "- Các chủ đề nhạy cảm: Tài chính cá nhân & vay tín chấp, sản phẩm y tế/sức khỏe, thay đổi hình thể quá mức, cờ bạc, hàng giả/hàng nhái thương hiệu lớn.\n"
+            "- Cơ chế hoạt động: TikTok quét cả văn bản caption bài đăng, chữ hiển thị đè trên video (text overlays) và đặc biệt là giọng nói lồng trong video (voiceover) thông qua công nghệ chuyển đổi giọng nói thành văn bản tự động (ASR - Automatic Speech Recognition). Do đó, việc chèn chữ hoặc nói các từ cấm đều bị hệ thống phát hiện ngay lập tức."
+        )
+        
+        store_knowledge(
+            db=db,
+            workspace_id=default_ws.id,
+            category="policies",
+            source_name="Facebook_Ad_Policy_Guidelines.txt",
+            content=fb_policy,
+            metadata={"platform": "facebook", "type": "policy"}
+        )
+        
+        store_knowledge(
+            db=db,
+            workspace_id=default_ws.id,
+            category="policies",
+            source_name="TikTok_Ad_Policy_Guidelines.txt",
+            content=tiktok_policy,
+            metadata={"platform": "tiktok", "type": "policy"}
+        )
+        logger.info("Successfully seeded advertising policy guidelines in pgvector!")
+    else:
+        logger.info("Advertising policy guidelines already seeded.")
+        
+    # 7. Seed Semantic Router Utterances
+    seed_semantic_router(db)
+        
     logger.info("Database seeding successfully completed!")
+
+def seed_semantic_router(db: Session):
+    logger.info("Seeding Intent Routing Knowledge...")
+
+    # Kiểm tra xem đã có dữ liệu chưa
+    existing = db.query(IntentRoutingKnowledge).first()
+    if existing:
+        logger.info("Intent Routing Data already exists. Skipping.")
+        return
+
+    from core.ollama_client import get_embedding
+
+    DEFAULT_UTTERANCES = {
+        "create_campaign": [
+            "Lên chiến dịch quảng cáo mới cho sản phẩm",
+            "Viết cho tôi 3 kịch bản tiktok",
+            "Tạo nội dung chạy ads tối ưu chuyển đổi",
+            "Lên camp mới"
+        ],
+        "show_metrics": [
+            "Báo cáo hiệu suất quảng cáo tuần này",
+            "CPA của chiến dịch hôm qua là bao nhiêu?",
+            "Kiểm tra xem kịch bản nào đang đốt tiền",
+            "Xem số liệu ads"
+        ],
+        "research": [
+            "Tại sao quảng cáo bị Facebook quét từ khóa cấm?",
+            "Chính sách cấm của TikTok đối với ngành dược",
+            "Trong tài liệu hướng dẫn viết gì về đánh vào nỗi sợ?",
+            "Làm sao để kháng nghị tài khoản bị khóa"
+        ],
+        "chat": [
+            "Chào buổi sáng",
+            "Hello hệ thống",
+            "Bạn có khỏe không"
+        ]
+    }
+
+    for intent, sentences in DEFAULT_UTTERANCES.items():
+        for sentence in sentences:
+            logger.info(f"Generating embedding for intent router utterance: '{sentence}'...")
+            try:
+                vector = get_embedding(sentence)
+                record = IntentRoutingKnowledge(
+                    intent_category=intent,
+                    utterance=sentence,
+                    embedding=vector
+                )
+                db.add(record)
+            except Exception as e:
+                logger.error(f"Error seeding utterance '{sentence}': {e}")
+                raise
+
+    db.commit()
+    logger.info("Successfully seeded semantic router data!")
 
 if __name__ == "__main__":
     db_session = SessionLocal()

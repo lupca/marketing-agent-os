@@ -5,7 +5,10 @@ from langchain_core.messages import AIMessage
 from graphs.state import AgencyState
 from graphs.business import analyst_node, performance_node
 from graphs.creative import strategist_node, copywriter_node, brand_guardian_node
-from core.ollama_client import generate_text
+from core.ollama_client import generate_text, get_embedding
+from graphs.researcher import researcher_node
+from db.connection import SessionLocal
+from core.models import IntentRoutingKnowledge
 
 logger = logging.getLogger("graphs_main_router")
 logging.basicConfig(level=logging.INFO)
@@ -14,75 +17,74 @@ logging.basicConfig(level=logging.INFO)
 def triage_node(state: AgencyState) -> dict:
     """
     Triage Node (Supervisor) at the entry gateway.
-    Classifies user message intent into 'chat', 'show_metrics', or 'create_campaign'.
-    Guarantees strict SOP starting path.
+    Classifies user message intent into 'chat', 'show_metrics', 'create_campaign', or 'research'.
+    Uses database-driven vector similarity matching via pgvector cosine distance.
     """
-    logger.info("Executing Triage Node (Supervisor Input Intent Classifier)...")
+    logger.info("Executing Triage Node (Database-Driven Vector Router)...")
     
     # Retrieve last user message
     messages = state.get("messages", [])
     if not messages:
-        return {"sop_stage": "triage"}
+        return {"sop_stage": "triage", "intent_classification": "research"}
         
-    last_msg = messages[-1].content.lower()
+    query = messages[-1].content.strip()
     
-    # Simple keyword-based & LLM-aided classifier
-    intent = "chat"
-    if any(k in last_msg for k in ["báo cáo", "metrics", "số liệu", "chỉ số", "cpa tuần", "hiệu suất"]):
-        intent = "show_metrics"
-    elif any(k in last_msg for k in ["lên kịch bản", "viết bài", "camp mới", "tạo chiến dịch", "chiến dịch mới", "content"]):
-        intent = "create_campaign"
-    else:
-        # LLM-assisted categorization to be highly precise
-        prompt = (
-            f"Classify the following User input into exactly one category: 'chat', 'show_metrics', or 'create_campaign'.\n"
-            f"- 'create_campaign': User wants to create new campaigns, copywriting scripts, or content briefs.\n"
-            f"- 'show_metrics': User wants reports, ads metrics, budget scale/kill reviews, or audit data.\n"
-            f"- 'chat': Greeting, small talk, chit-chat.\n\n"
-            f"User input: \"{messages[-1].content}\"\n"
-            f"Category (one word only):"
-        )
-        res = generate_text(prompt, system_prompt="Answer with exactly one word: 'chat', 'show_metrics', or 'create_campaign'.")
-        res_clean = res.strip().lower()
-        if "create_campaign" in res_clean:
-            intent = "create_campaign"
-        elif "show_metrics" in res_clean:
-            intent = "show_metrics"
+    intent = "research" # Fallback safe default (RAG QA)
+    db = SessionLocal()
+    
+    try:
+        query_vector = get_embedding(query)
+        
+        # Calculate cosine distance using pgvector operator
+        distance_expr = IntentRoutingKnowledge.embedding.cosine_distance(query_vector)
+        
+        # Fetch closest matching utterance
+        closest_match_data = db.query(IntentRoutingKnowledge, distance_expr).filter(
+            IntentRoutingKnowledge.is_active == True
+        ).order_by(distance_expr).first()
+        
+        if closest_match_data:
+            record, distance = closest_match_data
+            logger.info(f"Closest match utterance: '{record.utterance}' with cosine distance: {distance:.4f}")
             
-    logger.info(f"Classified Intent: '{intent}'")
+            # Threshold check: distance < 0.30 (equivalent to similarity > 0.70)
+            if distance < 0.30:
+                intent = record.intent_category
+                logger.info(f"Semantic Match Found: '{record.utterance}' -> Intent: {intent}")
+            else:
+                logger.warning(f"Closest match distance {distance:.4f} exceeds threshold 0.30. Fallback to 'research'.")
+        else:
+            logger.warning("No dynamic utterances found in intent_routing_knowledge table.")
+            
+    except Exception as e:
+        logger.error(f"Semantic Router DB Error: {e}. Falling back to default 'research'.")
+        # Fail fast as requested by Sếp
+        raise RuntimeError(f"Lỗi hệ thống cửa ngõ: Không thể thực hiện phân tích định tuyến vector CSDL: {e}") from e
+    finally:
+        db.close()
+        
+    # Assign active UI channel based on intent
+    channel = "#phong-sang-tao" if intent == "research" else "#phong-kinh-doanh"
     
-    # Save intent in messages or metadata
     return {
         "sop_stage": "triage",
-        "current_channel": "#phong-kinh-doanh" if intent != "chat" else state.get("current_channel", "#phong-kinh-doanh")
+        "intent_classification": intent,
+        "current_channel": channel
     }
 
 # Conditional routing from Triage
 def route_after_triage(state: AgencyState) -> str:
-    messages = state.get("messages", [])
-    if not messages:
-        return "end"
-        
-    last_msg = messages[-1].content.lower()
-    
-    # Re-evaluate classified intent
-    if any(k in last_msg for k in ["báo cáo", "metrics", "số liệu", "chỉ số", "cpa tuần", "hiệu suất"]):
-        return "performance"
-    elif any(k in last_msg for k in ["lên kịch bản", "viết bài", "camp mới", "tạo chiến dịch", "chiến dịch mới", "content"]):
+    """
+    Evaluates the classified intent in state and routes to the correct node.
+    """
+    intent = state.get("intent_classification", "research")
+    logger.info(f"Conditional Router: routing state based on intent '{intent}'")
+    if intent == "create_campaign":
         return "analyst"
-    
-    # Standard text-based fallback routing matching triage_node classification
-    prompt = (
-        f"Route user query. Answer with 'performance' for metrics/reports, "
-        f"'analyst' for campaign creation, or 'end' for casual chat.\n"
-        f"Query: \"{messages[-1].content}\"\n"
-        f"Answer:"
-    )
-    res = generate_text(prompt).strip().lower()
-    if "analyst" in res:
-        return "analyst"
-    elif "performance" in res:
+    elif intent == "show_metrics":
         return "performance"
+    elif intent == "research":
+        return "researcher_agent"
     return "end"
 
 # Conditional routing from Brand Guardian (Scoring Gatekeeper)
@@ -195,6 +197,7 @@ builder.add_node("copywriter", copywriter_node)
 builder.add_node("guardian", brand_guardian_node)
 builder.add_node("waiting_approval_barrier", waiting_approval_barrier_node)
 builder.add_node("publisher", publisher_node)
+builder.add_node("researcher_agent", researcher_node)
 
 # Add Edges
 builder.add_edge(START, "triage")
@@ -206,6 +209,7 @@ builder.add_conditional_edges(
     {
         "analyst": "analyst",
         "performance": "performance",
+        "researcher_agent": "researcher_agent",
         "end": END
     }
 )
@@ -214,6 +218,7 @@ builder.add_conditional_edges(
 builder.add_edge("analyst", "strategist")
 builder.add_edge("strategist", "copywriter")
 builder.add_edge("copywriter", "guardian")
+builder.add_edge("researcher_agent", END)
 
 # Guardian conditional check
 builder.add_conditional_edges(

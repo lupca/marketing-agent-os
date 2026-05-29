@@ -25,6 +25,7 @@ Chứa các văn bản về mục tiêu, phạm vi bàn giao và các tiêu chí
 Chứa phân tích thiết kế chi tiết ở tầng kỹ thuật, thuật toán đo lường và các phân hệ chức năng chuyên sâu.
 *   📄 **[system_design_analysis.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/system_design_analysis.md):** Phân tích thiết kế hệ thống N-Tier, giải thuật quản trị bộ nhớ tránh tràn Context Window, và cơ chế lưu checkpoint của LangGraph.
 *   📄 **[cmo_bi_dashboard_design.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/cmo_bi_dashboard_design.md):** Đặc tả thiết kế phân hệ CMO BI Dashboard, công thức toán học tính Paid/Blended CAC, đèn báo LTV:CAC, và giải thuật phát hiện Creative Fatigue sớm.
+*   📄 **[semantic_router_researcher_v2.1.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/semantic_router_researcher_v2.1.md):** Bản nâng cấp v2.1 tích hợp Bộ định tuyến Ngữ nghĩa CSDL (pgvector Cosine distance) và Tác tử Nghiên cứu chính sách chạy ngầm tự trị.
 
 ---
 

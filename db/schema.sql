@@ -298,3 +298,18 @@ CREATE TABLE rag_knowledgebase (
 
 -- HNSW Index for ultra-fast vector cosine similarity searches
 CREATE INDEX IF NOT EXISTS idx_rag_kb_embedding ON rag_knowledgebase USING hnsw (embedding vector_cosine_ops);
+
+-- 21. Table: intent_routing_knowledge (Dynamic Semantic Router)
+CREATE TABLE intent_routing_knowledge (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE, -- NULL = Mặc định hệ thống
+    intent_category VARCHAR(50) NOT NULL, -- 'create_campaign', 'show_metrics', 'research', 'chat'
+    utterance TEXT NOT NULL,              -- Câu người dùng hay gõ, ví dụ: "Lên camp cho tôi"
+    embedding VECTOR(1024),               -- Embedding của utterance (dùng model bge-m3)
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index tối ưu tốc độ tìm kiếm Semantic Router (dưới 10ms)
+CREATE INDEX IF NOT EXISTS idx_intent_routing_embedding
+ON intent_routing_knowledge USING hnsw (embedding vector_cosine_ops);

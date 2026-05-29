@@ -21,3 +21,5 @@ class AgencyState(TypedDict):
     master_content: Dict[str, Any]       # Core message from Copywriter
     variants: List[Dict[str, Any]]       # Generated platform-specific kịch bản
     feedback_log: List[str]              # Logs for Guardian review iteration
+    intent_classification: str           # Classified intent: 'chat', 'show_metrics', 'create_campaign', 'research'
+
