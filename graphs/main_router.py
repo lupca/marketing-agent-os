@@ -61,7 +61,7 @@ def triage_node(state: AgencyState) -> dict:
 def route_after_triage(state: AgencyState) -> str:
     messages = state.get("messages", [])
     if not messages:
-        return END
+        return "end"
         
     last_msg = messages[-1].content.lower()
     
@@ -83,7 +83,7 @@ def route_after_triage(state: AgencyState) -> str:
         return "analyst"
     elif "performance" in res:
         return "performance"
-    return END
+    return "end"
 
 # Conditional routing from Brand Guardian (Scoring Gatekeeper)
 def route_after_guardian(state: AgencyState) -> str:

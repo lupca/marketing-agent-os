@@ -6,67 +6,13 @@ from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
 from sqlalchemy.sql import func
 from db.connection import Base, IS_MOCK_DATABASE
 
-# Custom UUID fallback for SQLite (uses string representation)
-class SQLiteUUID(TypeDecorator):
-    impl = String
-    cache_ok = True
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        return str(value)
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return None
-        return uuid.UUID(value)
+# Resolve cross-database data types - PostgreSQL Native & pgvector Type Anchor
+UUID_TYPE = UUID(as_uuid=True)
+ARRAY_TYPE = ARRAY(UUID(as_uuid=True))
+JSON_TYPE = JSONB
 
-# SQLite compatible array mapping (stored as json text)
-class SQLiteArray(TypeDecorator):
-    impl = TEXT = Text
-    cache_ok = True
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return "[]"
-        return json.dumps(value)
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return []
-        try:
-            return json.loads(value)
-        except Exception:
-            return []
-
-# Custom vector type fallback for SQLite
-class MockVector(TypeDecorator):
-    impl = Text
-    cache_ok = True
-    def process_bind_param(self, value, dialect):
-        if value is not None:
-            if isinstance(value, list):
-                return json.dumps([float(x) for x in value])
-            return str(value)
-        return None
-    def process_result_value(self, value, dialect):
-        if value is not None:
-            try:
-                return json.loads(value)
-            except Exception:
-                try:
-                    clean = value.strip('[]').split(',')
-                    return [float(x.strip()) for x in clean if x.strip()]
-                except Exception:
-                    return None
-        return None
-
-# Resolve cross-database data types
-UUID_TYPE = UUID(as_uuid=True) if not IS_MOCK_DATABASE else SQLiteUUID()
-ARRAY_TYPE = ARRAY(UUID(as_uuid=True)) if not IS_MOCK_DATABASE else SQLiteArray()
-JSON_TYPE = JSONB if not IS_MOCK_DATABASE else JSON
-
-if not IS_MOCK_DATABASE:
-    from pgvector.sqlalchemy import Vector
-    VECTOR_TYPE = Vector(1024)
-else:
-    VECTOR_TYPE = MockVector()
+from pgvector.sqlalchemy import Vector
+VECTOR_TYPE = Vector(1024)
 
 # 1. Model: User
 class User(Base):

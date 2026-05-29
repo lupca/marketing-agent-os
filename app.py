@@ -1,12 +1,14 @@
 # app.py
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import uuid
 import logging
 import asyncio
 from typing import cast
 import chainlit as cl
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy.orm import Session
 
 # Import backend modules
@@ -16,6 +18,55 @@ from core.parser import extract_text_from_file, chunk_text
 from core.storage import upload_file
 from core.rag import store_knowledge
 from graphs.main_router import graph
+
+# Import FastAPI routing requirements
+from chainlit.server import app as fastapi_app
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import Request
+from core.dashboard import get_dashboard_analytics, simulate_scenario
+
+@fastapi_app.middleware("http")
+async def custom_dashboard_middleware(request: Request, call_next):
+    """
+    Highly robust, fail-safe custom dashboard middleware.
+    Intercepts dashboard requests at the HTTP layer, bypassing any Chainlit React SPA routing conflicts.
+    """
+    path = request.url.path
+    if path == "/dashboard" and request.method == "GET":
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "dashboard.html"))
+        if not os.path.exists(template_path):
+            return HTMLResponse(content="<h1>CMO BI Dashboard Template Not Found</h1><p>Please ensure data/templates/dashboard.html exists.</p>", status_code=404)
+        with open(template_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+        
+    elif path == "/api/dashboard/metrics" and request.method == "GET":
+        db: Session = SessionLocal()
+        try:
+            data = get_dashboard_analytics(db)
+            return JSONResponse(content=data)
+        except Exception as e:
+            logger.error(f"Error fetching dashboard metrics: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+            
+    elif path == "/api/dashboard/simulate" and request.method == "POST":
+        db: Session = SessionLocal()
+        try:
+            body = await request.json()
+            test_budget = float(body.get("test_budget", 0))
+            price = float(body.get("price", 0))
+            cost = float(body.get("cost", 0))
+            res = simulate_scenario(test_budget, price, cost, db)
+            return JSONResponse(content=res)
+        except Exception as e:
+            logger.error(f"Error simulating scenario: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+            
+    return await call_next(request)
 
 logger = logging.getLogger("chainlit_app")
 logging.basicConfig(level=logging.INFO)
@@ -240,7 +291,28 @@ async def on_message(message: cl.Message):
                 logs = node_update.get("feedback_log", [])
                 await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{logs[-1]}`").send()
 
-    # 3. Detect if graph is paused at Approval Barrier (waiting_approval_barrier)
+    # 3. Detect if graph is paused or finished
+    current_state = graph.get_state(config)
+    
+    # Handle casual chat (END state) gracefully on UI
+    if not current_state.next:
+        # If the graph has finished (e.g., small talk categorized as END / 'chat')
+        # We query the LLM directly or show a standard friendly message
+        from core.ollama_client import generate_text
+        prompt = (
+            f"Bạn là trợ lý Marketing Agent OS. Hãy trả lời thân thiện bằng Tiếng Việt câu hỏi này của Sếp:\n"
+            f"\"{message.content}\"\n"
+        )
+        try:
+            logger.info("Generating casual chat response via Ollama...")
+            response_text = generate_text(prompt, system_prompt="Trả lời ngắn gọn, vui vẻ, lịch sự và chuyên nghiệp.")
+        except Exception:
+            response_text = "Dạ, em nghe đây ạ! Em là hệ điều hành Marketing Agent OS. Sếp cần em giúp gì hôm nay ạ? 💻"
+            
+        await cl.Message(content=response_text).send()
+        return
+
+    # 4. Detect if graph is paused at Approval Barrier (waiting_approval_barrier)
     current_state = graph.get_state(config)
     if current_state.next and current_state.next[0] == "waiting_approval_barrier":
         logger.info("Approval barrier detected! Rendering action buttons for CEO.")

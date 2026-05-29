@@ -22,11 +22,6 @@ POSTGRES_URL = os.getenv(
     "postgresql://postgres:secret_password@localhost:5432/marketing_agent_db"
 )
 
-# Persistent Mock SQLite Database path (to allow testing without Docker)
-MOCK_SQLITE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
-os.makedirs(MOCK_SQLITE_DIR, exist_ok=True)
-MOCK_SQLITE_URL = f"sqlite:///{os.path.join(MOCK_SQLITE_DIR, 'mock_database.db')}"
-
 engine = None
 SessionLocal = None
 IS_MOCK_DATABASE = False
@@ -43,8 +38,7 @@ with engine.connect() as conn:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 logger.info("Successfully connected to PostgreSQL database!")
-IS_MOCK_DATABASE = False
-    
+
 def get_db():
     """Dependency for acquiring database session."""
     db = SessionLocal()
@@ -54,5 +48,5 @@ def get_db():
         db.close()
 
 def is_mock():
-    """Helper to check if currently running on SQLite mock fallback."""
-    return IS_MOCK_DATABASE
+    """Helper to check if currently running on SQLite mock fallback. Always returns False."""
+    return False
