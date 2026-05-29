@@ -125,21 +125,38 @@ def publisher_node(state: AgencyState) -> dict:
     db: Session = SessionLocal()
     workspace_id = state.get("workspace_id")
     campaign_id = state.get("campaign_id")
+    product_id = state.get("product_id")
     variants = state.get("variants", [])
     master_data = state.get("master_content", {})
     
     try:
-        from core.models import Workspace
+        from core.models import Workspace, MarketingCampaign
         ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
         ws_id = ws.id if ws else uuid.UUID(str(workspace_id))
         
+        # Resolve campaign_id NOT NULL constraint
+        if not campaign_id:
+            # Create a default campaign dynamically
+            new_camp = MarketingCampaign(
+                workspace_id=ws_id,
+                product_id=uuid.UUID(str(product_id)) if product_id else None,
+                name=f"Chiến dịch tự động {uuid.uuid4().hex[:6]}",
+                status="active",
+                budget=2000000.0
+            )
+            db.add(new_camp)
+            db.commit()
+            db.refresh(new_camp)
+            campaign_id = str(new_camp.id)
+            logger.info(f"Dynamically created campaign ID {campaign_id} for NOT NULL constraint.")
+            
         # Save master content
         master = MasterContent(
             workspace_id=ws_id,
-            campaign_id=uuid.UUID(str(campaign_id)) if campaign_id else None,
+            campaign_id=uuid.UUID(str(campaign_id)),
             core_message=master_data.get("core_message", ""),
             approval_status="approved",
-            metadata=master_data
+            meta_data=master_data
         )
         db.add(master)
         db.commit()
@@ -153,7 +170,7 @@ def publisher_node(state: AgencyState) -> dict:
                 adapted_copy=v.get("adapted_copy", ""),
                 publish_status="scheduled", # Scheduled for publishing
                 content_type="text",
-                metadata=v
+                meta_data=v
             )
             db.add(pv)
         db.commit()

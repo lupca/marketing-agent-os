@@ -85,7 +85,7 @@ class Workspace(Base):
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
     name = Column(String(255), unique=True, nullable=False)
     owner_id = Column(UUID_TYPE, ForeignKey("users.id"))
-    members = Column(JSON_TYPE, default=list) # Stored as JSON array of UUID strings
+    members = Column(ARRAY_TYPE, default=list) # Stored as array of UUIDs
     settings = Column(JSON_TYPE, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -236,9 +236,9 @@ class MasterContent(Base):
     campaign_id = Column(UUID_TYPE, ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
     content_brief_id = Column(UUID_TYPE, ForeignKey("content_briefs.id", ondelete="SET NULL"), nullable=True)
     core_message = Column(Text)
-    primary_media_ids = Column(JSON_TYPE, default=list) # List of UUID strings
+    primary_media_ids = Column(ARRAY_TYPE, default=list) # List of UUIDs
     approval_status = Column(String(50), default="pending")
-    metadata = Column(JSON_TYPE, default=dict)
+    meta_data = Column("metadata", JSON_TYPE, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -262,13 +262,13 @@ class PlatformVariant(Base):
     master_content_id = Column(UUID_TYPE, ForeignKey("master_contents.id", ondelete="CASCADE"), nullable=False)
     platform = Column(String(50), nullable=False)
     adapted_copy = Column(Text)
-    platform_media_ids = Column(JSON_TYPE, default=list) # List of UUID strings
+    platform_media_ids = Column(ARRAY_TYPE, default=list) # List of UUIDs
     publish_status = Column(String(50), default="draft")
     content_type = Column(String(50))
     scheduled_at = Column(DateTime(timezone=True))
     published_at = Column(DateTime(timezone=True))
     platform_post_id = Column(String(255))
-    metadata = Column(JSON_TYPE, default=dict)
+    meta_data = Column("metadata", JSON_TYPE, default=dict)
     metric_views = Column(Integer, default=0)
     metric_likes = Column(Integer, default=0)
     metric_shares = Column(Integer, default=0)
@@ -352,16 +352,8 @@ class RAGKnowledgebase(Base):
     category = Column(String(50), nullable=False)
     source_name = Column(String(255))
     content = Column(Text, nullable=False)
-    metadata = Column(JSON_TYPE, default=dict)
+    meta_data = Column("metadata", JSON_TYPE, default=dict)
     embedding = Column(VECTOR_TYPE)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-# Initialize SQLite database file if fallback is active
-if IS_MOCK_DATABASE:
-    try:
-        from db.connection import engine as db_engine
-        Base.metadata.create_all(db_engine)
-        logger = logging.getLogger("db_models")
-        logger.info("Automatically synchronized schemas in Mock SQLite database!")
-    except Exception as e:
-        print(f"Error initializing Mock SQLite schemas: {e}")
+

@@ -138,7 +138,7 @@ def performance_node(state: AgencyState) -> dict:
                     metric_views=120,
                     metric_likes=5,
                     # We store metric_cpa or cost in metadata since SQL schema stores metrics views/likes
-                    metadata={"metric_cpa": 1400000.0} # Failing CPA
+                    meta_data={"metric_cpa": 1400000.0} # Failing CPA
                 )
                 db.add(failed_var)
                 db.commit()
@@ -151,7 +151,7 @@ def performance_node(state: AgencyState) -> dict:
     
     for v in variants:
         # Extract CPA from metadata
-        metrics = v.metadata or {}
+        metrics = v.meta_data or {}
         cpa = metrics.get("metric_cpa", 0.0)
         
         if cpa > 0:

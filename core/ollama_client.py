@@ -88,7 +88,4 @@ def rerank_documents(query: str, documents: list) -> list:
         return sorted(reranked_docs, key=lambda x: x["rerank_score"], reverse=True)
     except Exception as e:
         logger.error(f"Error in rerank_documents: {e}")
-        raiseower().split()
-            match_count = sum(1 for w in query_words if w in content_words)
-            doc["rerank_score"] = float(match_count) / max(len(query_words), 1)
-        return sorted(documents, key=lambda x: x["rerank_score"], reverse=True)
+        raise

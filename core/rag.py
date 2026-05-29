@@ -35,7 +35,7 @@ def store_knowledge(db: Session, workspace_id, category: str, source_name: str, 
         category=category,
         source_name=source_name,
         content=content,
-        metadata=metadata or {},
+        meta_data=metadata or {},
         embedding=vector
     )
     
@@ -77,7 +77,7 @@ def retrieve_knowledge(db: Session, workspace_id, query: str, categories: list =
                     "category": r.category,
                     "source_name": r.source_name,
                     "content": r.content,
-                    "metadata": r.metadata,
+                    "metadata": r.meta_data,
                     "score": 1.0  # Cosine distance doesn't map directly to 0-1 similarity but works for ranking
                 })
             return results
@@ -112,7 +112,7 @@ def retrieve_knowledge(db: Session, workspace_id, query: str, categories: list =
             "category": r.category,
             "source_name": r.source_name,
             "content": r.content,
-            "metadata": r.metadata,
+            "metadata": r.meta_data,
             "score": score
         })
     logger.info(f"Retrieved {len(results)} mock records.")
