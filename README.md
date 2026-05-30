@@ -98,10 +98,11 @@ ollama pull qllama/bge-reranker-large:latest
 ```
 
 ### Bước 4: Cài Đặt Thư Viện Python
-Cài đặt tất cả các thư viện cần thiết trong môi trường của bạn:
+Cài đặt tất cả các thư viện cần thiết trong môi trường của bạn (bao gồm thư viện `markitdown` để chuyển đổi các định dạng tài liệu phức tạp sang Markdown cấu trúc):
 ```bash
 pip install -r requirements.txt
 pip install pgvector json_repair
+pip install "markitdown[pdf,docx,pptx,xlsx]"
 ```
 
 ---
@@ -131,6 +132,15 @@ python3 tests/test_workflow.py
 *   Nếu copywriter viết chưa hay, Brand Guardian tự từ chối (<80đ) và kích hoạt vòng lặp tối ưu lại.
 *   Dừng chờ duyệt thành công tại nút thắt CMO Approval.
 *   Sau khi resume, ghi nhận lưu trữ kịch bản thành công vào PostgreSQL.
+
+### 4. Kiểm tra trích xuất MarkItDown & Chống trùng lặp:
+```bash
+# Chạy trong container Docker hoặc môi trường máy chủ
+python3 -m unittest tests/test_markitdown.py
+```
+*Kỳ vọng:*
+*   Trích xuất bảng dữ liệu Excel (.xlsx) thành cấu trúc bảng Markdown có định dạng đẹp mắt.
+*   Nhận diện trùng lặp mã băm SHA-256 chính xác khi tải lên cùng một file nội dung 2 lần, chặn thành công lần tải thứ 2.
 
 ---
 

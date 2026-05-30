@@ -66,7 +66,7 @@ reaction_on_message_received = false
     # 3. For specific file extensions:
     #    accept = { "application/octet-stream" = [".xyz", ".pdb"] }
     # Note: Using "*/*" is not recommended as it may cause browser warnings
-    accept = ["*/*"]
+    accept = { "application/pdf" = [".pdf"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document" = [".docx"], "application/vnd.openxmlformats-officedocument.presentationml.presentation" = [".pptx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" = [".xlsx"], "application/vnd.ms-excel" = [".xls"], "text/plain" = [".txt"], "text/csv" = [".csv"], "application/octet-stream" = [".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".csv"] }
     max_files = 20
     max_size_mb = 500
 

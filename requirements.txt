@@ -21,3 +21,5 @@ langchain-ollama
 psycopg-pool
 langgraph-checkpoint-postgres
 asyncpg
+markitdown[pdf,docx,pptx,xlsx]
+

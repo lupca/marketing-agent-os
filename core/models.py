@@ -312,6 +312,7 @@ class RAGDocument(Base):
     sync_status     = Column(String(50), nullable=False, default="synced")
     chunk_count     = Column(Integer, nullable=False, default=0)
     file_size_bytes = Column("file_size_bytes", Integer, nullable=False, default=0)
+    file_hash       = Column(String(64), nullable=True)
     is_deleted      = Column(Boolean, nullable=False, default=False)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -309,12 +309,17 @@ CREATE TABLE IF NOT EXISTS rag_documents (
     sync_status      VARCHAR(50) NOT NULL DEFAULT 'synced',     -- 'synced'|'syncing'|'failed'
     chunk_count      INT NOT NULL DEFAULT 0,
     file_size_bytes  BIGINT NOT NULL DEFAULT 0,
+    file_hash        VARCHAR(64),
     is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_rag_documents_workspace_active
     ON rag_documents (workspace_id, created_at DESC) WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_rag_documents_workspace_hash
+    ON rag_documents (workspace_id, file_hash) WHERE is_deleted = FALSE;
+
 
 -- 21b. Table: rag_chunks (Child — Vector Store, Phi chuẩn hóa Zero-JOIN)
 CREATE TABLE IF NOT EXISTS rag_chunks (

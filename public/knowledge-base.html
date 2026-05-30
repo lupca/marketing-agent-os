@@ -216,6 +216,75 @@
     .dz-upload-text { font-size: 15px; font-weight: 500; color: var(--text-primary); }
     .dz-upload-hint { font-size: 12px; color: var(--text-muted); }
     .dz-custom .dz-message { margin: 0; }
+    #upload-dropzone .dz-preview {
+      display: none !important;
+    }
+
+    /* ---- CUSTOM FILE QUEUE LIST ---- */
+    .file-queue-container {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      animation: slideIn 0.2s ease;
+    }
+    .queue-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .file-queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: var(--transition);
+    }
+    .queue-item:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+    .queue-item-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .queue-item-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .queue-item-size {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .btn-remove-queue {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+    .btn-remove-queue:hover {
+      color: var(--red);
+      background: rgba(239, 68, 68, 0.1);
+    }
 
     /* ---- TAG SELECTOR ---- */
     .tag-area { margin-top: 20px; }
@@ -695,9 +764,15 @@
       <div class="dz-message" data-dz-message>
         <div class="dz-upload-icon">📁</div>
         <div class="dz-upload-text">Kéo thả file vào đây hoặc <span style="color:var(--accent)">click để chọn</span></div>
-        <div class="dz-upload-hint">Hỗ trợ: PDF, TXT, DOCX, XLSX • Tối đa 50MB/file</div>
+        <div class="dz-upload-hint">Hỗ trợ: PDF, TXT, DOCX, XLSX, PPTX, CSV • Tối đa 50MB/file</div>
       </div>
     </form>
+
+    <!-- Custom File Queue List -->
+    <div id="file-queue-container" class="file-queue-container" style="display: none;">
+      <div class="queue-title">📋 Danh sách file chờ upload:</div>
+      <div id="file-queue-list" class="file-queue-list"></div>
+    </div>
 
     <!-- Tag selector -->
     <div class="tag-area">
@@ -805,14 +880,14 @@
 
 </main>
 
-<!-- ===== MODAL: SỬA TAGS ===== -->
+<!-- ===== MODAL: SỬA TÀI LIỆU ===== -->
 <div class="modal-overlay" id="modal-edit-tags">
   <div class="modal">
-    <div class="modal-title">🏷️ Cập nhật Access Tags</div>
+    <div class="modal-title">✏️ Cập nhật thông tin tài liệu</div>
     <input type="hidden" id="modal-doc-id" />
     <div class="input-group">
       <label>Tên tài liệu</label>
-      <input type="text" id="modal-doc-name" disabled />
+      <input type="text" id="modal-doc-name" />
     </div>
     <div class="input-group">
       <label>Chọn tags mới</label>
@@ -842,6 +917,7 @@ let totalDocs = 0;
 const PAGE_SIZE = 20;
 const WORKSPACE_ID = null; // null = auto-detect (first workspace)
 let pollIntervals = {};
+let loadedDocuments = [];
 
 /* ============================================================
    UTILS
@@ -985,23 +1061,19 @@ const dz = new Dropzone("#upload-dropzone", {
   url: "/api/rag/upload",
   paramName: "file",
   maxFilesize: 50,
-  acceptedFiles: ".pdf,.txt,.docx,.xlsx",
+  acceptedFiles: ".pdf,.txt,.docx,.xlsx,.pptx,.csv",
   addRemoveLinks: true,
   dictDefaultMessage: "",
   autoProcessQueue: false,
-  parallelUploads: 1,
+  parallelUploads: 5,
 
   init: function () {
     this.on("addedfile", (file) => {
-      document.getElementById("upload-status-hint").textContent = `📄 ${file.name} (${formatBytes(file.size)}) — Nhấn Upload để bắt đầu`;
+      renderFileQueue();
     });
 
     this.on("removedfile", (file) => {
-      if (this.files.length === 0) {
-        document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
-      } else {
-        document.getElementById("upload-status-hint").textContent = `📄 ${this.files[0].name} (${formatBytes(this.files[0].size)}) — Nhấn Upload để bắt đầu`;
-      }
+      renderFileQueue();
     });
 
     this.on("sending", (file, xhr, formData) => {
@@ -1012,10 +1084,15 @@ const dz = new Dropzone("#upload-dropzone", {
     this.on("success", (file, response) => {
       toast(`✅ "${file.name}" đã được nhận! Celery đang băm vector ngầm...`, "success", 5000);
       this.removeFile(file);
-      document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
       // Poll status của document vừa upload
       if (response.document_id) startPollingDocument(response.document_id);
-      setTimeout(loadDocuments, 1500);
+      // Tiếp tục xử lý file tiếp theo trong queue (fix multi-file upload)
+      if (this.getQueuedFiles().length > 0) {
+        this.processQueue();
+      } else {
+        renderFileQueue();
+        setTimeout(loadDocuments, 1500);
+      }
     });
 
     this.on("error", (file, errorMsg) => {
@@ -1034,6 +1111,47 @@ uploadBtn.onclick = () => dz.processQueue();
 uploadActions.prepend(uploadBtn);
 
 /* ============================================================
+   CUSTOM QUEUE RENDERING
+============================================================ */
+function renderFileQueue() {
+  const container = document.getElementById("file-queue-container");
+  const listEl = document.getElementById("file-queue-list");
+  const files = dz.files;
+
+  if (files.length === 0) {
+    container.style.display = "none";
+    listEl.innerHTML = "";
+    document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
+    return;
+  }
+
+  container.style.display = "block";
+  listEl.innerHTML = files.map((file, idx) => {
+    return `
+      <div class="queue-item" data-index="${idx}">
+        <div class="queue-item-info">
+          <span style="font-size:16px">📄</span>
+          <div>
+            <div class="queue-item-name">${file.name}</div>
+            <div class="queue-item-size">${formatBytes(file.size)}</div>
+          </div>
+        </div>
+        <button class="btn-remove-queue" onclick="removeFileFromQueue(${idx})" title="Xóa file khỏi hàng đợi">🗑️</button>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("upload-status-hint").textContent = `📋 Có ${files.length} file sẵn sàng — Nhấn Upload để bắt đầu`;
+}
+
+window.removeFileFromQueue = function(index) {
+  const file = dz.files[index];
+  if (file) {
+    dz.removeFile(file);
+  }
+};
+
+/* ============================================================
    DOCUMENTS TABLE
 ============================================================ */
 async function loadDocuments(page = 1) {
@@ -1047,6 +1165,7 @@ async function loadDocuments(page = 1) {
 
     totalDocs = data.total || 0;
     const docs = data.documents || [];
+    loadedDocuments = docs;
 
     // Update stats
     let readyCount = 0, procCount = 0, totalChunks = 0;
@@ -1097,8 +1216,8 @@ function renderTable(docs) {
       <td>${formatDate(d.created_at)}</td>
       <td>
         <div class="actions">
-          <button class="btn btn-edit" onclick="openEditTags('${d.document_id}', '${d.file_name}', ${JSON.stringify(d.access_tags)})">✏️ Sửa</button>
-          <button class="btn btn-danger" onclick="deleteDocument('${d.document_id}', '${d.file_name}')">🗑️ Xóa</button>
+          <button class="btn btn-edit" onclick="openEditTagsClick('${d.document_id}')">✏️ Sửa</button>
+          <button class="btn btn-danger" onclick="deleteDocument('${d.document_id}', '${d.file_name.replace(/'/g, "\\'")}')">🗑️ Xóa</button>
         </div>
       </td>
     </tr>`;
@@ -1155,20 +1274,32 @@ function openEditTags(docId, fileName, currentTags) {
   document.getElementById("modal-edit-tags").classList.add("open");
 }
 
+function openEditTagsClick(docId) {
+  const doc = loadedDocuments.find(d => d.document_id === docId);
+  if (doc) {
+    openEditTags(doc.document_id, doc.file_name, doc.access_tags);
+  }
+}
+
 function closeModal() {
   document.getElementById("modal-edit-tags").classList.remove("open");
 }
 
 async function saveDocumentTags() {
   const docId = document.getElementById("modal-doc-id").value;
+  const fileName = document.getElementById("modal-doc-name").value.trim();
+  if (!fileName) {
+    toast("❌ Tên tài liệu không được để trống!", "error");
+    return;
+  }
   try {
-    const res = await fetch(`/api/rag/documents/${docId}/tags`, {
+    const res = await fetch(`/api/rag/documents/${docId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ access_tags: modalSelectedTags })
+      body: JSON.stringify({ file_name: fileName, access_tags: modalSelectedTags })
     });
     if (!res.ok) { const e = await res.json(); toast(`❌ ${e.detail}`, "error"); return; }
-    toast("🔄 Đã gửi yêu cầu cập nhật tags. Celery đang đồng bộ ngầm...", "info");
+    toast("🔄 Đã lưu thay đổi. Celery đang đồng bộ ngầm...", "info");
     closeModal();
     setTimeout(() => { loadDocuments(currentPage); }, 1000);
     const statusEl = document.getElementById(`status-${docId}`);

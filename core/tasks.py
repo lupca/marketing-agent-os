@@ -15,7 +15,7 @@ from sqlalchemy import text
 from core.celery_app import celery_app
 from db.connection import SessionLocal
 from core.ollama_client import get_embedding
-from core.parser import extract_text_from_file, semantic_chunk_text
+from core.parser import extract_text_from_file, semantic_chunk_text, UniversalParser
 from core.storage import download_file_from_minio
 
 logger = logging.getLogger("core_tasks")
@@ -54,13 +54,14 @@ def ingest_document(self, document_id: str, file_key: str, workspace_id: str, ac
         download_file_from_minio(file_key, tmp_path)
         logger.info(f"[ingest_document] Downloaded to {tmp_path}")
 
-        # ---- Bước 2: Extract text ----
-        raw_text = extract_text_from_file(tmp_path)
-        if not raw_text or len(raw_text.strip()) < 10:
-            raise ValueError(f"File rỗng hoặc không extract được text: {file_key}")
+        # ---- Bước 2: Extract text (Sử dụng UniversalParser tích hợp MarkItDown) ----
+        parser = UniversalParser()
+        raw_markdown = parser.extract_markdown(tmp_path)
+        if not raw_markdown or len(raw_markdown.strip()) < 10:
+            raise ValueError(f"File rỗng hoặc không trích xuất được Markdown: {file_key}")
 
-        # ---- Bước 3: Semantic chunking ----
-        chunks = semantic_chunk_text(raw_text)
+        # ---- Bước 3: Semantic chunking (Chiến lược chunking 2 bước) ----
+        chunks = parser.chunk_markdown(raw_markdown)
         if not chunks:
             raise ValueError(f"Không tạo được chunk nào từ file: {file_key}")
         logger.info(f"[ingest_document] Created {len(chunks)} chunks")
@@ -71,7 +72,9 @@ def ingest_document(self, document_id: str, file_key: str, workspace_id: str, ac
         access_tags_jsonb = json.dumps(access_tags, ensure_ascii=False)
 
         inserted = 0
-        for idx, chunk_content in enumerate(chunks):
+        for idx, chunk in enumerate(chunks):
+            # Lấy page_content nếu là đối tượng LangChain Document, hoặc giữ nguyên chuỗi
+            chunk_content = chunk.page_content if hasattr(chunk, "page_content") else chunk
             if not chunk_content or len(chunk_content.strip()) < 5:
                 continue
 

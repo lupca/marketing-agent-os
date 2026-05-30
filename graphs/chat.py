@@ -6,7 +6,9 @@ Trả lời thân thiện, hướng dẫn user sử dụng hệ thống khi cầ
 import logging
 import uuid
 from langchain_core.messages import AIMessage
+from db.connection import SessionLocal
 from core.db_services import get_brand_context, get_product_context
+from core.rag import retrieve_chunks_reranked
 from core.ollama_client import generate_text
 from core.decision_logger import log_decision
 from graphs.state import AgencyState
@@ -36,17 +38,39 @@ def chat_node(state: AgencyState) -> dict:
     brand_info = f"Tên thương hiệu: {brand['brand_name']} | Định hướng/Slogan: {brand['slogan']}"
     product_info = f"Tên sản phẩm: {product['name']} | Mô tả: {product['description']} | USP: {product['usp']}"
 
-    # 2. Design the dynamic Chat System Prompt
+    # 2. Fetch context from RAG Knowledge Base
+    db = SessionLocal()
+    rag_context = ""
+    try:
+        rag_results = retrieve_chunks_reranked(
+            db=db,
+            workspace_id=str(ws_id),
+            query=query,
+            access_tags=["marketing", "economics", "psychology", "policies", "manager_feedback", "digital_marketing", "facebook_ads", "planning", "hubspot", "global"],
+            limit=3
+        )
+        if rag_results:
+            rag_context = "## Kiến thức tra cứu được từ Kho Tài Liệu (RAG):\n"
+            for idx, item in enumerate(rag_results):
+                rag_context += f"{idx + 1}. {item.get('content', '')}\n"
+    except Exception as e:
+        logger.error(f"Error fetching RAG context for chat: {e}")
+    finally:
+        db.close()
+
+    # 3. Design the dynamic Chat System Prompt
     chat_system_prompt = (
         f"Bạn là trợ lý AI của Marketing Agent OS — một hệ thống quản lý marketing thông minh.\n\n"
         f"## Ngữ cảnh Doanh nghiệp hiện tại:\n"
         f"- **Thương hiệu hiện tại:** {brand_info}\n"
         f"- **Sản phẩm hiện tại:** {product_info}\n\n"
+        f"{rag_context}\n"
         f"## Tính cách:\n"
         f"- Thân thiện, chuyên nghiệp, ngắn gọn.\n"
         f"- Luôn sẵn sàng giúp đỡ và hướng dẫn người dùng.\n\n"
         f"## Khi người dùng hỏi về Thương hiệu hiện tại hoặc Sản phẩm hiện tại:\n"
         f"- Hãy trả lời chính xác dựa trên thông tin Ngữ cảnh Doanh nghiệp được cung cấp ở trên (ví dụ: thương hiệu hiện tại là 'G-Agent Tech', sản phẩm là 'Marketing Agent OS Software'). Tuyệt đối không bịa đặt hoặc trả lời mơ hồ, không dùng các placeholder như [tên thương hiệu].\n\n"
+        f"## Nếu người dùng hỏi câu hỏi kiến thức, hãy ưu tiên sử dụng 'Kiến thức tra cứu được từ Kho Tài Liệu (RAG)' ở trên để trả lời.\n\n"
         f"## Khi người dùng chào hỏi hoặc hỏi tổng quát:\n"
         f"- Chào lại và giới thiệu ngắn gọn bạn có thể làm gì.\n\n"
         f"## Các tính năng bạn có thể hướng dẫn:\n"
@@ -68,7 +92,7 @@ def chat_node(state: AgencyState) -> dict:
             action="Chat Response",
             decision_status="success",
             reason=f"Trả lời hội thoại thông thường: '{query[:80]}...' " if len(query) > 80 else f"Trả lời hội thoại thông thường: '{query}'",
-            metadata={"query": query, "brand": brand_info, "product": product_info}
+            metadata={"query": query, "brand": brand_info, "product": product_info, "rag_hit": bool(rag_context)}
         )
 
         return {

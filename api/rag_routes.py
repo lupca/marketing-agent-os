@@ -63,6 +63,10 @@ class CreateTagRequest(BaseModel):
 class UpdateTagsRequest(BaseModel):
     access_tags: List[str]
 
+class UpdateDocumentRequest(BaseModel):
+    file_name: str
+    access_tags: List[str]
+
 class TestRetrievalRequest(BaseModel):
     workspace_id: str
     query: str
@@ -189,7 +193,7 @@ async def upload_document(
     # Validate file type
     filename = file.filename or "unknown"
     ext = os.path.splitext(filename)[-1].lower()
-    allowed_exts = {".pdf", ".txt", ".docx", ".xlsx"}
+    allowed_exts = {".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".csv"}
     if ext not in allowed_exts:
         raise HTTPException(
             status_code=400,
@@ -199,11 +203,35 @@ async def upload_document(
     # Validate tags exist in master
     _validate_tags_exist(db, ws_id, tags)
 
+    content = await file.read()
+    file_size = len(content)
+
+    # Tính mã băm SHA-256 chống trùng lặp tài liệu trong Workspace
+    import hashlib
+    hasher = hashlib.sha256()
+    hasher.update(content)
+    file_hash = hasher.hexdigest()
+
+    duplicate = db.execute(
+        text("""
+            SELECT document_id FROM rag_documents 
+            WHERE workspace_id = CAST(:workspace_id AS uuid) 
+              AND file_hash = :file_hash 
+              AND is_deleted = FALSE 
+            LIMIT 1
+        """),
+        {"workspace_id": str(ws_id), "file_hash": file_hash}
+    ).fetchone()
+
+    if duplicate:
+        raise HTTPException(
+            status_code=409,
+            detail="Tài liệu này đã tồn tại trong Knowledge Base. Bỏ qua quá trình xử lý để tiết kiệm tài nguyên."
+        )
+
     # Save file tạm → upload MinIO
     tmp_dir = tempfile.mkdtemp()
     tmp_path = os.path.join(tmp_dir, filename)
-    content = await file.read()
-    file_size = len(content)
 
     with open(tmp_path, "wb") as f:
         f.write(content)
@@ -230,6 +258,7 @@ async def upload_document(
             file_key=object_key,
             access_tags=tags,
             file_size_bytes=file_size,
+            file_hash=file_hash,
         )
     except Exception as e:
         logger.error(f"[upload_document] store_document failed: {e}")
@@ -367,6 +396,49 @@ async def update_document_tags(
         {
             "message":     "Đang cập nhật tags ngầm. Poll /status để kiểm tra tiến độ.",
             "document_id": document_id,
+            "new_tags":    payload.access_tags,
+            "sync_status": "syncing",
+        },
+        status_code=202,
+    )
+
+
+# ============================================================
+# PUT /api/rag/documents/{id} — Cập nhật file_name và access_tags
+# ============================================================
+@rag_router.put("/api/rag/documents/{document_id}", status_code=202)
+async def update_document(
+    document_id: str,
+    payload: UpdateDocumentRequest,
+    db: Session = Depends(get_db)
+):
+    # Kiểm tra document tồn tại
+    row = db.execute(
+        text("SELECT workspace_id FROM rag_documents WHERE document_id = CAST(:id AS UUID) AND is_deleted = FALSE"),
+        {"id": document_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Document không tồn tại: {document_id}")
+
+    ws_id = str(row.workspace_id)
+    _validate_tags_exist(db, ws_id, payload.access_tags)
+
+    # Cập nhật file_name trực tiếp
+    db.execute(
+        text("UPDATE rag_documents SET file_name = :file_name, sync_status = 'syncing', updated_at = NOW() WHERE document_id = CAST(:id AS UUID)"),
+        {"file_name": payload.file_name, "id": document_id}
+    )
+    db.commit()
+
+    # Kick off Celery cascade task
+    cascade_update_tags.delay(document_id=document_id, new_tags=payload.access_tags)
+
+    logger.info(f"[update_document] document_id={document_id}, file_name={payload.file_name}, new_tags={payload.access_tags}")
+    return JSONResponse(
+        {
+            "message":     "Đang cập nhật tài liệu ngầm. Poll /status để kiểm tra tiến độ.",
+            "document_id": document_id,
+            "file_name":   payload.file_name,
             "new_tags":    payload.access_tags,
             "sync_status": "syncing",
         },
