@@ -14,6 +14,9 @@ from reference.prompt.prompts import (
     PLATFORM_VARIANT_GENERATOR_PROMPT,
     EDITOR_BRAND_GUARDIAN_PROMPT
 )
+from core.decision_logger import log_decision
+from core.ollama_client import get_trimmed_context
+from langchain_core.messages import AIMessage
 
 logger = logging.getLogger("graphs_creative")
 logging.basicConfig(level=logging.INFO)
@@ -117,9 +120,33 @@ def strategist_node(state: AgencyState) -> dict:
         
     logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
     
+    # Perform token trimming to keep context within 14000 tokens
+    raw_messages = state.get("messages", [])
+    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
+    
+    # Log strategist decision
+    log_decision(
+        workspace_id=workspace_id,
+        campaign_id=state.get("campaign_id"),
+        agent_name="Strategist Agent",
+        action="Formulate Marketing Angle",
+        decision_status="success",
+        reason=f"Đề xuất góc tiếp cận sáng tạo thành công: '{angle_data.get('angle_name')}' ({angle_data.get('psychological_angle')}). Định hướng: {angle_data.get('brief')}",
+        metadata=angle_data
+    )
+    
+    strat_msg = (
+        f"🧠 **[Phòng Sáng Tạo - Strategist]**\n"
+        f"- Đã nghiên cứu RAG và tự động dán RAG bài học thất bại.\n"
+        f"- **Angle đề xuất:** `{angle_data.get('angle_name')}`\n"
+        f"- **Nỗi đau đánh trúng:** \"{angle_data.get('pain_point_focus')}\"\n"
+        f"- **Tập trung:** {angle_data.get('psychological_angle')}"
+    )
+    
     return {
         "current_angle": angle_data,
-        "sop_stage": "creative_generation"
+        "sop_stage": "creative_generation",
+        "messages": [AIMessage(content=strat_msg)]
     }
 
 def copywriter_node(state: AgencyState) -> dict:
@@ -237,10 +264,34 @@ def copywriter_node(state: AgencyState) -> dict:
 
     fb_variant["platform"] = "facebook"
     
+    # Perform token trimming to keep context within 14000 tokens
+    raw_messages = state.get("messages", [])
+    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
+    
+    # Log copywriter decision
+    log_decision(
+        workspace_id=state.get("workspace_id"),
+        campaign_id=state.get("campaign_id"),
+        agent_name="Copywriter Agent",
+        action="Generate Social Script",
+        decision_status="success",
+        reason=f"Đã xây dựng xong kịch bản Facebook Ads thích ứng theo mục tiêu Target CPA {target_cpa:,.0f} VNĐ. Phản hồi feedback cũ được giải quyết.",
+        metadata={"hashtags": fb_variant.get("hashtags", []), "char_count": len(fb_variant.get("adapted_copy", ""))}
+    )
+    
+    copy_msg = (
+        f"✍️ **[Phòng Sáng Tạo - Copywriter]**\n"
+        f"- Đã xào nấu và tối ưu hóa kịch bản theo target CPA.\n"
+        f"- **Nội dung nháp Facebook:**\n\n"
+        f"```text\n{fb_variant.get('adapted_copy')}\n```\n"
+        f"- **Tags:** {', '.join(fb_variant.get('hashtags', []))}"
+    )
+    
     return {
         "master_content": master_content,
         "variants": [fb_variant],
-        "sop_stage": "creative_generation"
+        "sop_stage": "creative_generation",
+        "messages": [AIMessage(content=copy_msg)]
     }
 
 def brand_guardian_node(state: AgencyState) -> dict:
@@ -292,16 +343,36 @@ def brand_guardian_node(state: AgencyState) -> dict:
     log_entry = f"Lượt đánh giá {len(feedback_log)+1} - Điểm: {score}/100 - Lý do: {reason}"
     new_logs = feedback_log + [log_entry]
     
+    # Perform token trimming to keep context within 14000 tokens
+    raw_messages = state.get("messages", [])
+    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
+    
+    # Log Brand Guardian compliance check decision
+    status_str = "success" if score >= 80 else "failed"
+    log_decision(
+        workspace_id=state.get("workspace_id"),
+        campaign_id=state.get("campaign_id"),
+        agent_name="Brand Guardian Agent",
+        action="Evaluate Copy Compliance",
+        decision_status=status_str,
+        reason=f"Chấm điểm bài viết quảng cáo đạt {score}/100 điểm. Kết quả: {'VƯỢT QUA' if score >= 80 else 'TỪ CHỐI (CẦN SỬA LẠI)'}. Feedback: {reason}",
+        metadata={"score": score, "feedback": reason}
+    )
+    
+    guardian_msg = f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{log_entry}`"
+    
     # Conditional branching threshold check
     if score >= 80:
         logger.info("Score >= 80! Creative output successfully PASSED. Preparing for CEO Interrupt (waiting_approval)...")
         return {
             "feedback_log": new_logs,
-            "sop_stage": "waiting_approval"
+            "sop_stage": "waiting_approval",
+            "messages": [AIMessage(content=guardian_msg)]
         }
     else:
         logger.warning(f"Score {score} < 80. REJECTED by Brand Guardian! Triggering rewrite loop...")
         return {
             "feedback_log": new_logs,
-            "sop_stage": "creative_generation"
+            "sop_stage": "creative_generation",
+            "messages": [AIMessage(content=guardian_msg)]
         }

@@ -313,4 +313,18 @@ class IntentRoutingKnowledge(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+# 22. Model: AgentDecision
+class AgentDecision(Base):
+    __tablename__ = "agent_decisions"
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    campaign_id = Column(UUID_TYPE, ForeignKey("marketing_campaigns.id", ondelete="SET NULL"), nullable=True)
+    agent_name = Column(String(255), nullable=False)
+    action = Column(String(255), nullable=False)
+    decision_status = Column(String(50), nullable=False)
+    reason = Column(Text, nullable=False)
+    meta_data = Column("metadata", JSON_TYPE, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 

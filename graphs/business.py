@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from db.connection import SessionLocal
 from core.models import ProductService, PlatformVariant, MarketingCampaign
 from graphs.state import AgencyState
+from core.decision_logger import log_decision
+from langchain_core.messages import AIMessage
 
 logger = logging.getLogger("graphs_business")
 logging.basicConfig(level=logging.INFO)
@@ -73,11 +75,29 @@ def analyst_node(state: AgencyState) -> dict:
 
     logger.info(f"CPA Anchor Set! Target CPA: {target_cpa} VNĐ, Ngân sách Test: {test_budget} VNĐ")
     
-    # Return updated state
+    # Log analyst decisions
+    log_decision(
+        workspace_id=workspace_id,
+        campaign_id=campaign_id,
+        agent_name="Analyst Agent",
+        action="Calculate CPA Anchor",
+        decision_status="success",
+        reason=f"Đã xác định các chỉ tiêu kinh tế sống còn cho chiến dịch: Target CPA = {target_cpa:,.0f} VNĐ (30% biên lợi nhuận), Ngân sách chạy thử = {test_budget:,.0f} VNĐ.",
+        metadata={"target_cpa": target_cpa, "test_budget": test_budget}
+    )
+    
+    # Return updated state with visual message persisted
+    analyst_msg = (
+        f"🎯 **[Phòng Kinh Doanh - Analyst]**\n"
+        f"- Đã tính toán xong Điểm Neo kinh tế sống còn.\n"
+        f"- **CPA Target:** `{target_cpa:,.0f} VNĐ` / đơn hàng.\n"
+        f"- **Ngân sách Test tối đa:** `{test_budget:,.0f} VNĐ`."
+    )
     return {
         "target_cpa": target_cpa,
         "test_budget": test_budget,
-        "sop_stage": "cpa_calculation"
+        "sop_stage": "cpa_calculation",
+        "messages": [AIMessage(content=analyst_msg)]
     }
 
 def performance_node(state: AgencyState) -> dict:
@@ -161,6 +181,17 @@ def performance_node(state: AgencyState) -> dict:
                 db.add(v)
                 logger.warning(f"KILLED: Variant {v.id} on {v.platform} has CPA {cpa} > Target {target_cpa}")
                 
+                # Log performance agent decision to kill
+                log_decision(
+                    workspace_id=workspace_id,
+                    campaign_id=state.get("campaign_id"),
+                    agent_name="Performance Agent",
+                    action="Kill Variant",
+                    decision_status="killed",
+                    reason=f"Đã khai tử kịch bản quảng cáo {v.id} trên kênh {v.platform} do chi phí CPA thực tế đạt {cpa:,.0f} VNĐ, vượt quá ngưỡng CPA mục tiêu {target_cpa:,.0f} VNĐ.",
+                    metadata={"variant_id": str(v.id), "failed_cpa": cpa, "target_cpa": target_cpa, "copy": v.adapted_copy}
+                )
+                
                 # Record feedback payload (Inter-department SOP)
                 killed_feedback.append({
                     "variant_id": str(v.id),
@@ -176,10 +207,33 @@ def performance_node(state: AgencyState) -> dict:
                 db.add(v)
                 logger.info(f"SCALED: Variant {v.id} on {v.platform} has CPA {cpa} <= Target {target_cpa}")
                 
+                # Log performance agent decision to scale
+                log_decision(
+                    workspace_id=workspace_id,
+                    campaign_id=state.get("campaign_id"),
+                    agent_name="Performance Agent",
+                    action="Scale Variant",
+                    decision_status="scaled",
+                    reason=f"Đã tăng 20% ngân sách phân phối cho kịch bản {v.id} trên kênh {v.platform} do hoạt động hiệu quả, CPA thực tế đạt {cpa:,.0f} VNĐ thấp hơn CPA mục tiêu {target_cpa:,.0f} VNĐ.",
+                    metadata={"variant_id": str(v.id), "metric_cpa": cpa, "target_cpa": target_cpa}
+                )
+                
     db.commit()
     db.close()
     
+    # Return updated state with visual message persisted
+    if killed_feedback:
+        perf_msg = (
+            f"🚨 **[Phòng Kinh Doanh - Performance]**\n"
+            f"- Phát hiện `{len(killed_feedback)} kịch bản` vượt ngưỡng CPA!\n"
+            f"- variant_id: `{killed_feedback[0].get('variant_id')}` bị TẮT (Killed) do CPA đạt `{killed_feedback[0].get('failed_cpa'):,.0f} VNĐ` > Target `{target_cpa:,.0f} VNĐ`.\n"
+            f"👉 **Giao thức cãi nhau:** Gửi phản hồi nóng bắt Ban Sáng Tạo đổi Angle viết lại!"
+        )
+    else:
+        perf_msg = "📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn."
+
     return {
         "killed_variants_feedback": killed_feedback,
-        "sop_stage": "cpa_calculation"
+        "sop_stage": "cpa_calculation",
+        "messages": [AIMessage(content=perf_msg)]
     }

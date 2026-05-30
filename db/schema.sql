@@ -313,3 +313,17 @@ CREATE TABLE intent_routing_knowledge (
 -- Index tối ưu tốc độ tìm kiếm Semantic Router (dưới 10ms)
 CREATE INDEX IF NOT EXISTS idx_intent_routing_embedding
 ON intent_routing_knowledge USING hnsw (embedding vector_cosine_ops);
+
+-- 22. Table: agent_decisions (Decision Audit Log)
+CREATE TABLE IF NOT EXISTS agent_decisions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    campaign_id UUID REFERENCES marketing_campaigns(id) ON DELETE SET NULL,
+    agent_name VARCHAR(255) NOT NULL,
+    action VARCHAR(255) NOT NULL,
+    decision_status VARCHAR(50) NOT NULL,
+    reason TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+

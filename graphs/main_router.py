@@ -9,6 +9,7 @@ from core.ollama_client import generate_text, get_embedding
 from graphs.researcher import researcher_node
 from db.connection import SessionLocal
 from core.models import IntentRoutingKnowledge
+from core.decision_logger import log_decision
 
 logger = logging.getLogger("graphs_main_router")
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +66,17 @@ def triage_node(state: AgencyState) -> dict:
         
     # Assign active UI channel based on intent
     channel = "#phong-sang-tao" if intent == "research" else "#phong-kinh-doanh"
+    
+    # Log triage routing decision
+    ws_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+    log_decision(
+        workspace_id=ws_id,
+        agent_name="Triage Node",
+        action="Route Intent",
+        decision_status="success",
+        reason=f"Phân loại tin nhắn thành intent '{intent}'. Kênh điều hướng: {channel}",
+        metadata={"intent": intent, "query": query}
+    )
     
     return {
         "sop_stage": "triage",
@@ -177,6 +189,17 @@ def publisher_node(state: AgencyState) -> dict:
             db.add(pv)
         db.commit()
         logger.info("Successfully persisted published campaign contents in database!")
+        
+        # Log publisher decision
+        log_decision(
+            workspace_id=ws_id,
+            campaign_id=campaign_id,
+            agent_name="Publisher Node",
+            action="Approve & Publish",
+            decision_status="success",
+            reason=f"Duyệt và xuất bản thành công kịch bản. Lên lịch đăng {len(variants)} kịch bản chuyển đổi lên mạng xã hội.",
+            metadata={"variants_count": len(variants), "master_content": master_data.get("core_message", "")}
+        )
     except Exception as e:
         logger.error(f"Error saving published contents: {e}")
     finally:
@@ -236,12 +259,81 @@ builder.add_edge("publisher", END)
 builder.add_edge("performance", END)
 
 # Compile Graph with Interrupt before Sếp review barrier
-# Postgres checkpointer is typically used, but Sqlite/Memory is fine for thread context.
-# We interrupt exactly before the 'waiting_approval_barrier' node executes!
-from langgraph.checkpoint.memory import MemorySaver
-memory_checkpointer = MemorySaver()
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from db.connection import POSTGRES_URL
+
+class LazyPostgresSaver(BaseCheckpointSaver):
+    def __init__(self, pool):
+        super().__init__()
+        self.pool = pool
+        self._saver = None
+
+    @property
+    def saver(self):
+        if self._saver is None:
+            self._saver = AsyncPostgresSaver(self.pool)
+        return self._saver
+
+    def get_tuple(self, config):
+        return self.saver.get_tuple(config)
+
+    def put(self, config, checkpoint, metadata, new_versions):
+        return self.saver.put(config, checkpoint, metadata, new_versions)
+
+    def put_writes(self, config, writes, task_id):
+        return self.saver.put_writes(config, writes, task_id)
+
+    def list(self, config, *, before=None, limit=None):
+        return self.saver.list(config, before=before, limit=limit)
+
+    async def aget_tuple(self, config):
+        return await self.saver.aget_tuple(config)
+
+    async def aput(self, config, checkpoint, metadata, new_versions):
+        return await self.saver.aput(config, checkpoint, metadata, new_versions)
+
+    async def aput_writes(self, config, writes, task_id):
+        return await self.saver.aput_writes(config, writes, task_id)
+
+    async def alist(self, config, *, before=None, limit=None):
+        return await self.saver.alist(config, before=before, limit=limit)
+        
+    async def setup(self):
+        await self.saver.setup()
+
+    def get_next_version(self, current, channel):
+        return self.saver.get_next_version(current, channel)
+
+# Establish Connection Pool for LangGraph AsyncPostgresSaver checkpointer
+postgres_pool = AsyncConnectionPool(
+    conninfo=POSTGRES_URL,
+    max_size=10,
+    open=False, # Prevent opening immediately during module import without a running loop
+    kwargs={"autocommit": True, "row_factory": dict_row}
+)
+
+postgres_checkpointer = LazyPostgresSaver(postgres_pool)
+
+import asyncio
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+async def setup_checkpointer():
+    await postgres_pool.open()
+    await postgres_checkpointer.setup()
+
+if loop.is_running():
+    loop.create_task(setup_checkpointer())
+else:
+    loop.run_until_complete(setup_checkpointer())
 
 graph = builder.compile(
-    checkpointer=memory_checkpointer,
+    checkpointer=postgres_checkpointer,
     interrupt_before=["waiting_approval_barrier"]
 )

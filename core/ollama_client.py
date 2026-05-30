@@ -4,6 +4,8 @@ import json
 import logging
 import requests
 from dotenv import load_dotenv
+from langchain_community.chat_models import ChatOllama
+from langchain_core.messages import trim_messages
 
 load_dotenv()
 logger = logging.getLogger("ollama_client")
@@ -15,6 +17,13 @@ OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:14b-instruct")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "bge-m3")
 OLLAMA_RERANK_MODEL = os.getenv("OLLAMA_RERANK_MODEL", "bge-reranker-large:latest")
 
+# Initialize ChatOllama for token counting
+llm_counter = ChatOllama(
+    model=OLLAMA_LLM_MODEL,
+    base_url=OLLAMA_HOST,
+    num_ctx=16384
+)
+
 def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False) -> str:
     """Generate text using Ollama's Qwen2.5 14B model."""
     try:
@@ -23,7 +32,7 @@ def generate_text(prompt: str, system_prompt: str = None, json_format: bool = Fa
             "model": OLLAMA_LLM_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0.2}
+            "options": {"temperature": 0.2, "num_ctx": 16384}
         }
         if system_prompt:
             payload["system"] = system_prompt
@@ -89,3 +98,39 @@ def rerank_documents(query: str, documents: list) -> list:
     except Exception as e:
         logger.error(f"Error in rerank_documents: {e}")
         raise
+
+def get_trimmed_context(messages: list, max_tokens: int = 14000) -> list:
+    """
+    Trims the conversation messages list using LangChain's trim_messages utility
+    to ensure it fits within the context window (default max 14000 tokens).
+    """
+    if not messages:
+        return []
+        
+    # Standard fallback token counter to avoid heavy transformers/tiktoken imports
+    def count_tokens(msgs: list) -> int:
+        total_tokens = 0
+        for m in msgs:
+            # 1 token ~= 3.5 characters for standard text including Vietnamese/English
+            total_tokens += len(m.content or "") // 3.5 + 4
+        return int(total_tokens)
+        
+    try:
+        trimmed = trim_messages(
+            messages,
+            max_tokens=max_tokens,
+            strategy="last",
+            token_counter=count_tokens,
+            include_system=True,
+            allow_partial=False
+        )
+        logger.info(f"Successfully trimmed messages context. Count before: {len(messages)}, after: {len(trimmed)}")
+        return trimmed
+    except Exception as e:
+        # Fail-safe fallback: return SystemMessage (if it's the first message) and append the last 8 messages
+        logger.error(f"Error in trim_messages: {e}. Falling back to basic slice.", exc_info=True)
+        from langchain_core.messages import SystemMessage
+        system_msg = [messages[0]] if isinstance(messages[0], SystemMessage) else []
+        other_msgs = messages[1:] if system_msg else messages
+        return system_msg + other_msgs[-8:]
+
