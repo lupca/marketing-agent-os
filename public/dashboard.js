@@ -123,7 +123,7 @@
         DOM.winningBoard = document.getElementById("winning-board");
         DOM.killedBoard = document.getElementById("killed-board");
         DOM.antiPatternsList = document.getElementById("anti-patterns-list");
-        DOM.btnRefreshMetrics = document.querySelector(".refresh-btn[onclick='fetchMetrics()']") || document.querySelector(".refresh-btn");
+        DOM.btnRefreshMetrics = document.getElementById("btn-refresh-metrics");
 
         DOM.simBudget = document.getElementById("sim-budget");
         DOM.simPrice = document.getElementById("sim-price");
@@ -150,7 +150,7 @@
         DOM.settingApiKey = document.getElementById("setting-api-key");
         DOM.settingApiUrl = document.getElementById("setting-api-url");
         DOM.settingEnableThinking = document.getElementById("setting-enable-thinking");
-        DOM.btnSaveSettings = document.querySelector("button[onclick='saveAISettings()']");
+        DOM.btnSaveSettings = document.getElementById("btn-save-settings");
         DOM.settingsStatus = document.getElementById("settings-status");
 
         DOM.tokenTotalPrompt = document.getElementById("token-total-prompt");
@@ -162,8 +162,8 @@
         DOM.modelsSidebar = document.getElementById("models-sidebar");
         DOM.modelsGrid = document.getElementById("models-grid");
         DOM.modelSearchQuery = document.getElementById("model-search-query");
-        DOM.btnOpenModels = document.querySelector("button[onclick='openModelsOverlay()']");
-        DOM.btnCloseModels = document.querySelector("button[onclick='closeModelsOverlay()']");
+        DOM.btnOpenModels = document.getElementById("btn-open-models");
+        DOM.btnCloseModels = document.getElementById("btn-close-models");
         DOM.btnToggleSidebar = document.getElementById("toggle-filter-btn");
         DOM.toggleFilterText = document.getElementById("toggle-filter-text");
 
@@ -182,9 +182,9 @@
         DOM.formModelApiUrl = document.getElementById("form-model-api-url");
         DOM.formModelApiKey = document.getElementById("form-model-api-key");
         DOM.formModelDescription = document.getElementById("form-model-description");
-        DOM.btnNewModel = document.querySelector("button[onclick='openNewModelModal()']");
-        DOM.btnSaveForm = document.querySelector("button[onclick='saveModelForm()']");
-        DOM.btnCloseForm = document.querySelector("button[onclick='closeModelModal()']");
+        DOM.btnNewModel = document.getElementById("btn-new-model");
+        DOM.btnSaveForm = document.getElementById("btn-save-form");
+        DOM.btnCloseForm = document.getElementById("btn-close-form");
     }
 
     /**
@@ -221,6 +221,14 @@
      * Main pipeline to retrieve and distribute metrics across the dashboard views.
      */
     async function fetchMetrics() {
+        const btn = DOM.btnRefreshMetrics;
+        let originalHTML = "";
+        if (btn) {
+            originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spin" style="display:inline-block; margin-right:6px;">🔄</span> Đang cập nhật...`;
+            btn.style.opacity = "0.7";
+        }
         try {
             const data = await apiRequest("/api/dashboard/metrics");
             
@@ -250,8 +258,31 @@
             }
             
             runLocalSimulation();
+
+            // Flash KPI grid and charts with a subtle glow for visual feedback
+            const flashTargets = [DOM.kpisSection, document.getElementById("cpaTrendChart"), document.getElementById("channelFunnelChart")];
+            flashTargets.forEach(el => {
+                if (el) {
+                    el.style.transition = "filter 0.2s ease, transform 0.2s ease";
+                    el.style.filter = "brightness(1.2) contrast(1.05)";
+                    el.style.transform = "scale(1.005)";
+                    setTimeout(() => {
+                        el.style.filter = "none";
+                        el.style.transform = "none";
+                    }, 300);
+                }
+            });
+
+            // Show a high-fidelity toast notification
+            showToast("Đã đồng bộ số liệu thời gian thực thành công!", "success");
         } catch (error) {
             showModalAlert("Không thể kết nối máy chủ để tải số liệu thời gian thực.", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                btn.style.opacity = "";
+            }
         }
     }
 
@@ -1370,6 +1401,74 @@
         // Fallback to standard alerts, but log beautifully
         console.warn(`[${type.toUpperCase()}] Dashboard Alert: ${message}`);
         alert(message);
+    }
+
+    /**
+     * Renders a highly interactive premium floating toast notification.
+     */
+    function showToast(message, type = "success") {
+        let container = document.getElementById("toast-container");
+        if (!container) {
+            container = document.createElement("div");
+            container.id = "toast-container";
+            container.style.position = "fixed";
+            container.style.bottom = "24px";
+            container.style.right = "24px";
+            container.style.zIndex = "9999";
+            container.style.display = "flex";
+            container.style.flexDirection = "column";
+            container.style.gap = "8px";
+            document.body.appendChild(container);
+        }
+        
+        const toast = document.createElement("div");
+        toast.className = `toast-item toast-${type}`;
+        toast.style.background = "rgba(18, 18, 29, 0.9)";
+        toast.style.backdropFilter = "blur(12px)";
+        toast.style.webkitBackdropFilter = "blur(12px)";
+        toast.style.border = "1px solid rgba(255, 255, 255, 0.08)";
+        toast.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.5)";
+        toast.style.padding = "12px 20px";
+        toast.style.borderRadius = "10px";
+        toast.style.color = "#fff";
+        toast.style.fontFamily = "var(--font-family, 'Outfit', sans-serif)";
+        toast.style.fontSize = "0.85rem";
+        toast.style.fontWeight = "500";
+        toast.style.minWidth = "280px";
+        toast.style.display = "flex";
+        toast.style.alignItems = "center";
+        toast.style.gap = "10px";
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(20px)";
+        toast.style.transition = "all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+        
+        let icon = "🔔";
+        if (type === "success") {
+            icon = "✅";
+            toast.style.borderLeft = "4px solid var(--color-success, #10b981)";
+        } else if (type === "error") {
+            icon = "❌";
+            toast.style.borderLeft = "4px solid var(--color-danger, #ef4444)";
+        }
+        
+        toast.innerHTML = `<span style="font-size:1.1rem;">${icon}</span> <span>${message}</span>`;
+        container.appendChild(toast);
+        
+        // Force reflow
+        toast.offsetHeight;
+        
+        // Slide up & fade in
+        toast.style.opacity = "1";
+        toast.style.transform = "translateY(0)";
+        
+        // Auto remove with slide out
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(-20px)";
+            setTimeout(() => {
+                toast.remove();
+            }, 350);
+        }, 4000);
     }
 
     // =========================================================================

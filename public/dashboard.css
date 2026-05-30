@@ -1036,3 +1036,15 @@ input[type=range]::-webkit-slider-thumb:hover {
 .models-modal.active .models-modal-content {
     transform: scale(1);
 }
+
+/* Custom Spin & Reload Micro-Animations */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+

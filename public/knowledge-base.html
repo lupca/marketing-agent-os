@@ -1,1646 +1,281 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Knowledge Base — Marketing Agent OS</title>
-  <meta name="description" content="Quản trị tri thức tập trung cho Marketing Agent OS. Upload, phân quyền và kiểm thử tài liệu RAG." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
-  <!-- Dropzone.js -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-Agent OS - RAG Knowledge Library</title>
+  
+  <!-- Google Fonts Outfit & Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Dropzone CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.css" />
-  <style>
-    /* ============================================================
-       DESIGN SYSTEM
-    ============================================================ */
-    :root {
-      --bg-base: #0f1117;
-      --bg-card: #1a1d27;
-      --bg-card-hover: #1f2235;
-      --bg-input: #12151f;
-      --border: #2a2d3e;
-      --border-focus: #6366f1;
-
-      --text-primary: #e8eaf6;
-      --text-secondary: #8b91b5;
-      --text-muted: #4a5082;
-
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.25);
-      --accent-hover: #818cf8;
-
-      --green: #22c55e;
-      --green-glow: rgba(34, 197, 94, 0.2);
-      --yellow: #f59e0b;
-      --yellow-glow: rgba(245, 158, 11, 0.2);
-      --red: #ef4444;
-      --red-glow: rgba(239, 68, 68, 0.2);
-      --blue: #3b82f6;
-      --purple: #8b5cf6;
-      --orange: #f97316;
-      --cyan: #06b6d4;
-
-      --radius: 12px;
-      --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.4);
-      --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
-
-      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg-base);
-      color: var(--text-primary);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Background grid decoration */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ---- HEADER ---- */
-    .header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(15, 17, 23, 0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-    }
-    .header-inner {
-      max-width: 1400px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      height: 64px;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-    }
-    .logo-icon {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-    }
-    .logo-text {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
-      letter-spacing: -0.3px;
-    }
-    .header-divider { color: var(--border); }
-    .header-title {
-      font-size: 15px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-    .header-spacer { flex: 1; }
-    .btn-back {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 16px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: var(--transition);
-    }
-    .btn-back:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: var(--accent-glow);
-    }
-
-    /* ---- MAIN LAYOUT ---- */
-    .main {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 32px;
-      position: relative;
-      z-index: 1;
-    }
-    .kb-layout {
-      display: grid;
-      grid-template-columns: 1.8fr 1.2fr;
-      gap: 24px;
-      align-items: start;
-      transition: grid-template-columns 0.3s ease;
-    }
-    .kb-layout.sidebar-collapsed {
-      grid-template-columns: 1fr;
-    }
-    @media (max-width: 1200px) {
-      .kb-layout {
-        grid-template-columns: 1fr;
-      }
-      .kb-sidebar {
-        display: flex !important;
-      }
-      .btn-close-sidebar {
-        display: none !important;
-      }
-      .fab-open-sidebar {
-        display: none !important;
-      }
-    }
-    .kb-main-content {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .kb-sidebar {
-      position: sticky;
-      top: 88px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .kb-sidebar .playground-grid {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-    .btn-close-sidebar {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: var(--transition);
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .btn-close-sidebar:hover {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: rgba(239, 68, 68, 0.3);
-      color: var(--red);
-    }
-    .fab-open-sidebar {
-      position: fixed;
-      bottom: 32px;
-      right: 32px;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      color: #fff;
-      border: none;
-      border-radius: 30px;
-      padding: 12px 22px;
-      font-size: 13.5px;
-      font-weight: 600;
-      box-shadow: 0 4px 20px var(--accent-glow);
-      cursor: pointer;
-      z-index: 999;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: var(--transition);
-      animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .fab-open-sidebar:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px var(--accent-glow);
-    }
-
-    /* ---- SECTION HEADER ---- */
-    .section-header {
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .section-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .section-title .icon {
-      width: 36px; height: 36px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-    }
-    .section-desc {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-top: 4px;
-    }
-
-    /* ---- CARD ---- */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: var(--shadow);
-      margin-bottom: 24px;
-      transition: var(--transition);
-    }
-    .card:hover { border-color: rgba(99,102,241,0.3); }
-
-    /* ---- DROPZONE ---- */
-    .dz-custom {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      background: var(--bg-input);
-      min-height: 160px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      cursor: pointer;
-      transition: var(--transition);
-      position: relative;
-      overflow: hidden;
-    }
-    .dz-custom::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 50% 50%, var(--accent-glow) 0%, transparent 70%);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .dz-custom:hover,
-    .dz-custom.dz-drag-hover {
-      border-color: var(--accent);
-      background: rgba(99,102,241,0.05);
-    }
-    .dz-custom:hover::before { opacity: 1; }
-    .dz-upload-icon { font-size: 40px; }
-    .dz-upload-text { font-size: 15px; font-weight: 500; color: var(--text-primary); }
-    .dz-upload-hint { font-size: 12px; color: var(--text-muted); }
-    .dz-custom .dz-message { margin: 0; }
-    #upload-dropzone .dz-preview {
-      display: none !important;
-    }
-
-    /* ---- CUSTOM FILE QUEUE LIST ---- */
-    .file-queue-container {
-      margin-top: 16px;
-      padding: 16px;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      animation: slideIn 0.2s ease;
-    }
-    .queue-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-bottom: 10px;
-    }
-    .file-queue-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .queue-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      transition: var(--transition);
-    }
-    .queue-item:hover {
-      border-color: rgba(99, 102, 241, 0.3);
-    }
-    .queue-item-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .queue-item-name {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-    .queue-item-size {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-    .btn-remove-queue {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 14px;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-    }
-    .btn-remove-queue:hover {
-      color: var(--red);
-      background: rgba(239, 68, 68, 0.1);
-    }
-
-    /* ---- TAG SELECTOR ---- */
-    .tag-area { margin-top: 20px; }
-    .tag-area label {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      display: block;
-      margin-bottom: 10px;
-    }
-    .tags-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .tag-chip {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--bg-input);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: var(--transition);
-      user-select: none;
-    }
-    .tag-chip .tag-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .tag-chip.selected {
-      border-color: currentColor;
-      background: rgba(255,255,255,0.06);
-    }
-    .tag-chip:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .tag-chip {
-      position: relative;
-    }
-
-    .tag-tooltip {
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%) translateY(5px);
-      width: 250px;
-      background: rgba(26, 29, 39, 0.96);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 8px;
-      padding: 10px 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      opacity: 0;
-      pointer-events: none;
-      visibility: hidden;
-      transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
-      z-index: 1000;
-      text-align: left;
-      color: #fff;
-    }
-
-    .tag-tooltip::after {
-      content: "";
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 6px;
-      border-style: solid;
-      border-color: rgba(26, 29, 39, 0.96) transparent transparent transparent;
-    }
-
-    .tag-chip:hover .tag-tooltip {
-      opacity: 1;
-      visibility: visible;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    .tag-tooltip-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 6px;
-      font-size: 12.5px;
-    }
-
-    .tag-tooltip-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    .tag-tooltip-desc {
-      font-size: 11px;
-      color: #a0aec0;
-      line-height: 1.4;
-      margin-bottom: 6px;
-      font-weight: 400;
-    }
-
-    .tag-tooltip-footer {
-      font-size: 10.5px;
-      color: #718096;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding-top: 6px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 400;
-    }
-
-    .tag-explainer-legend {
-      margin-top: 10px;
-      font-size: 11px;
-      color: #a0aec0;
-      background: rgba(255, 255, 255, 0.02);
-      border-radius: 6px;
-      padding: 8px 12px;
-      border-left: 3px solid var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .upload-actions {
-      margin-top: 16px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    /* ---- BUTTONS ---- */
-    .btn {
-      padding: 10px 20px;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      border: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      color: #fff;
-      box-shadow: 0 4px 15px var(--accent-glow);
-    }
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px var(--accent-glow);
-    }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .btn-ghost {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-    }
-    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-    .btn-danger {
-      background: rgba(239,68,68,0.15);
-      border: 1px solid rgba(239,68,68,0.3);
-      color: var(--red);
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-    .btn-danger:hover { background: rgba(239,68,68,0.25); }
-    .btn-edit {
-      background: rgba(99,102,241,0.15);
-      border: 1px solid rgba(99,102,241,0.3);
-      color: var(--accent-hover);
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-    .btn-edit:hover { background: rgba(99,102,241,0.25); }
-
-    /* ---- STATUS BADGES ---- */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-    }
-    .badge-processing { background: var(--yellow-glow); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
-    .badge-ready     { background: var(--green-glow);  color: var(--green);  border: 1px solid rgba(34,197,94,0.3); }
-    .badge-failed    { background: var(--red-glow);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
-    .badge-syncing   { background: rgba(99,102,241,0.15); color: var(--accent-hover); border: 1px solid rgba(99,102,241,0.3); }
-    .badge-synced    { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-
-    /* ---- TABLE ---- */
-    .table-wrapper { overflow-x: auto; margin-top: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    tbody tr {
-      border-bottom: 1px solid rgba(42,45,62,0.5);
-      transition: var(--transition);
-    }
-    tbody tr:hover { background: var(--bg-card-hover); }
-    tbody td {
-      padding: 14px 16px;
-      font-size: 13px;
-      vertical-align: middle;
-    }
-    .filename { font-weight: 500; color: var(--text-primary); }
-    .filesize { color: var(--text-muted); font-size: 12px; }
-    .actions { display: flex; gap: 8px; }
-
-    .pulse { animation: pulse 1.5s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-    .spin { animation: spin 1s linear infinite; display: inline-block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ---- ADVANCED SEARCH & FILTER BAR ---- */
-    .search-filter-bar {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      margin-top: 16px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-    .search-input-wrapper {
-      position: relative;
-      flex: 1;
-      min-width: 260px;
-    }
-    .search-input-wrapper input {
-      padding-left: 38px;
-      height: 40px;
-      font-size: 13.5px;
-    }
-    .search-icon {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      font-size: 14px;
-      pointer-events: none;
-    }
-    .filter-group {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .filter-group select {
-      height: 40px;
-      padding: 0 16px;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text-primary);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      outline: none;
-      transition: var(--transition);
-      min-width: 165px;
-    }
-    .filter-group select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-
-    /* ---- PAGINATION ---- */
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 20px;
-    }
-    .page-btn {
-      width: 34px; height: 34px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-      transition: var(--transition);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .page-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    /* ---- PLAYGROUND ---- */
-    .playground-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    @media (max-width: 900px) { .playground-grid { grid-template-columns: 1fr; } }
-    .input-group { margin-bottom: 16px; }
-    .input-group label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    textarea, input[type=text] {
-      width: 100%;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text-primary);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      padding: 12px 14px;
-      resize: vertical;
-      transition: var(--transition);
-    }
-    textarea:focus, input[type=text]:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-    textarea { min-height: 100px; }
-
-    .result-panel {
-      min-height: 200px;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 16px;
-      overflow-y: auto;
-      max-height: 500px;
-    }
-    .result-item {
-      padding: 14px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      margin-bottom: 10px;
-      background: var(--bg-card);
-      transition: var(--transition);
-    }
-    .result-item:hover { border-color: rgba(99,102,241,0.3); }
-    .result-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .result-score {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--green);
-    }
-    .result-content {
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-    .score-bar {
-      height: 3px;
-      border-radius: 2px;
-      background: var(--border);
-      margin-top: 8px;
-      overflow: hidden;
-    }
-    .score-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--green));
-      border-radius: 2px;
-      transition: width 0.5s ease;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-muted);
-    }
-    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-
-    /* ---- MODAL ---- */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(6px);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      width: 90%;
-      max-width: 480px;
-      box-shadow: var(--shadow);
-      animation: slideIn 0.2s ease;
-    }
-    @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .modal-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 20px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-    /* ---- TOAST ---- */
-    #toast-container {
-      position: fixed;
-      bottom: 24px; right: 24px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .toast {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 18px;
-      font-size: 13px;
-      color: var(--text-primary);
-      display: flex; align-items: center; gap: 10px;
-      box-shadow: var(--shadow);
-      animation: toastIn 0.3s ease;
-      max-width: 340px;
-    }
-    @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-    .toast.success { border-left: 3px solid var(--green); }
-    .toast.error   { border-left: 3px solid var(--red); }
-    .toast.info    { border-left: 3px solid var(--accent); }
-
-    /* Stats row */
-    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    .stat-card {
-      flex: 1; min-width: 140px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 16px 20px;
-    }
-    .stat-value { font-size: 28px; font-weight: 700; }
-    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-    .flex-center { display: flex; align-items: center; justify-content: center; }
-    .gap-8 { gap: 8px; }
-    .mt-12 { margin-top: 12px; }
-    .text-muted { color: var(--text-muted); font-size: 12px; }
-  </style>
+  
+  <!-- Decoupled Premium Theme Stylesheet -->
+  <link rel="stylesheet" href="/public/knowledge-base.css">
 </head>
 <body>
 
-<!-- ===== HEADER ===== -->
-<header class="header">
-  <div class="header-inner">
-    <a href="/" class="logo">
-      <div class="logo-icon">🤖</div>
-      <span class="logo-text">Marketing OS</span>
-    </a>
-    <span class="header-divider">/</span>
-    <span class="header-title">Knowledge Base</span>
-    <div class="header-spacer"></div>
-    <a href="/" class="btn-back">← Chat</a>
-    <a href="/dashboard" class="btn-back">📊 Dashboard</a>
-  </div>
-</header>
+  <!-- ===== TOP HEADER NAVIGATION ===== -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="logo-wrapper">
+        <div class="logo-icon">📁</div>
+        <span class="logo-text">G-Agent Marketing OS</span>
+      </a>
+      <div class="header-divider">/</div>
+      <div class="header-title">Thư Viện RAG Tri Thức Doanh Nghiệp (Enterprise RAG)</div>
+    </div>
+    
+    <div class="header-right">
+      <a href="/" class="btn-nav chat">
+        💬 Vào Khung Chat Agent
+      </a>
+      <a href="/dashboard" class="btn-nav dashboard">
+        📊 Số liệu phân tích (CMO Dashboard)
+      </a>
+    </div>
+  </header>
 
-<!-- ===== MAIN ===== -->
-<main class="main">
+  <!-- ===== NOTEBOOK WORKSPACE LAYOUT ===== -->
+  <div class="notebook-layout">
+    
+    <!-- COLUMN 1: NGUỒN (SOURCES & UPLOADS) -->
+    <aside class="notebook-col sources-column">
+      <div class="col-header" style="padding-bottom: 0.5rem;">
+        <h2>📁 Nguồn Tài Liệu</h2>
+        <span class="source-count-badge" id="source-count-lbl">— nguồn</span>
+      </div>
 
-  <!-- Stats -->
-  <div class="stats-row" id="stats-row">
-    <div class="stat-card">
-      <div class="stat-value" id="stat-total">—</div>
-      <div class="stat-label">Tổng tài liệu</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" style="color:var(--green)" id="stat-ready">—</div>
-      <div class="stat-label">Sẵn sàng</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" style="color:var(--yellow)" id="stat-processing">—</div>
-      <div class="stat-label">Đang xử lý</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" style="color:var(--accent)" id="stat-chunks">—</div>
-      <div class="stat-label">Tổng chunks</div>
-    </div>
-  </div>
+      <!-- Advanced SLATE SEARCH & QUICK FILTER PILLS -->
+      <div style="padding: 0 1.25rem 0.75rem 1.25rem; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--border); margin-bottom: 8px;">
+        <div class="search-input-container">
+          <input type="text" id="source-search-query" placeholder="Tìm nguồn tài liệu..." oninput="filterSourcesList()">
+          <svg class="search-icon-svg" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </div>
+        <div class="filter-pills-row" id="filter-pills-row">
+          <div class="filter-pill active" onclick="applyStatusFilter('all', this)">🌐 Tất cả</div>
+          <div class="filter-pill" onclick="applyStatusFilter('ready', this)">✅ Sẵn sàng</div>
+          <div class="filter-pill" onclick="applyStatusFilter('processing', this)">⏳ Đang băm</div>
+          <div class="filter-pill" onclick="applyStatusFilter('failed', this)">❌ Lỗi</div>
+        </div>
+        <div class="tag-filter-container" style="position: relative; margin-top: 4px; flex-shrink: 0; width: 100%;">
+          <select id="tag-filter-select" class="tag-filter-select" onchange="applyTagSelectFilter(this.value)">
+            <option value="all">🏷️ Tất cả Access Tags</option>
+          </select>
+          <svg style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; width: 10px; height: 10px; fill: var(--text-muted);" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+      </div>
+      
+      <div class="col-body" id="sources-list-body">
+        <!-- Document Flat Cards loaded dynamically -->
+        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">🔄 Đang tải nguồn tri thức...</div>
+      </div>
 
-  <div class="kb-layout">
-    <!-- Left Column: Main content -->
-    <div class="kb-main-content">
-      <!-- ===== KHU VỰC A: SMART UPLOAD ===== -->
-      <div class="card">
-        <div class="section-header">
-          <div>
-            <div class="section-title">
-              <div class="icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">📤</div>
-              Khu vực A — Smart Upload
-            </div>
-            <div class="section-desc">Kéo thả hoặc click để chọn tài liệu. Hệ thống sẽ tự động băm vector ngầm qua Celery.</div>
+      <!-- Compact Smart Upload Container -->
+      <div class="source-upload-container">
+        <!-- Advanced ACCESS TAG Selector chips -->
+        <div style="margin-bottom: 12px;">
+          <span class="citations-title" style="margin-bottom: 6px;">🏷️ Phân quyền Access Tags</span>
+          <div class="tags-grid" id="tags-grid">
+            <span class="text-muted" style="font-size:0.7rem;">Đang tải access tags...</span>
           </div>
         </div>
 
-        <!-- Dropzone -->
-        <form id="upload-dropzone" class="dropzone dz-custom" action="/api/rag/upload" method="POST">
+        <form id="upload-dropzone" class="dropzone dz-custom-compact" action="/api/rag/upload" method="POST">
           <div class="dz-message" data-dz-message>
-            <div class="dz-upload-icon">📁</div>
-            <div class="dz-upload-text">Kéo thả file vào đây hoặc <span style="color:var(--accent)">click để chọn</span></div>
-            <div class="dz-upload-hint">Hỗ trợ: PDF, TXT, DOCX, XLSX, PPTX, CSV • Tối đa 50MB/file</div>
+            <div class="dz-compact-icon">📤</div>
+            <div class="dz-compact-text">Thả file vào hoặc <span>chọn file</span></div>
           </div>
         </form>
-
-        <!-- Custom File Queue List -->
-        <div id="file-queue-container" class="file-queue-container" style="display: none;">
-          <div class="queue-title">📋 Danh sách file chờ upload:</div>
-          <div id="file-queue-list" class="file-queue-list"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:0.68rem; color:var(--text-muted);" id="upload-status-hint">Chọn file & tags để upload</span>
+          <button id="btn-trigger-upload" class="btn-studio-add" style="width:auto; margin:0; padding:6px 12px; border-radius:6px; font-size:0.72rem;">📤 Upload</button>
         </div>
+      </div>
+    </aside>
 
-        <!-- Tag selector -->
-        <div class="tag-area">
-          <label>🏷️ Phân quyền truy cập (chọn tags trước khi upload)</label>
-          <div class="tags-grid" id="tags-grid">
-            <div class="text-muted">Đang tải tags...</div>
-          </div>
-          <div class="tag-explainer-legend">
-            💡 <b>Mẹo:</b> Rê chuột vào từng tag để xem mô tả chi tiết & quyền truy cập của Agent.
-          </div>
-        </div>
-
-        <div class="upload-actions">
-          <span class="text-muted" id="upload-status-hint">Chọn file và tags để bắt đầu upload</span>
+    <!-- COLUMN 2: CUỘC TRÒ CHUYỆN (CHAT PLAYGROUND) -->
+    <main class="notebook-col conversation-column">
+      <div class="col-header" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+        <div>
+          <h2 id="notebook-main-title">📚 Tri Thức Thư Viện RAG</h2>
+          <span id="notebook-subtitle" style="font-size: 0.75rem; color: var(--text-secondary);">Thư viện truy vấn HNSW Vector Index</span>
         </div>
       </div>
 
-      <!-- ===== KHU VỰC B: KNOWLEDGE GRID ===== -->
-      <div class="card">
-        <div class="section-header">
-          <div>
-            <div class="section-title">
-              <div class="icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">📋</div>
-              Khu vực B — The Knowledge Grid
+      <div class="conv-scroll-feed" id="chat-scroll-feed">
+        <!-- Welcome View by default -->
+        <div class="greeting-view" id="greeting-view">
+          <div class="greeting-title">Định Hướng Tri Thức Hệ Thống</div>
+          <div class="greeting-desc">
+            Các nguồn tài liệu này cung cấp một <span class="highlight-keyword purple">hướng dẫn toàn diện</span> về việc tối ưu hóa sự hiện diện của thương hiệu và triển khai quảng cáo hiệu quả trên <span class="highlight-keyword blue">Facebook</span>. Tác giả nhấn mạnh tầm quan trọng của việc <span class="highlight-keyword green">phân tích đối thủ cạnh tranh</span> để học hỏi cách thiết lập quảng cáo theo mục tiêu tiếp thị và thực hiện thử nghiệm tách.
+          </div>
+
+          <span class="citations-title" style="text-align: left; align-self: flex-start; width: 100%;">💡 Gợi ý câu hỏi hoặc chủ đề truy vấn:</span>
+          <div class="suggested-prompts" id="suggested-prompts-box">
+            <div class="prompt-card" onclick="triggerSuggestedPrompt('Chính sách quảng cáo Facebook về sản phẩm giảm cân hay sức khỏe là gì?')">
+              <span>Chính sách quảng cáo Facebook về sản phẩm sức khỏe là gì?</span>
+              <span class="prompt-card-arrow">→</span>
             </div>
-            <div class="section-desc">Quản lý toàn bộ tài liệu. Sửa tag và xóa mềm sẽ được Celery cascade cập nhật xuống tất cả chunks ngầm.</div>
-          </div>
-          <button class="btn btn-ghost" onclick="loadDocuments()" id="btn-refresh">🔄 Làm mới</button>
-        </div>
-
-        <!-- Advanced Search & Filter Bar -->
-        <div class="search-filter-bar">
-          <div class="search-input-wrapper">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="grid-search" placeholder="Tìm kiếm theo tên tài liệu..." oninput="filterGrid()" />
-          </div>
-          <div class="filter-group">
-            <select id="filter-status" onchange="filterGrid()">
-              <option value="all">🌐 Tất cả trạng thái</option>
-              <option value="ready">✅ Sẵn sàng (Ready)</option>
-              <option value="processing">⏳ Đang xử lý (Processing)</option>
-              <option value="failed">❌ Lỗi (Failed)</option>
-            </select>
-            <select id="filter-tag" onchange="filterGrid()">
-              <option value="all">🏷️ Tất cả tags</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="table-wrapper">
-          <table id="docs-table">
-            <thead>
-              <tr>
-                <th>Tên tài liệu</th>
-                <th>Tags</th>
-                <th>Trạng thái</th>
-                <th>Chunks</th>
-                <th>Kích thước</th>
-                <th>Ngày upload</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="docs-tbody">
-              <tr><td colspan="7" class="empty-state"><div class="icon">📂</div>Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="pagination" id="pagination"></div>
-      </div>
-    </div>
-
-    <!-- Right Column: Sidebar -->
-    <div class="kb-sidebar">
-      <!-- ===== KHU VỰC C: RAG PLAYGROUND ===== -->
-      <div class="card">
-        <div class="section-header">
-          <div>
-            <div class="section-title">
-              <div class="icon" style="background:linear-gradient(135deg,#22c55e,#06b6d4)">🔬</div>
-              Khu vực C — RAG Testing Playground
+            <div class="prompt-card" onclick="triggerSuggestedPrompt('Làm thế nào để tối ưu hóa góc sáng tạo viết kịch bản quảng cáo?')">
+              <span>Làm thế nào để tối ưu hóa góc viết sáng tạo (Winning Angles)?</span>
+              <span class="prompt-card-arrow">→</span>
             </div>
-            <div class="section-desc">Kiểm thử truy vấn Zero-JOIN trực tiếp. Kết quả thực tế từ HNSW Index.</div>
-          </div>
-          <button class="btn-close-sidebar" onclick="toggleSidebar(false)" title="Thu gọn RAG Playground">✕</button>
-        </div>
-
-        <div class="playground-grid">
-      <!-- Input -->
-      <div>
-        <div class="input-group">
-          <label>Câu hỏi / Truy vấn</label>
-          <textarea id="pg-query" placeholder="VD: Chính sách quảng cáo Facebook về sản phẩm giảm cân..."></textarea>
-        </div>
-        <div class="input-group">
-          <label>Lọc theo tags (giữ Ctrl để chọn nhiều)</label>
-          <div class="tags-grid" id="pg-tags-grid" style="min-height:40px">
-            <div class="text-muted">Đang tải...</div>
-          </div>
-          <div class="tag-explainer-legend">
-            💡 Rê chuột vào tag để xem mô tả & quyền truy cập Agent.
-          </div>
-        </div>
-        <div class="input-group">
-          <label>Số kết quả tối đa</label>
-          <input type="text" id="pg-limit" value="5" style="width:80px" />
-        </div>
-        <button class="btn btn-primary" id="btn-test" onclick="runTestRetrieval()">
-          🚀 Chạy Retrieval
-        </button>
-        <div class="mt-12 text-muted" id="pg-elapsed"></div>
-      </div>
-
-      <!-- Results -->
-      <div>
-        <div class="input-group">
-          <label>Kết quả trả về</label>
-        </div>
-        <div class="result-panel" id="pg-results">
-          <div class="empty-state">
-            <div class="icon">🔍</div>
-            <div>Nhập query và nhấn Chạy để kiểm thử RAG</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-  </div>
-
-</main>
-
-<!-- ===== FLOATING ACTION BUTTON (FAB) FOR SIDEBAR ===== -->
-<button id="fab-open-sidebar" class="fab-open-sidebar" onclick="toggleSidebar(true)" style="display: none;">
-  🔬 Thử nghiệm RAG
-</button>
-
-<!-- ===== MODAL: SỬA TÀI LIỆU ===== -->
-<div class="modal-overlay" id="modal-edit-tags">
-  <div class="modal">
-    <div class="modal-title">✏️ Cập nhật thông tin tài liệu</div>
-    <input type="hidden" id="modal-doc-id" />
-    <div class="input-group">
-      <label>Tên tài liệu</label>
-      <input type="text" id="modal-doc-name" />
-    </div>
-    <div class="input-group">
-      <label>Chọn tags mới</label>
-      <div class="tags-grid" id="modal-tags-grid"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Huỷ</button>
-      <button class="btn btn-primary" onclick="saveDocumentTags()">💾 Lưu thay đổi</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== TOAST CONTAINER ===== -->
-<div id="toast-container"></div>
-
-<!-- ===== SCRIPTS ===== -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
-<script>
-/* ============================================================
-   STATE
-============================================================ */
-let allTags = [];
-let selectedUploadTags = ["global"];
-let selectedPlaygroundTags = ["global"];
-let currentPage = 1;
-let totalDocs = 0;
-const PAGE_SIZE = 20;
-const WORKSPACE_ID = null; // null = auto-detect (first workspace)
-let pollIntervals = {};
-let loadedDocuments = [];
-
-/* ============================================================
-   UTILS
-============================================================ */
-function toast(msg, type = "info", duration = 3500) {
-  const ct = document.getElementById("toast-container");
-  const el = document.createElement("div");
-  const icons = { success: "✅", error: "❌", info: "ℹ️" };
-  el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
-  ct.appendChild(el);
-  setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, duration);
-}
-
-function formatBytes(bytes) {
-  if (!bytes || bytes === 0) return "—";
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-}
-
-function formatDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function qs(url, params) {
-  const u = new URL(url, window.location.origin);
-  if (params) Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
-  return u.toString();
-}
-
-function statusBadge(uploadStatus, syncStatus) {
-  const uMap = { processing: ["badge-processing", "⏳ Đang xử lý"], ready: ["badge-ready", "✅ Sẵn sàng"], failed: ["badge-failed", "❌ Lỗi"] };
-  const sMap = { syncing: ["badge-syncing", "<span class='spin'>⟳</span> Đồng bộ"], synced: ["badge-synced", ""], failed: ["badge-failed", "⚠ Sync lỗi"] };
-  const [uc, ut] = uMap[uploadStatus] || ["badge-failed", uploadStatus];
-  const [sc, st] = sMap[syncStatus] || ["badge-synced", ""];
-  let html = `<span class="badge ${uc}">${ut}</span>`;
-  if (syncStatus === "syncing") html += ` <span class="badge ${sc}">${st}</span>`;
-  if (syncStatus === "failed") html += ` <span class="badge ${sc}">${st}</span>`;
-  return html;
-}
-
-/* ============================================================
-   TAGS
-============================================================ */
-async function loadTags() {
-  try {
-    const params = WORKSPACE_ID ? { workspace_id: WORKSPACE_ID } : {};
-    const res = await fetch(qs("/api/rag/tags", params));
-    const data = await res.json();
-    allTags = data.tags || [];
-    renderUploadTagGrid();
-    renderPlaygroundTagGrid();
-    renderModalTagGrid();
-
-    // Populate Advanced Search tag dropdown
-    const tagSelect = document.getElementById("filter-tag");
-    if (tagSelect) {
-      tagSelect.innerHTML = '<option value="all">🏷️ Tất cả tags</option>' + 
-        allTags.map(t => `<option value="${t.tag_name}">${t.tag_name}</option>`).join("");
-    }
-  } catch (e) {
-    document.getElementById("tags-grid").innerHTML = `<span class="text-muted">Lỗi tải tags</span>`;
-  }
-}
-
-function getAgentAccessExplanation(tagName) {
-  switch (tagName) {
-    case "global": return "Tất cả các Agents";
-    case "marketing": return "Creative Agent (Lên ý tưởng)";
-    case "anti_patterns": return "Analyst (Phân tích) & Creative (Sáng tạo)";
-    case "policies": return "Researcher (Tra cứu) & Brand Guardian (Kiểm duyệt)";
-    case "manager_feedback": return "Tất cả Agents (Học từ feedback của CMO)";
-    case "psychology": return "Creative Agent (Tối ưu tâm lý người dùng)";
-    case "economics": return "Analyst Agent (Nghiên cứu thị trường)";
-    default: return "Agents được phân quyền trong Workspace";
-  }
-}
-
-function renderTagGrid(containerId, selected, onToggle, colorize = true) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  if (!allTags.length) { el.innerHTML = `<span class="text-muted">Chưa có tags</span>`; return; }
-  el.innerHTML = allTags.map(t => {
-    const isSelected = selected.includes(t.tag_name);
-    const style = isSelected && colorize ? `color:${t.color};border-color:${t.color}` : "";
-    return `
-      <div class="tag-chip ${isSelected ? "selected" : ""}" style="${style}"
-           onclick="${onToggle}('${t.tag_name}', '${containerId}')">
-        <span class="tag-dot" style="background:${t.color}"></span>
-        ${t.tag_name}
-        <div class="tag-tooltip">
-          <div class="tag-tooltip-header">
-            <span class="tag-tooltip-dot" style="background:${t.color}"></span>
-            <span class="tag-tooltip-name" style="color:${t.color};font-weight:700">${t.tag_name}</span>
-          </div>
-          <div class="tag-tooltip-desc">${t.description || "Không có mô tả chi tiết."}</div>
-          <div class="tag-tooltip-footer">
-            🔑 Quyền truy cập: ${getAgentAccessExplanation(t.tag_name)}
-          </div>
-        </div>
-      </div>`;
-  }).join("");
-}
-
-function renderUploadTagGrid() { renderTagGrid("tags-grid", selectedUploadTags, "toggleUploadTag"); }
-function renderPlaygroundTagGrid() { renderTagGrid("pg-tags-grid", selectedPlaygroundTags, "togglePlaygroundTag"); }
-function renderModalTagGrid() { renderTagGrid("modal-tags-grid", selectedUploadTags, "toggleModalTag"); }
-
-function toggleUploadTag(tagName, _) {
-  if (selectedUploadTags.includes(tagName)) {
-    if (selectedUploadTags.length === 1) return; // Phải có ít nhất 1 tag
-    selectedUploadTags = selectedUploadTags.filter(t => t !== tagName);
-  } else {
-    selectedUploadTags.push(tagName);
-  }
-  renderUploadTagGrid();
-}
-
-function togglePlaygroundTag(tagName, _) {
-  if (selectedPlaygroundTags.includes(tagName)) {
-    if (selectedPlaygroundTags.length === 1) return;
-    selectedPlaygroundTags = selectedPlaygroundTags.filter(t => t !== tagName);
-  } else {
-    selectedPlaygroundTags.push(tagName);
-  }
-  renderPlaygroundTagGrid();
-}
-
-let modalSelectedTags = [];
-function toggleModalTag(tagName, _) {
-  if (modalSelectedTags.includes(tagName)) {
-    if (modalSelectedTags.length === 1) return;
-    modalSelectedTags = modalSelectedTags.filter(t => t !== tagName);
-  } else {
-    modalSelectedTags.push(tagName);
-  }
-  renderTagGrid("modal-tags-grid", modalSelectedTags, "toggleModalTag");
-}
-
-/* ============================================================
-   DROPZONE CONFIG
-============================================================ */
-Dropzone.autoDiscover = false;
-const dz = new Dropzone("#upload-dropzone", {
-  url: "/api/rag/upload",
-  paramName: "file",
-  maxFilesize: 50,
-  acceptedFiles: ".pdf,.txt,.docx,.xlsx,.pptx,.csv",
-  addRemoveLinks: true,
-  dictDefaultMessage: "",
-  autoProcessQueue: false,
-  parallelUploads: 5,
-
-  init: function () {
-    this.on("addedfile", (file) => {
-      renderFileQueue();
-    });
-
-    this.on("removedfile", (file) => {
-      renderFileQueue();
-    });
-
-    this.on("sending", (file, xhr, formData) => {
-      formData.append("access_tags", JSON.stringify(selectedUploadTags));
-      if (WORKSPACE_ID) formData.append("workspace_id", WORKSPACE_ID);
-    });
-
-    this.on("success", (file, response) => {
-      toast(`✅ "${file.name}" đã được nhận! Celery đang băm vector ngầm...`, "success", 5000);
-      this.removeFile(file);
-      // Poll status của document vừa upload
-      if (response.document_id) startPollingDocument(response.document_id);
-      // Tiếp tục xử lý file tiếp theo trong queue (fix multi-file upload)
-      if (this.getQueuedFiles().length > 0) {
-        this.processQueue();
-      } else {
-        renderFileQueue();
-        setTimeout(loadDocuments, 1500);
-      }
-    });
-
-    this.on("error", (file, errorMsg) => {
-      const msg = typeof errorMsg === "object" ? errorMsg.detail : errorMsg;
-      toast(`❌ Upload thất bại: ${msg}`, "error");
-    });
-  }
-});
-
-// Thêm nút Upload riêng
-const uploadActions = document.querySelector(".upload-actions");
-const uploadBtn = document.createElement("button");
-uploadBtn.className = "btn btn-primary";
-uploadBtn.innerHTML = "📤 Upload tất cả";
-uploadBtn.onclick = () => dz.processQueue();
-uploadActions.prepend(uploadBtn);
-
-/* ============================================================
-   CUSTOM QUEUE RENDERING
-============================================================ */
-function renderFileQueue() {
-  const container = document.getElementById("file-queue-container");
-  const listEl = document.getElementById("file-queue-list");
-  const files = dz.files;
-
-  if (files.length === 0) {
-    container.style.display = "none";
-    listEl.innerHTML = "";
-    document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
-    return;
-  }
-
-  container.style.display = "block";
-  listEl.innerHTML = files.map((file, idx) => {
-    return `
-      <div class="queue-item" data-index="${idx}">
-        <div class="queue-item-info">
-          <span style="font-size:16px">📄</span>
-          <div>
-            <div class="queue-item-name">${file.name}</div>
-            <div class="queue-item-size">${formatBytes(file.size)}</div>
-          </div>
-        </div>
-        <button class="btn-remove-queue" onclick="removeFileFromQueue(${idx})" title="Xóa file khỏi hàng đợi">🗑️</button>
-      </div>
-    `;
-  }).join("");
-
-  document.getElementById("upload-status-hint").textContent = `📋 Có ${files.length} file sẵn sàng — Nhấn Upload để bắt đầu`;
-}
-
-window.removeFileFromQueue = function(index) {
-  const file = dz.files[index];
-  if (file) {
-    dz.removeFile(file);
-  }
-};
-
-/* ============================================================
-   DOCUMENTS TABLE
-============================================================ */
-async function loadDocuments(page = 1) {
-  currentPage = page;
-  document.getElementById("btn-refresh").textContent = "⏳ Đang tải...";
-  try {
-    const params = { page, limit: PAGE_SIZE };
-    if (WORKSPACE_ID) params.workspace_id = WORKSPACE_ID;
-    const res = await fetch(qs("/api/rag/documents", params));
-    const data = await res.json();
-
-    totalDocs = data.total || 0;
-    const docs = data.documents || [];
-    loadedDocuments = docs;
-
-    // Update stats
-    let readyCount = 0, procCount = 0, totalChunks = 0;
-    docs.forEach(d => {
-      if (d.upload_status === "ready") readyCount++;
-      if (d.upload_status === "processing") procCount++;
-      totalChunks += d.chunk_count || 0;
-    });
-    document.getElementById("stat-total").textContent = totalDocs;
-    document.getElementById("stat-ready").textContent = readyCount;
-    document.getElementById("stat-processing").textContent = procCount;
-    document.getElementById("stat-chunks").textContent = totalChunks.toLocaleString();
-
-    renderTable(docs);
-    renderPagination(data.total, page);
-
-    // Auto-poll processing docs
-    docs.filter(d => d.upload_status === "processing" || d.sync_status === "syncing")
-        .forEach(d => startPollingDocument(d.document_id));
-
-  } catch (e) {
-    document.getElementById("docs-tbody").innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icon">⚠️</div>Lỗi tải danh sách tài liệu</td></tr>`;
-  }
-  document.getElementById("btn-refresh").textContent = "🔄 Làm mới";
-}
-
-function renderTable(docs) {
-  const tbody = document.getElementById("docs-tbody");
-  if (!docs.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><div>Chưa có tài liệu nào. Upload tài liệu đầu tiên của bạn!</div></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = docs.map(d => {
-    const tags = (d.access_tags || ["global"]).map(t => {
-      const tag = allTags.find(at => at.tag_name === t);
-      return `<span class="tag-chip" style="color:${tag?.color||'#6366f1'};border-color:${tag?.color||'#6366f1'};padding:3px 8px;font-size:11px"><span class="tag-dot" style="background:${tag?.color||'#6366f1'}"></span>${t}</span>`;
-    }).join(" ");
-
-    return `<tr data-doc-id="${d.document_id}">
-      <td>
-        <div class="filename">📄 ${d.file_name}</div>
-        <div class="filesize">${d.document_id.slice(0, 8)}...</div>
-      </td>
-      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${tags}</div></td>
-      <td id="status-${d.document_id}">${statusBadge(d.upload_status, d.sync_status)}</td>
-      <td>${d.chunk_count ? `<strong>${d.chunk_count}</strong>` : "—"}</td>
-      <td>${formatBytes(d.file_size_bytes)}</td>
-      <td>${formatDate(d.created_at)}</td>
-      <td>
-        <div class="actions">
-          <button class="btn btn-edit" onclick="openEditTagsClick('${d.document_id}')">✏️ Sửa</button>
-          <button class="btn btn-danger" onclick="deleteDocument('${d.document_id}', '${d.file_name.replace(/'/g, "\\'")}')">🗑️ Xóa</button>
-        </div>
-      </td>
-    </tr>`;
-  }).join("");
-}
-
-function renderPagination(total, current) {
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  if (totalPages <= 1) { document.getElementById("pagination").innerHTML = ""; return; }
-  let html = `<button class="page-btn" onclick="loadDocuments(${current-1})" ${current<=1?"disabled":""}>←</button>`;
-  for (let i = 1; i <= totalPages; i++) {
-    html += `<button class="page-btn ${i===current?"active":""}" onclick="loadDocuments(${i})">${i}</button>`;
-  }
-  html += `<button class="page-btn" onclick="loadDocuments(${current+1})" ${current>=totalPages?"disabled":""}>→</button>`;
-  document.getElementById("pagination").innerHTML = html;
-}
-
-/* ============================================================
-   ADVANCED FILTERING
-============================================================ */
-function filterGrid() {
-  const searchQuery = document.getElementById("grid-search").value.toLowerCase().trim();
-  const statusFilter = document.getElementById("filter-status").value;
-  const tagFilter = document.getElementById("filter-tag").value;
-
-  const filtered = loadedDocuments.filter(d => {
-    // 1. Filter by search query
-    const matchSearch = d.file_name.toLowerCase().includes(searchQuery);
-    
-    // 2. Filter by status
-    let matchStatus = true;
-    if (statusFilter !== "all") {
-      matchStatus = d.upload_status === statusFilter;
-    }
-    
-    // 3. Filter by tag
-    let matchTag = true;
-    if (tagFilter !== "all") {
-      matchTag = (d.access_tags || []).includes(tagFilter);
-    }
-    
-    return matchSearch && matchStatus && matchTag;
-  });
-
-  renderTable(filtered);
-}
-
-/* ============================================================
-   POLLING (Status check)
-============================================================ */
-function startPollingDocument(docId) {
-  if (pollIntervals[docId]) return;
-  let attempts = 0;
-  pollIntervals[docId] = setInterval(async () => {
-    attempts++;
-    if (attempts > 60) { clearInterval(pollIntervals[docId]); delete pollIntervals[docId]; return; }
-    try {
-      const res = await fetch(`/api/rag/documents/${docId}/status`);
-      const d = await res.json();
-      const statusEl = document.getElementById(`status-${docId}`);
-      if (statusEl) statusEl.innerHTML = statusBadge(d.upload_status, d.sync_status);
-
-      if (d.upload_status === "ready" && d.sync_status === "synced") {
-        clearInterval(pollIntervals[docId]); delete pollIntervals[docId];
-        toast(`✅ Tài liệu "${d.file_name}" đã băm xong ${d.chunk_count} chunks!`, "success");
-        loadDocuments(currentPage);
-      }
-      if (d.upload_status === "failed") {
-        clearInterval(pollIntervals[docId]); delete pollIntervals[docId];
-        toast(`❌ Băm vector thất bại: "${d.file_name}"`, "error");
-      }
-    } catch (_) {}
-  }, 3000);
-}
-
-/* ============================================================
-   EDIT TAGS MODAL
-============================================================ */
-function openEditTags(docId, fileName, currentTags) {
-  document.getElementById("modal-doc-id").value = docId;
-  document.getElementById("modal-doc-name").value = fileName;
-  modalSelectedTags = [...currentTags];
-  renderTagGrid("modal-tags-grid", modalSelectedTags, "toggleModalTag");
-  document.getElementById("modal-edit-tags").classList.add("open");
-}
-
-function openEditTagsClick(docId) {
-  const doc = loadedDocuments.find(d => d.document_id === docId);
-  if (doc) {
-    openEditTags(doc.document_id, doc.file_name, doc.access_tags);
-  }
-}
-
-function closeModal() {
-  document.getElementById("modal-edit-tags").classList.remove("open");
-}
-
-async function saveDocumentTags() {
-  const docId = document.getElementById("modal-doc-id").value;
-  const fileName = document.getElementById("modal-doc-name").value.trim();
-  if (!fileName) {
-    toast("❌ Tên tài liệu không được để trống!", "error");
-    return;
-  }
-  try {
-    const res = await fetch(`/api/rag/documents/${docId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_name: fileName, access_tags: modalSelectedTags })
-    });
-    if (!res.ok) { const e = await res.json(); toast(`❌ ${e.detail}`, "error"); return; }
-    toast("🔄 Đã lưu thay đổi. Celery đang đồng bộ ngầm...", "info");
-    closeModal();
-    setTimeout(() => { loadDocuments(currentPage); }, 1000);
-    const statusEl = document.getElementById(`status-${docId}`);
-    if (statusEl) statusEl.innerHTML = statusBadge("ready", "syncing");
-    startPollingDocument(docId);
-  } catch (e) { toast("❌ Lỗi kết nối", "error"); }
-}
-
-/* ============================================================
-   DELETE
-============================================================ */
-async function deleteDocument(docId, fileName) {
-  if (!confirm(`Xóa tài liệu "${fileName}"?\n\nDữ liệu sẽ bị xóa mềm và biến mất khỏi tất cả retrieval.`)) return;
-  try {
-    const res = await fetch(`/api/rag/documents/${docId}`, { method: "DELETE" });
-    if (!res.ok) { const e = await res.json(); toast(`❌ ${e.detail}`, "error"); return; }
-    toast(`🗑️ "${fileName}" đang được xóa ngầm...`, "info");
-    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
-    if (row) { row.style.opacity = "0.3"; row.style.pointerEvents = "none"; }
-    setTimeout(() => loadDocuments(currentPage), 2000);
-  } catch (e) { toast("❌ Lỗi kết nối", "error"); }
-}
-
-/* ============================================================
-   RAG PLAYGROUND
-============================================================ */
-async function runTestRetrieval() {
-  const query = document.getElementById("pg-query").value.trim();
-  if (query.length < 3) { toast("Query phải có ít nhất 3 ký tự!", "error"); return; }
-
-  const btn = document.getElementById("btn-test");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin">⟳</span> Đang truy vấn...';
-
-  const panel = document.getElementById("pg-results");
-  panel.innerHTML = `<div class="empty-state"><div class="spin" style="font-size:32px">⟳</div><div>Đang truy vấn HNSW Index...</div></div>`;
-
-  try {
-    const payload = {
-      query,
-      access_tags: selectedPlaygroundTags,
-      limit: parseInt(document.getElementById("pg-limit").value) || 5
-    };
-    if (WORKSPACE_ID) payload.workspace_id = WORKSPACE_ID;
-    else {
-      // Auto-detect workspace_id
-      const docsRes = await fetch("/api/rag/tags");
-      const docsData = await docsRes.json();
-      payload.workspace_id = docsData.workspace_id;
-    }
-
-    const res = await fetch("/api/rag/test-retrieval", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-
-    document.getElementById("pg-elapsed").textContent = `⚡ Thời gian: ${data.elapsed_ms} ms | Tìm thấy: ${data.result_count} chunks`;
-
-    if (!data.results?.length) {
-      panel.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>Không tìm thấy kết quả phù hợp với tags: [${payload.access_tags.join(", ")}]</div></div>`;
-      return;
-    }
-
-    panel.innerHTML = data.results.map((r, i) => {
-      const pct = Math.round(r.similarity_score * 100);
-      const tags = (r.access_tags || []).map(t => {
-        const tag = allTags.find(at => at.tag_name === t);
-        return `<span class="tag-chip" style="color:${tag?.color||'#6366f1'};padding:2px 7px;font-size:11px">${t}</span>`;
-      }).join(" ");
-      return `
-        <div class="result-item" style="animation: toastIn 0.3s ease ${i * 0.08}s both">
-          <div class="result-meta">
-            <div style="display:flex;gap:8px;align-items:center">
-              <span style="font-size:12px;color:var(--text-muted)">#${i+1}</span>
-              ${tags}
+            <div class="prompt-card" onclick="triggerSuggestedPrompt('Thuật toán Inverse CPA Weighting hoạt động thế nào để đề xuất ngân sách?')">
+              <span>Thuật toán AI phân bổ ngân sách hoạt động thế nào?</span>
+              <span class="prompt-card-arrow">→</span>
             </div>
-            <div class="result-score">🎯 ${pct}%</div>
           </div>
-          <div class="result-content">${r.content_preview || ""}${r.content_full?.length > 300 ? "..." : ""}</div>
-          <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
-        </div>`;
-    }).join("");
+        </div>
+      </div>
 
-  } catch (e) {
-    panel.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>Lỗi kết nối API: ${e.message}</div></div>`;
-    toast("❌ Lỗi khi gọi test retrieval", "error");
-  }
+      <!-- Bottom Query Pill Input Area -->
+      <div class="query-capsule-container">
+        <div class="query-capsule">
+          <textarea id="pg-query" placeholder="Đặt câu hỏi hoặc yêu cầu tạo nội dung từ nguồn..." rows="1" oninput="adjustInputHeight(this)"></textarea>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="query-capsule-badge" id="limit-indicator-btn" onclick="toggleLimitParameter()" style="cursor:pointer;" title="Click để thay đổi số chunks tối đa">
+              Limit: <span id="lbl-pg-limit">5</span> chunks
+            </div>
+            <button class="query-submit-btn" id="btn-run-retrieval" onclick="runTestRetrieval()">
+              <span style="font-size:1.15rem; font-weight:bold;">→</span>
+            </button>
+          </div>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:0 12px;">
+          <span id="pg-elapsed" style="font-size:0.72rem; color:var(--text-muted);">Hệ thống Zero-JOIN Vector Search sẵn sàng</span>
+          
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:0.7rem; color:var(--text-muted);">Lọc Playground:</span>
+            <div class="tags-grid" id="pg-tags-grid">
+              <!-- Loaded dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
 
-  btn.disabled = false;
-  btn.innerHTML = "🚀 Chạy Retrieval";
-}
+    <!-- COLUMN 3: STUDIO (Strategic summary & presets cards) -->
+    <aside class="notebook-col studio-column">
+      <div class="col-header" style="padding-bottom: 0.5rem;">
+        <h2>🛠️ Studio Preset Cards</h2>
+      </div>
+      
+      <div class="col-body">
+        <!-- Interactive Presets banner -->
+        <div class="studio-banner">
+          <div class="studio-banner-text">
+            <h4>CMO Copywriter Studio</h4>
+            <p>Chọn các preset để AI tự động trích xuất insights từ tài liệu nguồn của bạn.</p>
+          </div>
+        </div>
 
-// Close modal on overlay click
-document.getElementById("modal-edit-tags").addEventListener("click", function(e) {
-  if (e.target === this) closeModal();
-});
+        <!-- Presets card grid -->
+        <div class="studio-tools-grid">
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Tạo tóm tắt tổng quan RAG toàn bộ nguồn tài liệu đang có trong workspace')">
+            <div class="tool-tile-icon purple">📝</div>
+            <div class="tool-tile-title">Tổng quan</div>
+          </div>
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Liệt kê bản đồ insights khách hàng và insight chân dung đối tượng mục tiêu')">
+            <div class="tool-tile-icon orange">🗺️</div>
+            <div class="tool-tile-title">Bản đồ</div>
+          </div>
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Tìm kiếm các góc viết quảng cáo cạnh tranh và so sánh với đối thủ cạnh tranh')">
+            <div class="tool-tile-icon green">⚔️</div>
+            <div class="tool-tile-title">Cạnh tranh</div>
+          </div>
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Tạo các flashcard câu hỏi nhanh để học và đào tạo về chính sách quảng cáo')">
+            <div class="tool-tile-icon blue">📇</div>
+            <div class="tool-tile-title">Flashcard</div>
+          </div>
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Trích xuất các quy chuẩn viết kịch bản và luật cấm quảng cáo của nền tảng')">
+            <div class="tool-tile-icon purple">⚖️</div>
+            <div class="tool-tile-title">Quy chuẩn</div>
+          </div>
+          <div class="tool-tile-card" onclick="triggerSuggestedPrompt('Lập báo cáo RAG audit toàn bộ các điểm neo kiến thức và đề xuất tối ưu hóa')">
+            <div class="tool-tile-icon cyan">📊</div>
+            <div class="tool-tile-title">Báo cáo</div>
+          </div>
+        </div>
 
-/* ============================================================
-   SIDEBAR TOGGLE
-============================================================ */
-function toggleSidebar(show) {
-  const layout = document.querySelector(".kb-layout");
-  const sidebar = document.querySelector(".kb-sidebar");
-  const fab = document.getElementById("fab-open-sidebar");
+        <!-- Analytical Output Logs -->
+        <div class="outputs-list-title">Đầu ra RAG Studio Logs</div>
+        
+        <div style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; padding-right:2px;">
+          <div class="studio-item-card" onclick="triggerSuggestedPrompt('Tóm tắt tổng quan RAG toàn bộ nguồn tài liệu đang có trong workspace')">
+            <span class="studio-item-icon">📄</span>
+            <div class="studio-item-content">
+              <div class="studio-item-title">Tổng quan tài liệu nguồn</div>
+              <div class="studio-item-time">Vừa xong &bull; Preset System</div>
+            </div>
+          </div>
+          
+          <div class="studio-item-card" onclick="triggerSuggestedPrompt('Trích xuất các quy chuẩn viết kịch bản và luật cấm quảng cáo của nền tảng')">
+            <span class="studio-item-icon">📄</span>
+            <div class="studio-item-content">
+              <div class="studio-item-title">Quy chuẩn nội dung & luật cấm</div>
+              <div class="studio-item-time">5 phút trước &bull; Preset System</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
 
-  if (show) {
-    layout.classList.remove("sidebar-collapsed");
-    sidebar.style.display = "flex";
-    fab.style.display = "none";
-    localStorage.setItem("sidebar-collapsed", "false");
-  } else {
-    layout.classList.add("sidebar-collapsed");
-    sidebar.style.display = "none";
-    fab.style.display = "flex";
-    localStorage.setItem("sidebar-collapsed", "true");
-  }
-}
+  <!-- ===== MODAL: EDIT DOCUMENT ACCESS TAGS & META ===== -->
+  <div class="modal-overlay" id="modal-edit-tags">
+    <div class="modal">
+      <h3 class="modal-title">🏷️ Chỉnh Sửa Thông Tin Tài Liệu</h3>
+      
+      <input type="hidden" id="modal-doc-id">
+      
+      <div class="input-group">
+        <label for="modal-doc-name">Tên Tài Liệu (File Name)</label>
+        <input type="text" id="modal-doc-name" placeholder="Nhập tên tài liệu...">
+      </div>
 
-// Check initial state on page load
-(function() {
-  const collapsed = localStorage.getItem("sidebar-collapsed") === "true";
-  if (collapsed) {
-    setTimeout(() => toggleSidebar(false), 50);
-  }
-})();
+      <div class="input-group" style="margin-top:12px;">
+        <label>Phân quyền Access Tags cho AI Agents</label>
+        <div class="tags-grid" id="modal-tags-grid" style="margin-top:6px;"></div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn-studio-add" style="width:auto; background:rgba(255,255,255,0.05); color:#fff;" onclick="closeModal()">Huỷ</button>
+        <button class="btn-studio-add" style="width:auto;" onclick="saveDocumentTags()">💾 Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
 
-/* ============================================================
-   INIT
-============================================================ */
-(async function init() {
-  await loadTags();
-  await loadDocuments();
-})();
-</script>
+  <!-- ===== MODAL: GORGEOUS DOCUMENT READER MODAL ===== -->
+  <div class="doc-reader-overlay" id="doc-reader-overlay">
+    <div class="doc-reader-card">
+      <div class="doc-reader-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:1.6rem;" id="reader-doc-icon">📄</span>
+          <div>
+            <h3 id="reader-doc-title" style="font-family:'Outfit'; font-size:1.15rem; font-weight:800;">Tên tài liệu</h3>
+            <p id="reader-doc-meta" style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Kích thước: 0 KB | Chunks: 0</p>
+          </div>
+        </div>
+        <button class="source-btn" style="background:rgba(255,255,255,0.05); border-color:var(--border);" onclick="closeDocReader()" title="Đóng cửa sổ đọc">✕</button>
+      </div>
+      <div class="doc-reader-body" id="reader-doc-body">
+        <!-- Text chunks loaded dynamically -->
+        <div style="text-align: center; color: var(--text-muted); padding: 5rem 0;">
+          <span class="spin" style="font-size: 2rem;">⟳</span>
+          <div style="margin-top: 12px;">Đang trích xuất nội dung thô từ PostgreSQL...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ALERTS CONTAINER ===== -->
+  <div id="toast-container"></div>
+
+  <!-- ===== SCRIPTS ===== -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+  <script defer src="/public/knowledge-base.js"></script>
 </body>
 </html>

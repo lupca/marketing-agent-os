@@ -193,7 +193,7 @@ async def upload_document(
     # Validate file type
     filename = file.filename or "unknown"
     ext = os.path.splitext(filename)[-1].lower()
-    allowed_exts = {".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".csv"}
+    allowed_exts = {".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".csv", ".md"}
     if ext not in allowed_exts:
         raise HTTPException(
             status_code=400,
