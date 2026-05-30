@@ -14,60 +14,36 @@ from reference.prompt.prompts import (
     PLATFORM_VARIANT_GENERATOR_PROMPT,
     EDITOR_BRAND_GUARDIAN_PROMPT
 )
-from core.decision_logger import log_decision
-from core.ollama_client import get_trimmed_context
-from langchain_core.messages import AIMessage
+from core.utils import parse_llm_json, trim_and_log
+from reference.prompt.fallbacks import (
+    STRATEGIST_FALLBACK,
+    COPYWRITER_MASTER_FALLBACK,
+    FB_VARIANT_FALLBACK,
+    GUARDIAN_FALLBACK
+)
+from config.settings import (
+    MAX_CONTEXT_TOKENS,
+    LLM_CTX_WINDOW,
+    GUARDIAN_PASS_SCORE,
+    DEFAULT_TARGET_CPA,
+    DEFAULT_TEST_BUDGET
+)
 
 logger = logging.getLogger("graphs_creative")
 logging.basicConfig(level=logging.INFO)
 
-def strategist_node(state: AgencyState) -> dict:
-    """
-    Strategist Node (Ban Sáng Tạo).
-    Reads RAG psychological/economic insights, enforces RAG anti-patterns injection,
-    and creates a structured content marketing angle strategy.
-    """
-    logger.info("Executing Strategist Node (Marketing Angle Formulation)...")
-    db: Session = SessionLocal()
-    
-    workspace_id = state.get("workspace_id")
-    target_cpa = state.get("target_cpa")
-    test_budget = state.get("test_budget")
-    product_id = state.get("product_id")
-    
-    # 1. Fetch Product USP & Details
-    product = None
-    if product_id:
-        try:
-            product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
-        except Exception:
-            pass
-    if not product:
-        product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
-        
-    product_name = product.name if product else "Sản phẩm AI"
-    product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
-    
-    # 2. SOP Phân vai: Giao việc / Gọi Researcher Agent để lấy Báo cáo Insight Khách hàng
-    logger.info("Giao việc / Gọi Researcher Agent để lấy Báo cáo Insight Khách hàng...")
-    try:
-        insights_str = run_research(workspace_id, f"chiến lược marketing khách hàng nỗi đau cho {product_name}")
-    except Exception as e:
-        logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo Insight Khách hàng: {e}")
-        db.close()
-        raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo từ Researcher: {e}") from e
-    
-    # 3. SOP Phân vai: Giao việc / Gọi Researcher Agent để lấy Báo cáo Bài học thất bại (Anti-patterns)
-    logger.info("Giao việc / Gọi Researcher Agent để lấy Báo cáo Bài học thất bại (Anti-patterns)...")
-    try:
-        anti_patterns_report = run_research(workspace_id, f"mẫu quảng cáo thất bại sai lầm sản phẩm {product_name}")
-    except Exception as e:
-        logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo Bài học thất bại: {e}")
-        db.close()
-        raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo bài học thất bại từ Researcher: {e}") from e
-        
-    system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
-    
+# ==========================================
+# PROMPT BUILDERS
+# ==========================================
+
+def build_strategist_prompt(
+    state: AgencyState, 
+    product_name: str, 
+    product_usp: str, 
+    anti_patterns_report: str, 
+    insights_str: str
+) -> str:
+    """Build the prompt for Strategist Agent incorporating RAG findings."""
     base_prompt = ANGLE_STRATEGIST_PROMPT.format(
         num_angles=1,
         funnel_stage="Consideration",
@@ -86,83 +62,23 @@ def strategist_node(state: AgencyState) -> dict:
         language="Vietnamese"
     )
     
-    # Build final prompt by injecting report from Researcher
-    final_prompt = (
+    return (
         f"## BÁO CÁO BÀI HỌC THẤT BẠI CẦN TRÁNH (TỔNG HỢP BỞI BAN NGHIÊN CỨU - CẤM LẶP LẠI):\n"
         f"{anti_patterns_report}\n\n"
         f"{base_prompt}\n"
         f"**Tài liệu tri thức bổ sung thu thập từ Researcher Agent:**\n"
         f"{insights_str}\n"
     )
-    db.close()
-    
-    # 4. Generate Strategy via Ollama
-    logger.info("Generating marketing angle strategy from Ollama...")
-    res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True)
-    
-    try:
-        # Load and clean JSON
-        import json_repair
-        angle_data = json_repair.loads(res_str)
-        if isinstance(angle_data, list) and len(angle_data) > 0:
-            angle_data = angle_data[0]
-    except Exception as e:
-        logger.error(f"Error parsing Strategist output JSON: {e}. Using fallback strategy.")
-        angle_data = {
-            "angle_name": "Góc giải phóng thời gian (Logic Angle)",
-            "funnel_stage": "Consideration",
-            "psychological_angle": "Logic",
-            "pain_point_focus": "CMO không có thời gian duyệt từng kịch bản quảng cáo",
-            "key_message_variation": "Để AI Agent tự viết kịch bản, chấm điểm và báo cáo, giải phóng 80% thời gian điều hành Ads của bạn.",
-            "call_to_action_direction": "Đăng ký dùng thử bản Demo Agent OS ngay",
-            "brief": "Mở đầu: Cảnh báo việc đốt thời gian của sếp. Thân bài: Cơ chế Guardian chấm điểm tự động. Kết bài: Đăng ký demo."
-        }
-        
-    logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
-    
-    # Perform token trimming to keep context within 14000 tokens
-    raw_messages = state.get("messages", [])
-    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
-    
-    # Log strategist decision
-    log_decision(
-        workspace_id=workspace_id,
-        campaign_id=state.get("campaign_id"),
-        agent_name="Strategist Agent",
-        action="Formulate Marketing Angle",
-        decision_status="success",
-        reason=f"Đề xuất góc tiếp cận sáng tạo thành công: '{angle_data.get('angle_name')}' ({angle_data.get('psychological_angle')}). Định hướng: {angle_data.get('brief')}",
-        metadata=angle_data
-    )
-    
-    strat_msg = (
-        f"🧠 **[Phòng Sáng Tạo - Strategist]**\n"
-        f"- Đã nghiên cứu RAG và tự động dán RAG bài học thất bại.\n"
-        f"- **Angle đề xuất:** `{angle_data.get('angle_name')}`\n"
-        f"- **Nỗi đau đánh trúng:** \"{angle_data.get('pain_point_focus')}\"\n"
-        f"- **Tập trung:** {angle_data.get('psychological_angle')}"
-    )
-    
-    return {
-        "current_angle": angle_data,
-        "sop_stage": "creative_generation",
-        "messages": [AIMessage(content=strat_msg)]
-    }
 
-def copywriter_node(state: AgencyState) -> dict:
-    """
-    Copywriter Node (Ban Sáng Tạo).
-    Constructs creative copies strictly constrained under Target CPA and Budget.
-    Responds to inter-department feedback loop (Giao thức cãi nhau).
-    """
-    logger.info("Executing Copywriter Node (Constraint-Driven Content Generation)...")
-    
-    target_cpa = state.get("target_cpa", 1050000.0)
-    test_budget = state.get("test_budget", 2000000.0)
+def build_copywriter_master_prompt(
+    state: AgencyState, 
+    target_cpa: float, 
+    test_budget: float
+) -> str:
+    """Build the prompt for Copywriter Master content generation."""
     angle = state.get("current_angle", {})
     feedback_loop = state.get("killed_variants_feedback", [])
     
-    # 1. Standard prompt framing based on CPA targets
     cpa_constraints = (
         f"\n### RÀNG BUỘC KINH TẾ (BẮT BUỘC TUÂN THỦ)\n"
         f"- Ngân sách test chiến dịch: {test_budget} VNĐ.\n"
@@ -170,7 +86,6 @@ def copywriter_node(state: AgencyState) -> dict:
         f"- Yêu cầu: Viết nội dung sắc bén, đánh thẳng vào USP sản phẩm để thúc đẩy chuyển đổi nhanh, bảo toàn mức CPA tối ưu này.\n"
     )
     
-    # 2. GIAO THỨC CÃI NHAU: Inject inter-department feedback if previous campaigns were killed
     feedback_injection = ""
     if feedback_loop:
         logger.warning(f"GIAO THỨC CÃI NHAU: Copywriter received {len(feedback_loop)} killed campaigns feedback!")
@@ -184,7 +99,6 @@ def copywriter_node(state: AgencyState) -> dict:
                 f"👉 YÊU CẦU: Tuyệt đối KHÔNG sử dụng lại văn phong, tít hoặc lối tiếp cận cũ này. Hãy đổi sang Angle hoàn toàn khác!\n"
             )
             
-    # 3. Generate Master Content
     master_prompt = MASTER_CONTENT_GENERATOR_PROMPT.format(
         campaign_name="Tối ưu chuyển đổi Ads bằng AI",
         campaign_goal=f"Đạt CPA dưới {target_cpa} VNĐ",
@@ -200,28 +114,36 @@ def copywriter_node(state: AgencyState) -> dict:
     
     master_prompt += cpa_constraints + feedback_injection
     master_prompt += f"\n**Góc chiến lược do Strategist định hướng:**\n{json.dumps(angle, ensure_ascii=False)}\n"
-    
-    logger.info("Generating Master Content via Ollama...")
-    master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True)
-    
-    try:
-        import json_repair
-        master_content = json_repair.loads(master_res)
-    except Exception as e:
-        logger.error(f"Error parsing Master Content JSON: {e}")
-        master_content = {
-            "core_message": "Marketing Agent OS v2.0 - Để AI tự viết kịch bản, chấm điểm và tự động tắt ads lỗ, giữ CPA ổn định!",
-            "extended_message": "Nếu bạn là một CMO bận rộn đang đau đầu vì chi phí ads tăng vọt và mất thời gian duyệt bài viết, giải pháp Multi-agent tự trị LangGraph chính là cứu cánh của bạn. Hệ thống tự động tính CPA Target, gò Copywriter viết đúng hướng, và Performance Node tự tắt ads lỗ. Hãy giải phóng 80% thời gian của bạn ngay hôm nay.",
-            "tone_markers": ["Chuyên nghiệp", "Sắc bén", "Hiệu suất"],
-            "suggested_hashtags": ["#CPAAds", "#AgentOS", "#LangGraph"],
-            "call_to_action": "Đăng ký dùng thử bản demo ngay",
-            "key_benefits": ["Tiết kiệm 80% thời gian", "CPA an toàn dưới Target", "Scoring 100đ nghiêm ngặt"],
-            "confidence_score": 4.5,
-            "video_hook_idea": "Sếp đang ngồi đau đầu vì báo cáo ads đỏ lòm, đột nhiên AI báo cáo đã tự động tắt 3 chiến dịch lỗ.",
-            "video_setting_suggestion": "Văn phòng làm việc buổi tối muộn"
-        }
+    return master_prompt
 
-    # 4. Generate Platform Adaptation (Facebook variant)
+def build_copywriter_variant_prompt(
+    state: AgencyState, 
+    master_content: dict, 
+    target_cpa: float, 
+    test_budget: float
+) -> str:
+    """Build the prompt for platform adaptation (Facebook variant)."""
+    feedback_loop = state.get("killed_variants_feedback", [])
+    
+    cpa_constraints = (
+        f"\n### RÀNG BUỘC KINH TẾ (BẮT BUỘC TUÂN THỦ)\n"
+        f"- Ngân sách test chiến dịch: {test_budget} VNĐ.\n"
+        f"- Ngưỡng chi phí chuyển đổi (CPA Target): BẮT BUỘC DƯỚI {target_cpa} VNĐ/đơn hàng.\n"
+        f"- Yêu cầu: Viết nội dung sắc bén, đánh thẳng vào USP sản phẩm để thúc đẩy chuyển đổi nhanh, bảo toàn mức CPA tối ưu này.\n"
+    )
+    
+    feedback_injection = ""
+    if feedback_loop:
+        feedback_injection = "\n### PHẢN HỒI THẤT BẠI TỪ PHÒNG KINH DOANH ( variant_id KILLED )\n"
+        for item in feedback_loop:
+            feedback_injection += (
+                f"- Variant ID: {item.get('variant_id')} trên kênh {item.get('platform')} đã bị khai tử!\n"
+                f"  - Nội dung hỏng: \"{item.get('failed_copy')}\"\n"
+                f"  - CPA thực tế: {item.get('failed_cpa')} VNĐ (vượt xa mức target {item.get('target_cpa')} VNĐ).\n"
+                f"  - Nguyên nhân: {item.get('reason_killed')}\n"
+                f"👉 YÊU CẦU: Tuyệt đối KHÔNG sử dụng lại văn phong, tít hoặc lối tiếp cận cũ này. Hãy đổi sang Angle hoàn toàn khác!\n"
+            )
+            
     variant_prompt = PLATFORM_VARIANT_GENERATOR_PROMPT.format(
         platform="facebook",
         core_message=master_content.get("core_message", ""),
@@ -238,46 +160,122 @@ def copywriter_node(state: AgencyState) -> dict:
     )
     
     variant_prompt += cpa_constraints + feedback_injection
+    return variant_prompt
+
+def build_brand_guardian_prompt(
+    state: AgencyState, 
+    master_content: dict, 
+    fb_copy: str
+) -> str:
+    """Build the compliance check prompt for Brand Guardian."""
+    guardian_prompt = EDITOR_BRAND_GUARDIAN_PROMPT.format(
+        brand_name="G-Agent Tech",
+        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
+        brand_keywords="AI Agent, LangGraph, Tối ưu CPA"
+    )
     
+    guardian_prompt += (
+        f"\n### NỘI DUNG ĐỀ XUẤT CẦN ĐÁNH GIÁ:\n"
+        f"- Master Core Message: \"{master_content.get('core_message')}\"\n"
+        f"- Facebook Variant Copy: \"{fb_copy}\"\n"
+    )
+    return guardian_prompt
+
+
+# ==========================================
+# GRAPH NODES
+# ==========================================
+
+def strategist_node(state: AgencyState) -> dict:
+    """
+    Strategist Node (Ban Sáng Tạo).
+    Reads RAG psychological/economic insights, enforces RAG anti-patterns injection,
+    and creates a structured content marketing angle strategy.
+    """
+    logger.info("Executing Strategist Node (Marketing Angle Formulation)...")
+    db: Session = SessionLocal()
+    
+    workspace_id = state.get("workspace_id")
+    product_id = state.get("product_id")
+    
+    # 1. Fetch Product details
+    product = None
+    if product_id:
+        try:
+            product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
+        except Exception:
+            pass
+    if not product:
+        product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
+        
+    product_name = product.name if product else "Sản phẩm AI"
+    product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
+    
+    # 2. Get customer insights from Researcher
+    logger.info("Calling Researcher Agent for customer insights...")
+    try:
+        insights_str = run_research(workspace_id, f"chiến lược marketing khách hàng nỗi đau cho {product_name}")
+        anti_patterns_report = run_research(workspace_id, f"mẫu quảng cáo thất bại sai lầm sản phẩm {product_name}")
+    except Exception as e:
+        logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo từ Researcher: {e}")
+        db.close()
+        raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo từ Researcher: {e}") from e
+    finally:
+        db.close()
+        
+    # 3. Build Prompt & Generate
+    final_prompt = build_strategist_prompt(state, product_name, product_usp, anti_patterns_report, insights_str)
+    
+    logger.info("Generating marketing angle strategy from Ollama...")
+    system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
+    res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True)
+    angle_data = parse_llm_json(res_str, fallback_data=STRATEGIST_FALLBACK)
+    
+    logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
+    
+    strat_msg = (
+        f"🧠 **[Phòng Sáng Tạo - Strategist]**\n"
+        f"- Đã nghiên cứu RAG và tự động dán RAG bài học thất bại.\n"
+        f"- **Angle đề xuất:** `{angle_data.get('angle_name')}`\n"
+        f"- **Nỗi đau đánh trúng:** \"{angle_data.get('pain_point_focus')}\"\n"
+        f"- **Tập trung:** {angle_data.get('psychological_angle')}"
+    )
+    
+    return trim_and_log(
+        state=state,
+        new_state_data={
+            "current_angle": angle_data,
+            "sop_stage": "creative_generation"
+        },
+        message=strat_msg,
+        log_action="Formulate Marketing Angle",
+        agent_name="Strategist Agent",
+        reason=f"Đề xuất góc tiếp cận sáng tạo thành công: '{angle_data.get('angle_name')}' ({angle_data.get('psychological_angle')}). Định hướng: {angle_data.get('brief')}",
+        log_metadata=angle_data
+    )
+
+def copywriter_node(state: AgencyState) -> dict:
+    """
+    Copywriter Node (Ban Sáng Tạo).
+    Constructs creative copies strictly constrained under Target CPA and Budget.
+    """
+    logger.info("Executing Copywriter Node (Constraint-Driven Content Generation)...")
+    
+    target_cpa = state.get("target_cpa", DEFAULT_TARGET_CPA)
+    test_budget = state.get("test_budget", DEFAULT_TEST_BUDGET)
+    
+    # 1. Generate Master Content
+    master_prompt = build_copywriter_master_prompt(state, target_cpa, test_budget)
+    logger.info("Generating Master Content via Ollama...")
+    master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True)
+    master_content = parse_llm_json(master_res, fallback_data=COPYWRITER_MASTER_FALLBACK)
+
+    # 2. Generate Platform Adaptation (Facebook variant)
+    variant_prompt = build_copywriter_variant_prompt(state, master_content, target_cpa, test_budget)
     logger.info("Generating Facebook Platform Variant...")
     var_res = generate_text(variant_prompt, system_prompt="You are a platform optimization copywriter. Output JSON only.", json_format=True)
-    
-    try:
-        import json_repair
-        fb_variant = json_repair.loads(var_res)
-    except Exception as e:
-        logger.error(f"Error parsing Platform Variant JSON: {e}")
-        fb_variant = {
-            "adapted_copy": "SẾP CÓ ĐANG ĐỐT TIỀN CHO ADS? 💸\n\nLà một CMO, bạn mất bao nhiêu giờ mỗi tuần để duyệt kịch bản quảng cáo và canh tắt ads lỗ?\n\nVới Marketing Agent OS v2.0, Ban Kinh Doanh tự động tính toán CPA Target và ép Copywriter viết đúng khuôn. Brand Guardian chấm điểm nghiêm ngặt đạt trên 80đ mới cho duyệt.\n\n👉 Nhấn đăng ký để nhận ngay bản Demo miễn phí!",
-            "seoTitle": "Marketing Agent OS v2.0 - Giải Pháp Tối Ưu CPA Tự Động",
-            "seoDescription": "Phần mềm tích hợp LangGraph tự động hóa ads, tự động tắt camp vượt CPA Target.",
-            "seoKeywords": ["tự động ads", "giảm CPA", "marketing agent"],
-            "hashtags": ["#TựĐộngHóaAds", "#TốiƯuCPA", "#AgentOS"],
-            "summary": "Mẫu copy chuyển đổi ads tối ưu cho sếp bận rộn",
-            "callToAction": "Đăng ký nhận Demo",
-            "platform_tips": "Đăng vào khung giờ hành chính thứ 3 và thứ 5",
-            "aiPrompt_used": "Facebook platform variant generator",
-            "confidence_score": 4.7,
-            "character_count": 350,
-            "optimization_notes": "Sử dụng emoji tiền và báo động để giật tít nỗi đau."
-        }
-
+    fb_variant = parse_llm_json(var_res, fallback_data=FB_VARIANT_FALLBACK)
     fb_variant["platform"] = "facebook"
-    
-    # Perform token trimming to keep context within 14000 tokens
-    raw_messages = state.get("messages", [])
-    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
-    
-    # Log copywriter decision
-    log_decision(
-        workspace_id=state.get("workspace_id"),
-        campaign_id=state.get("campaign_id"),
-        agent_name="Copywriter Agent",
-        action="Generate Social Script",
-        decision_status="success",
-        reason=f"Đã xây dựng xong kịch bản Facebook Ads thích ứng theo mục tiêu Target CPA {target_cpa:,.0f} VNĐ. Phản hồi feedback cũ được giải quyết.",
-        metadata={"hashtags": fb_variant.get("hashtags", []), "char_count": len(fb_variant.get("adapted_copy", ""))}
-    )
     
     copy_msg = (
         f"✍️ **[Phòng Sáng Tạo - Copywriter]**\n"
@@ -287,18 +285,26 @@ def copywriter_node(state: AgencyState) -> dict:
         f"- **Tags:** {', '.join(fb_variant.get('hashtags', []))}"
     )
     
-    return {
-        "master_content": master_content,
-        "variants": [fb_variant],
-        "sop_stage": "creative_generation",
-        "messages": [AIMessage(content=copy_msg)]
-    }
+    return trim_and_log(
+        state=state,
+        new_state_data={
+            "master_content": master_content,
+            "variants": [fb_variant],
+            "sop_stage": "creative_generation"
+        },
+        message=copy_msg,
+        log_action="Generate Social Script",
+        agent_name="Copywriter Agent",
+        log_metadata={
+            "hashtags": fb_variant.get("hashtags", []),
+            "char_count": len(fb_variant.get("adapted_copy", ""))
+        }
+    )
 
 def brand_guardian_node(state: AgencyState) -> dict:
     """
     Brand Guardian Node (Ban Sáng Tạo).
-    Enforces the strict CMO 100-Point behavioral scoring matrix.
-    If the copy scores >= 80, triggers LangGraph interrupt for human-in-the-loop approval.
+    Enforces the strict CMO 100-Point compliance check.
     """
     logger.info("Executing Brand Guardian Node (Scoring Compliance Gatekeeper)...")
     
@@ -311,68 +317,36 @@ def brand_guardian_node(state: AgencyState) -> dict:
         
     fb_copy = variants[0].get("adapted_copy", "")
     
-    # Run scoring LLM evaluation
-    guardian_prompt = EDITOR_BRAND_GUARDIAN_PROMPT.format(
-        brand_name="G-Agent Tech",
-        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
-        brand_keywords="AI Agent, LangGraph, Tối ưu CPA"
-    )
-    
-    guardian_prompt += (
-        f"\n### NỘI DUNG ĐỀ XUẤT CẦN ĐÁNH GIÁ:\n"
-        f"- Master Core Message: \"{master_content.get('core_message')}\"\n"
-        f"- Facebook Variant Copy: \"{fb_copy}\"\n"
-    )
-    
-    logger.info("Running CMO 100-Point compliance scoring via Ollama...")
+    # Run evaluation
+    guardian_prompt = build_brand_guardian_prompt(state, master_content, fb_copy)
+    logger.info("Running compliance scoring via Ollama...")
     res_str = generate_text(guardian_prompt, system_prompt="You are the Brand Guardian. Score compliance in valid JSON.", json_format=True)
+    eval_data = parse_llm_json(res_str, fallback_data=GUARDIAN_FALLBACK)
     
-    try:
-        import json_repair
-        eval_data = json_repair.loads(res_str)
-        score = int(eval_data.get("score", 75))
-        reason = eval_data.get("feedback_reason", "Chưa đạt tiêu chí Hook hoặc CTA.")
-    except Exception as e:
-        logger.error(f"Error parsing Guardian scoring JSON: {e}")
-        # Graceful fallback scoring
-        score = 82 # Assume pass to demonstrate the interrupt block
-        reason = "Đạt chỉ tiêu: Hook (30/35), Retention (20/25), Emotion (20/25), CTA (12/15). Brand Voice chuẩn xác."
-        
-    logger.info(f"CMO Scoring Result: {score}/100. Feedback: {reason}")
+    score = int(eval_data.get("score", 75))
+    reason = eval_data.get("feedback_reason" if "feedback_reason" in eval_data else "reason", "Chưa đạt tiêu chí Hook hoặc CTA.")
     
+    logger.info(f"Compliance Scoring Result: {score}/100. Feedback: {reason}")
     log_entry = f"Lượt đánh giá {len(feedback_log)+1} - Điểm: {score}/100 - Lý do: {reason}"
     new_logs = feedback_log + [log_entry]
     
-    # Perform token trimming to keep context within 14000 tokens
-    raw_messages = state.get("messages", [])
-    safe_messages = get_trimmed_context(raw_messages, max_tokens=14000)
-    
-    # Log Brand Guardian compliance check decision
-    status_str = "success" if score >= 80 else "failed"
-    log_decision(
-        workspace_id=state.get("workspace_id"),
-        campaign_id=state.get("campaign_id"),
-        agent_name="Brand Guardian Agent",
-        action="Evaluate Copy Compliance",
-        decision_status=status_str,
-        reason=f"Chấm điểm bài viết quảng cáo đạt {score}/100 điểm. Kết quả: {'VƯỢT QUA' if score >= 80 else 'TỪ CHỐI (CẦN SỬA LẠI)'}. Feedback: {reason}",
-        metadata={"score": score, "feedback": reason}
-    )
-    
+    status_str = "success" if score >= GUARDIAN_PASS_SCORE else "failed"
+    sop_stage = "waiting_approval" if score >= GUARDIAN_PASS_SCORE else "creative_generation"
     guardian_msg = f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{log_entry}`"
     
-    # Conditional branching threshold check
-    if score >= 80:
-        logger.info("Score >= 80! Creative output successfully PASSED. Preparing for CEO Interrupt (waiting_approval)...")
-        return {
+    return trim_and_log(
+        state=state,
+        new_state_data={
             "feedback_log": new_logs,
-            "sop_stage": "waiting_approval",
-            "messages": [AIMessage(content=guardian_msg)]
+            "sop_stage": sop_stage
+        },
+        message=guardian_msg,
+        log_action="Evaluate Copy Compliance",
+        agent_name="Brand Guardian Agent",
+        decision_status=status_str,
+        reason=f"Chấm điểm bài viết quảng cáo đạt {score}/100 điểm. Kết quả: {'VƯỢT QUA' if score >= GUARDIAN_PASS_SCORE else 'TỪ CHỐI (CẦN SỬA LẠI)'}. Feedback: {reason}",
+        log_metadata={
+            "score": score,
+            "feedback": reason
         }
-    else:
-        logger.warning(f"Score {score} < 80. REJECTED by Brand Guardian! Triggering rewrite loop...")
-        return {
-            "feedback_log": new_logs,
-            "sop_stage": "creative_generation",
-            "messages": [AIMessage(content=guardian_msg)]
-        }
+    )

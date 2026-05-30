@@ -1,11 +1,10 @@
 # core/ollama_client.py
 import os
-import json
 import logging
-import requests
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatOllama
-from langchain_core.messages import trim_messages
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_core.messages import trim_messages, SystemMessage, HumanMessage
 
 load_dotenv()
 logger = logging.getLogger("ollama_client")
@@ -13,54 +12,51 @@ logging.basicConfig(level=logging.INFO)
 
 # Configs
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://172.22.45.28:11434")
-OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:14b-instruct")
+OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:7b-instruct")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "bge-m3")
 OLLAMA_RERANK_MODEL = os.getenv("OLLAMA_RERANK_MODEL", "bge-reranker-large:latest")
 
-# Initialize ChatOllama for token counting
-llm_counter = ChatOllama(
-    model=OLLAMA_LLM_MODEL,
+# Initialize LangChain Ollama Models
+llm = ChatOllama(
     base_url=OLLAMA_HOST,
+    model=OLLAMA_LLM_MODEL,
+    temperature=0.2,
     num_ctx=16384
 )
 
+llm_json = ChatOllama(
+    base_url=OLLAMA_HOST,
+    model=OLLAMA_LLM_MODEL,
+    temperature=0.2,
+    num_ctx=16384,
+    format="json"
+)
+
+embeddings_model = OllamaEmbeddings(
+    base_url=OLLAMA_HOST,
+    model=OLLAMA_EMBED_MODEL
+)
+
 def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False) -> str:
-    """Generate text using Ollama's Qwen2.5 14B model."""
+    """Generate text using Ollama's ChatOllama model through LangChain."""
     try:
-        url = f"{OLLAMA_HOST}/api/generate"
-        payload = {
-            "model": OLLAMA_LLM_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.2, "num_ctx": 16384}
-        }
+        model = llm_json if json_format else llm
+        
+        messages = []
         if system_prompt:
-            payload["system"] = system_prompt
-        if json_format:
-            payload["format"] = "json"
-            
-        response = requests.post(url, json=payload, timeout=60)
-        if response.status_code == 200:
-            return response.json().get("response", "")
-        else:
-            raise Exception(f"Ollama server returned code {response.status_code}: {response.text}")
+            messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=prompt))
+        
+        response = model.invoke(messages)
+        return response.content
     except Exception as e:
         logger.error(f"Error in generate_text: {e}")
         raise
 
 def get_embedding(text_content: str) -> list:
-    """Generate vector embedding (1024-dim) using bge-m3."""
+    """Generate vector embedding (1024-dim) using bge-m3 via OllamaEmbeddings."""
     try:
-        url = f"{OLLAMA_HOST}/api/embeddings"
-        payload = {
-            "model": OLLAMA_EMBED_MODEL,
-            "prompt": text_content
-        }
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            return response.json().get("embedding", [])
-        else:
-            raise Exception(f"Ollama embedding returned code {response.status_code}: {response.text}")
+        return embeddings_model.embed_query(text_content)
     except Exception as e:
         logger.error(f"Error in get_embedding: {e}")
         raise
@@ -85,7 +81,6 @@ def rerank_documents(query: str, documents: list) -> list:
             )
             score_str = generate_text(prompt, system_prompt="You are an expert search reranker. Output numbers only.")
             try:
-                # Find any float in output
                 import re
                 match = re.search(r"(\d+\.\d+)", score_str)
                 score = float(match.group(1)) if match else 0.5
@@ -107,11 +102,9 @@ def get_trimmed_context(messages: list, max_tokens: int = 14000) -> list:
     if not messages:
         return []
         
-    # Standard fallback token counter to avoid heavy transformers/tiktoken imports
     def count_tokens(msgs: list) -> int:
         total_tokens = 0
         for m in msgs:
-            # 1 token ~= 3.5 characters for standard text including Vietnamese/English
             total_tokens += len(m.content or "") // 3.5 + 4
         return int(total_tokens)
         
@@ -127,10 +120,8 @@ def get_trimmed_context(messages: list, max_tokens: int = 14000) -> list:
         logger.info(f"Successfully trimmed messages context. Count before: {len(messages)}, after: {len(trimmed)}")
         return trimmed
     except Exception as e:
-        # Fail-safe fallback: return SystemMessage (if it's the first message) and append the last 8 messages
         logger.error(f"Error in trim_messages: {e}. Falling back to basic slice.", exc_info=True)
         from langchain_core.messages import SystemMessage
         system_msg = [messages[0]] if isinstance(messages[0], SystemMessage) else []
         other_msgs = messages[1:] if system_msg else messages
         return system_msg + other_msgs[-8:]
-
