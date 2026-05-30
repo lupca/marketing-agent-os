@@ -10,6 +10,8 @@ from graphs.creative_reporter import creative_report_node
 from graphs.triage import triage_node, route_after_triage
 from graphs.publisher import publisher_node, waiting_approval_barrier_node, route_after_guardian
 from graphs.chat import chat_node
+from graphs.negotiator import negotiator_node
+from graphs.commit import commit_node
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -61,8 +63,10 @@ class LazyPostgresSaver(BaseCheckpointSaver):
     def put_writes(self, config, writes, task_id):
         return self._run_sync(self.saver.aput_writes(config, writes, task_id))
 
-    def list(self, config, *, before=None, limit=None):
-        return self._run_sync(self.saver.alist(config, before=before, limit=limit))
+    def list(self, config, *args, **kwargs):
+        async def collect():
+            return [x async for x in self.saver.alist(config, *args, **kwargs)]
+        return self._run_sync(collect())
 
     async def aget_tuple(self, config):
         return await self.saver.aget_tuple(config)
@@ -73,8 +77,9 @@ class LazyPostgresSaver(BaseCheckpointSaver):
     async def aput_writes(self, config, writes, task_id):
         return await self.saver.aput_writes(config, writes, task_id)
 
-    async def alist(self, config, *, before=None, limit=None):
-        return await self.saver.alist(config, before=before, limit=limit)
+    async def alist(self, config, *args, **kwargs):
+        async for checkpoint_tuple in self.saver.alist(config, *args, **kwargs):
+            yield checkpoint_tuple
         
     async def setup(self):
         await self.saver.setup()
@@ -124,6 +129,19 @@ else:
         loop.run_until_complete(setup_checkpointer())
 
 
+# ----------------- v3.2 Negotiation & Commit Nodes -----------------
+
+def waiting_draft_approval_node(state: AgencyState) -> dict:
+    """A barrier node where LangGraph will pause (interrupt_before) awaiting draft approval."""
+    logger.info("LangGraph paused at draft approval barrier. Awaiting CMO approval...")
+    return {"sop_stage": "waiting_draft_approval"}
+
+def route_after_draft_barrier(state: AgencyState) -> str:
+    """Conditional routing after draft approval barrier."""
+    if state.get("draft_approved"):
+        return "commit_node"
+    return "negotiator"
+
 # ----------------- Build LangGraph StateGraph -----------------
 
 builder = StateGraph(AgencyState)
@@ -132,6 +150,9 @@ builder = StateGraph(AgencyState)
 builder.add_node("triage", triage_node)
 builder.add_node("analyst", analyst_node)
 builder.add_node("performance", performance_node)
+builder.add_node("negotiator", negotiator_node)
+builder.add_node("waiting_draft_approval", waiting_draft_approval_node)
+builder.add_node("commit_node", commit_node)
 builder.add_node("strategist", strategist_node)
 builder.add_node("copywriter", copywriter_node)
 builder.add_node("guardian", brand_guardian_node)
@@ -159,7 +180,17 @@ builder.add_conditional_edges(
 )
 
 # Standard flows
-builder.add_edge("analyst", "strategist")
+builder.add_edge("analyst", "waiting_draft_approval")
+builder.add_conditional_edges(
+    "waiting_draft_approval",
+    route_after_draft_barrier,
+    {
+        "commit_node": "commit_node",
+        "negotiator": "negotiator"
+    }
+)
+builder.add_edge("negotiator", "waiting_draft_approval")
+builder.add_edge("commit_node", "strategist")
 builder.add_edge("strategist", "copywriter")
 builder.add_edge("copywriter", "guardian")
 builder.add_edge("researcher_agent", END)
@@ -184,5 +215,5 @@ builder.add_edge("performance", END)
 # Compile Graph with Interrupt before Sếp review barrier
 graph = builder.compile(
     checkpointer=postgres_checkpointer,
-    interrupt_before=["waiting_approval_barrier"]
+    interrupt_before=["waiting_draft_approval", "waiting_approval_barrier"]
 )

@@ -2,8 +2,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOllama
-from langchain_community.embeddings import OllamaEmbeddings
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.messages import trim_messages, SystemMessage, HumanMessage
 
 load_dotenv()

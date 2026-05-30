@@ -211,11 +211,21 @@ def strategist_node(state: AgencyState) -> dict:
     product_name = product.name if product else "Sản phẩm AI"
     product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
     
-    # 2. Get customer insights from Researcher
+    # 2. Get customer insights from Researcher (dùng access_tags phân quyền đúng)
     logger.info("Calling Researcher Agent for customer insights...")
     try:
-        insights_str = run_research(workspace_id, f"chiến lược marketing khách hàng nỗi đau cho {product_name}")
-        anti_patterns_report = run_research(workspace_id, f"mẫu quảng cáo thất bại sai lầm sản phẩm {product_name}")
+        # Insights tâm lý/chiến lược: truy cập cả marketing, psychology, economics
+        insights_str = run_research(
+            workspace_id,
+            f"chiến lược marketing khách hàng nỗi đau cho {product_name}",
+            access_tags=["marketing", "psychology", "economics", "global"],
+        )
+        # Anti-patterns: chỉ truy cập anti_patterns + manager_feedback
+        anti_patterns_report = run_research(
+            workspace_id,
+            f"mẫu quảng cáo thất bại sai lầm sản phẩm {product_name}",
+            access_tags=["anti_patterns", "manager_feedback"],
+        )
     except Exception as e:
         logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo từ Researcher: {e}")
         db.close()

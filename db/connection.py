@@ -22,6 +22,9 @@ POSTGRES_URL = os.getenv(
     "postgresql://postgres:secret_password@localhost:5432/marketing_agent_db"
 )
 
+if POSTGRES_URL.startswith("postgresql://"):
+    POSTGRES_URL = POSTGRES_URL.replace("postgresql://", "postgresql://", 1)
+
 engine = None
 SessionLocal = None
 IS_MOCK_DATABASE = False

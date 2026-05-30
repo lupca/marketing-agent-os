@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge Base — Marketing Agent OS</title>
+  <meta name="description" content="Quản trị tri thức tập trung cho Marketing Agent OS. Upload, phân quyền và kiểm thử tài liệu RAG." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+  <!-- Dropzone.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.css" />
+  <style>
+    /* ============================================================
+       DESIGN SYSTEM
+    ============================================================ */
+    :root {
+      --bg-base: #0f1117;
+      --bg-card: #1a1d27;
+      --bg-card-hover: #1f2235;
+      --bg-input: #12151f;
+      --border: #2a2d3e;
+      --border-focus: #6366f1;
+
+      --text-primary: #e8eaf6;
+      --text-secondary: #8b91b5;
+      --text-muted: #4a5082;
+
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --accent-hover: #818cf8;
+
+      --green: #22c55e;
+      --green-glow: rgba(34, 197, 94, 0.2);
+      --yellow: #f59e0b;
+      --yellow-glow: rgba(245, 158, 11, 0.2);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.2);
+      --blue: #3b82f6;
+      --purple: #8b5cf6;
+      --orange: #f97316;
+      --cyan: #06b6d4;
+
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background grid decoration */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ---- HEADER ---- */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 17, 23, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      height: 64px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+    .header-divider { color: var(--border); }
+    .header-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .header-spacer { flex: 1; }
+    .btn-back {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+    .btn-back:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ---- MAIN LAYOUT ---- */
+    .main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- SECTION HEADER ---- */
+    .section-header {
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ---- CARD ---- */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      transition: var(--transition);
+    }
+    .card:hover { border-color: rgba(99,102,241,0.3); }
+
+    /* ---- DROPZONE ---- */
+    .dz-custom {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-input);
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .dz-custom::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, var(--accent-glow) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .dz-custom:hover,
+    .dz-custom.dz-drag-hover {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.05);
+    }
+    .dz-custom:hover::before { opacity: 1; }
+    .dz-upload-icon { font-size: 40px; }
+    .dz-upload-text { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+    .dz-upload-hint { font-size: 12px; color: var(--text-muted); }
+    .dz-custom .dz-message { margin: 0; }
+
+    /* ---- TAG SELECTOR ---- */
+    .tag-area { margin-top: 20px; }
+    .tag-area label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 10px;
+    }
+    .tags-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tag-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      user-select: none;
+    }
+    .tag-chip .tag-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .tag-chip.selected {
+      border-color: currentColor;
+      background: rgba(255,255,255,0.06);
+    }
+    .tag-chip:hover { opacity: 0.8; }
+
+    .upload-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    /* ---- BUTTONS ---- */
+    .btn {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red);
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn-edit {
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.3);
+      color: var(--accent-hover);
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .btn-edit:hover { background: rgba(99,102,241,0.25); }
+
+    /* ---- STATUS BADGES ---- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge-processing { background: var(--yellow-glow); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-ready     { background: var(--green-glow);  color: var(--green);  border: 1px solid rgba(34,197,94,0.3); }
+    .badge-failed    { background: var(--red-glow);    color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+    .badge-syncing   { background: rgba(99,102,241,0.15); color: var(--accent-hover); border: 1px solid rgba(99,102,241,0.3); }
+    .badge-synced    { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ---- TABLE ---- */
+    .table-wrapper { overflow-x: auto; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(42,45,62,0.5);
+      transition: var(--transition);
+    }
+    tbody tr:hover { background: var(--bg-card-hover); }
+    tbody td {
+      padding: 14px 16px;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .filename { font-weight: 500; color: var(--text-primary); }
+    .filesize { color: var(--text-muted); font-size: 12px; }
+    .actions { display: flex; gap: 8px; }
+
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- PAGINATION ---- */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .page-btn {
+      width: 34px; height: 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ---- PLAYGROUND ---- */
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) { .playground-grid { grid-template-columns: 1fr; } }
+    .input-group { margin-bottom: 16px; }
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    textarea, input[type=text] {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      padding: 12px 14px;
+      resize: vertical;
+      transition: var(--transition);
+    }
+    textarea:focus, input[type=text]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    textarea { min-height: 100px; }
+
+    .result-panel {
+      min-height: 200px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      overflow-y: auto;
+      max-height: 500px;
+    }
+    .result-item {
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+      background: var(--bg-card);
+      transition: var(--transition);
+    }
+    .result-item:hover { border-color: rgba(99,102,241,0.3); }
+    .result-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .result-score {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green);
+    }
+    .result-content {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .score-bar {
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* ---- MODAL ---- */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ---- TOAST ---- */
+    #toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      font-size: 13px;
+      color: var(--text-primary);
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: var(--shadow);
+      animation: toastIn 0.3s ease;
+      max-width: 340px;
+    }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+
+    /* Stats row */
+    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 140px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+    }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    .flex-center { display: flex; align-items: center; justify-content: center; }
+    .gap-8 { gap: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .text-muted { color: var(--text-muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <div class="logo-icon">🤖</div>
+      <span class="logo-text">Marketing OS</span>
+    </a>
+    <span class="header-divider">/</span>
+    <span class="header-title">Knowledge Base</span>
+    <div class="header-spacer"></div>
+    <a href="/" class="btn-back">← Chat</a>
+    <a href="/dashboard" class="btn-back">📊 Dashboard</a>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Tổng tài liệu</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--green)" id="stat-ready">—</div>
+      <div class="stat-label">Sẵn sàng</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--yellow)" id="stat-processing">—</div>
+      <div class="stat-label">Đang xử lý</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--accent)" id="stat-chunks">—</div>
+      <div class="stat-label">Tổng chunks</div>
+    </div>
+  </div>
+
+  <!-- ===== KHU VỰC A: SMART UPLOAD ===== -->
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">
+          <div class="icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">📤</div>
+          Khu vực A — Smart Upload
+        </div>
+        <div class="section-desc">Kéo thả hoặc click để chọn tài liệu. Hệ thống sẽ tự động băm vector ngầm qua Celery.</div>
+      </div>
+    </div>
+
+    <!-- Dropzone -->
+    <form id="upload-dropzone" class="dropzone dz-custom" action="/api/rag/upload" method="POST">
+      <div class="dz-message" data-dz-message>
+        <div class="dz-upload-icon">📁</div>
+        <div class="dz-upload-text">Kéo thả file vào đây hoặc <span style="color:var(--accent)">click để chọn</span></div>
+        <div class="dz-upload-hint">Hỗ trợ: PDF, TXT, DOCX, XLSX • Tối đa 50MB/file</div>
+      </div>
+    </form>
+
+    <!-- Tag selector -->
+    <div class="tag-area">
+      <label>🏷️ Phân quyền truy cập (chọn tags trước khi upload)</label>
+      <div class="tags-grid" id="tags-grid">
+        <div class="text-muted">Đang tải tags...</div>
+      </div>
+    </div>
+
+    <div class="upload-actions">
+      <span class="text-muted" id="upload-status-hint">Chọn file và tags để bắt đầu upload</span>
+    </div>
+  </div>
+
+  <!-- ===== KHU VỰC B: KNOWLEDGE GRID ===== -->
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">
+          <div class="icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">📋</div>
+          Khu vực B — The Knowledge Grid
+        </div>
+        <div class="section-desc">Quản lý toàn bộ tài liệu. Sửa tag và xóa mềm sẽ được Celery cascade cập nhật xuống tất cả chunks ngầm.</div>
+      </div>
+      <button class="btn btn-ghost" onclick="loadDocuments()" id="btn-refresh">🔄 Làm mới</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table id="docs-table">
+        <thead>
+          <tr>
+            <th>Tên tài liệu</th>
+            <th>Tags</th>
+            <th>Trạng thái</th>
+            <th>Chunks</th>
+            <th>Kích thước</th>
+            <th>Ngày upload</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="docs-tbody">
+          <tr><td colspan="7" class="empty-state"><div class="icon">📂</div>Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- ===== KHU VỰC C: RAG PLAYGROUND ===== -->
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">
+          <div class="icon" style="background:linear-gradient(135deg,#22c55e,#06b6d4)">🔬</div>
+          Khu vực C — RAG Testing Playground
+        </div>
+        <div class="section-desc">Kiểm thử truy vấn Zero-JOIN trực tiếp. Kết quả thực tế từ HNSW Index.</div>
+      </div>
+    </div>
+
+    <div class="playground-grid">
+      <!-- Input -->
+      <div>
+        <div class="input-group">
+          <label>Câu hỏi / Truy vấn</label>
+          <textarea id="pg-query" placeholder="VD: Chính sách quảng cáo Facebook về sản phẩm giảm cân..."></textarea>
+        </div>
+        <div class="input-group">
+          <label>Lọc theo tags (giữ Ctrl để chọn nhiều)</label>
+          <div class="tags-grid" id="pg-tags-grid" style="min-height:40px">
+            <div class="text-muted">Đang tải...</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Số kết quả tối đa</label>
+          <input type="text" id="pg-limit" value="5" style="width:80px" />
+        </div>
+        <button class="btn btn-primary" id="btn-test" onclick="runTestRetrieval()">
+          🚀 Chạy Retrieval
+        </button>
+        <div class="mt-12 text-muted" id="pg-elapsed"></div>
+      </div>
+
+      <!-- Results -->
+      <div>
+        <div class="input-group">
+          <label>Kết quả trả về</label>
+        </div>
+        <div class="result-panel" id="pg-results">
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <div>Nhập query và nhấn Chạy để kiểm thử RAG</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== MODAL: SỬA TAGS ===== -->
+<div class="modal-overlay" id="modal-edit-tags">
+  <div class="modal">
+    <div class="modal-title">🏷️ Cập nhật Access Tags</div>
+    <input type="hidden" id="modal-doc-id" />
+    <div class="input-group">
+      <label>Tên tài liệu</label>
+      <input type="text" id="modal-doc-name" disabled />
+    </div>
+    <div class="input-group">
+      <label>Chọn tags mới</label>
+      <div class="tags-grid" id="modal-tags-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Huỷ</button>
+      <button class="btn btn-primary" onclick="saveDocumentTags()">💾 Lưu thay đổi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST CONTAINER ===== -->
+<div id="toast-container"></div>
+
+<!-- ===== SCRIPTS ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+let allTags = [];
+let selectedUploadTags = ["global"];
+let selectedPlaygroundTags = ["global"];
+let currentPage = 1;
+let totalDocs = 0;
+const PAGE_SIZE = 20;
+const WORKSPACE_ID = null; // null = auto-detect (first workspace)
+let pollIntervals = {};
+
+/* ============================================================
+   UTILS
+============================================================ */
+function toast(msg, type = "info", duration = 3500) {
+  const ct = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  const icons = { success: "✅", error: "❌", info: "ℹ️" };
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  ct.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, duration);
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return "—";
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function formatDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function qs(url, params) {
+  const u = new URL(url, window.location.origin);
+  if (params) Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+  return u.toString();
+}
+
+function statusBadge(uploadStatus, syncStatus) {
+  const uMap = { processing: ["badge-processing", "⏳ Đang xử lý"], ready: ["badge-ready", "✅ Sẵn sàng"], failed: ["badge-failed", "❌ Lỗi"] };
+  const sMap = { syncing: ["badge-syncing", "<span class='spin'>⟳</span> Đồng bộ"], synced: ["badge-synced", ""], failed: ["badge-failed", "⚠ Sync lỗi"] };
+  const [uc, ut] = uMap[uploadStatus] || ["badge-failed", uploadStatus];
+  const [sc, st] = sMap[syncStatus] || ["badge-synced", ""];
+  let html = `<span class="badge ${uc}">${ut}</span>`;
+  if (syncStatus === "syncing") html += ` <span class="badge ${sc}">${st}</span>`;
+  if (syncStatus === "failed") html += ` <span class="badge ${sc}">${st}</span>`;
+  return html;
+}
+
+/* ============================================================
+   TAGS
+============================================================ */
+async function loadTags() {
+  try {
+    const params = WORKSPACE_ID ? { workspace_id: WORKSPACE_ID } : {};
+    const res = await fetch(qs("/api/rag/tags", params));
+    const data = await res.json();
+    allTags = data.tags || [];
+    renderUploadTagGrid();
+    renderPlaygroundTagGrid();
+    renderModalTagGrid();
+  } catch (e) {
+    document.getElementById("tags-grid").innerHTML = `<span class="text-muted">Lỗi tải tags</span>`;
+  }
+}
+
+function renderTagGrid(containerId, selected, onToggle, colorize = true) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!allTags.length) { el.innerHTML = `<span class="text-muted">Chưa có tags</span>`; return; }
+  el.innerHTML = allTags.map(t => {
+    const isSelected = selected.includes(t.tag_name);
+    const style = isSelected && colorize ? `color:${t.color};border-color:${t.color}` : "";
+    return `
+      <div class="tag-chip ${isSelected ? "selected" : ""}" style="${style}"
+           onclick="${onToggle}('${t.tag_name}', '${containerId}')">
+        <span class="tag-dot" style="background:${t.color}"></span>
+        ${t.tag_name}
+      </div>`;
+  }).join("");
+}
+
+function renderUploadTagGrid() { renderTagGrid("tags-grid", selectedUploadTags, "toggleUploadTag"); }
+function renderPlaygroundTagGrid() { renderTagGrid("pg-tags-grid", selectedPlaygroundTags, "togglePlaygroundTag"); }
+function renderModalTagGrid() { renderTagGrid("modal-tags-grid", selectedUploadTags, "toggleModalTag"); }
+
+function toggleUploadTag(tagName, _) {
+  if (selectedUploadTags.includes(tagName)) {
+    if (selectedUploadTags.length === 1) return; // Phải có ít nhất 1 tag
+    selectedUploadTags = selectedUploadTags.filter(t => t !== tagName);
+  } else {
+    selectedUploadTags.push(tagName);
+  }
+  renderUploadTagGrid();
+}
+
+function togglePlaygroundTag(tagName, _) {
+  if (selectedPlaygroundTags.includes(tagName)) {
+    if (selectedPlaygroundTags.length === 1) return;
+    selectedPlaygroundTags = selectedPlaygroundTags.filter(t => t !== tagName);
+  } else {
+    selectedPlaygroundTags.push(tagName);
+  }
+  renderPlaygroundTagGrid();
+}
+
+let modalSelectedTags = [];
+function toggleModalTag(tagName, _) {
+  if (modalSelectedTags.includes(tagName)) {
+    if (modalSelectedTags.length === 1) return;
+    modalSelectedTags = modalSelectedTags.filter(t => t !== tagName);
+  } else {
+    modalSelectedTags.push(tagName);
+  }
+  renderTagGrid("modal-tags-grid", modalSelectedTags, "toggleModalTag");
+}
+
+/* ============================================================
+   DROPZONE CONFIG
+============================================================ */
+Dropzone.autoDiscover = false;
+const dz = new Dropzone("#upload-dropzone", {
+  url: "/api/rag/upload",
+  paramName: "file",
+  maxFilesize: 50,
+  acceptedFiles: ".pdf,.txt,.docx,.xlsx",
+  addRemoveLinks: true,
+  dictDefaultMessage: "",
+  autoProcessQueue: false,
+  parallelUploads: 1,
+
+  init: function () {
+    this.on("addedfile", (file) => {
+      document.getElementById("upload-status-hint").textContent = `📄 ${file.name} (${formatBytes(file.size)}) — Nhấn Upload để bắt đầu`;
+    });
+
+    this.on("sending", (file, xhr, formData) => {
+      formData.append("access_tags", JSON.stringify(selectedUploadTags));
+      if (WORKSPACE_ID) formData.append("workspace_id", WORKSPACE_ID);
+    });
+
+    this.on("success", (file, response) => {
+      toast(`✅ "${file.name}" đã được nhận! Celery đang băm vector ngầm...`, "success", 5000);
+      this.removeFile(file);
+      document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
+      // Poll status của document vừa upload
+      if (response.document_id) startPollingDocument(response.document_id);
+      setTimeout(loadDocuments, 1500);
+    });
+
+    this.on("error", (file, errorMsg) => {
+      const msg = typeof errorMsg === "object" ? errorMsg.detail : errorMsg;
+      toast(`❌ Upload thất bại: ${msg}`, "error");
+    });
+  }
+});
+
+document.getElementById("upload-dropzone").addEventListener("click", () => {
+  if (!dz.getQueuedFiles().length) dz.element.querySelector(".dz-hidden-input").click();
+  else { dz.processQueue(); }
+});
+
+// Thêm nút Upload riêng
+const uploadActions = document.querySelector(".upload-actions");
+const uploadBtn = document.createElement("button");
+uploadBtn.className = "btn btn-primary";
+uploadBtn.innerHTML = "📤 Upload tất cả";
+uploadBtn.onclick = () => dz.processQueue();
+uploadActions.prepend(uploadBtn);
+
+/* ============================================================
+   DOCUMENTS TABLE
+============================================================ */
+async function loadDocuments(page = 1) {
+  currentPage = page;
+  document.getElementById("btn-refresh").textContent = "⏳ Đang tải...";
+  try {
+    const params = { page, limit: PAGE_SIZE };
+    if (WORKSPACE_ID) params.workspace_id = WORKSPACE_ID;
+    const res = await fetch(qs("/api/rag/documents", params));
+    const data = await res.json();
+
+    totalDocs = data.total || 0;
+    const docs = data.documents || [];
+
+    // Update stats
+    let readyCount = 0, procCount = 0, totalChunks = 0;
+    docs.forEach(d => {
+      if (d.upload_status === "ready") readyCount++;
+      if (d.upload_status === "processing") procCount++;
+      totalChunks += d.chunk_count || 0;
+    });
+    document.getElementById("stat-total").textContent = totalDocs;
+    document.getElementById("stat-ready").textContent = readyCount;
+    document.getElementById("stat-processing").textContent = procCount;
+    document.getElementById("stat-chunks").textContent = totalChunks.toLocaleString();
+
+    renderTable(docs);
+    renderPagination(data.total, page);
+
+    // Auto-poll processing docs
+    docs.filter(d => d.upload_status === "processing" || d.sync_status === "syncing")
+        .forEach(d => startPollingDocument(d.document_id));
+
+  } catch (e) {
+    document.getElementById("docs-tbody").innerHTML = `<tr><td colspan="7" class="empty-state"><div class="icon">⚠️</div>Lỗi tải danh sách tài liệu</td></tr>`;
+  }
+  document.getElementById("btn-refresh").textContent = "🔄 Làm mới";
+}
+
+function renderTable(docs) {
+  const tbody = document.getElementById("docs-tbody");
+  if (!docs.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><div>Chưa có tài liệu nào. Upload tài liệu đầu tiên của bạn!</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = docs.map(d => {
+    const tags = (d.access_tags || ["global"]).map(t => {
+      const tag = allTags.find(at => at.tag_name === t);
+      return `<span class="tag-chip" style="color:${tag?.color||'#6366f1'};border-color:${tag?.color||'#6366f1'};padding:3px 8px;font-size:11px"><span class="tag-dot" style="background:${tag?.color||'#6366f1'}"></span>${t}</span>`;
+    }).join(" ");
+
+    return `<tr data-doc-id="${d.document_id}">
+      <td>
+        <div class="filename">📄 ${d.file_name}</div>
+        <div class="filesize">${d.document_id.slice(0, 8)}...</div>
+      </td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px">${tags}</div></td>
+      <td id="status-${d.document_id}">${statusBadge(d.upload_status, d.sync_status)}</td>
+      <td>${d.chunk_count ? `<strong>${d.chunk_count}</strong>` : "—"}</td>
+      <td>${formatBytes(d.file_size_bytes)}</td>
+      <td>${formatDate(d.created_at)}</td>
+      <td>
+        <div class="actions">
+          <button class="btn btn-edit" onclick="openEditTags('${d.document_id}', '${d.file_name}', ${JSON.stringify(d.access_tags)})">✏️ Sửa</button>
+          <button class="btn btn-danger" onclick="deleteDocument('${d.document_id}', '${d.file_name}')">🗑️ Xóa</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function renderPagination(total, current) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) { document.getElementById("pagination").innerHTML = ""; return; }
+  let html = `<button class="page-btn" onclick="loadDocuments(${current-1})" ${current<=1?"disabled":""}>←</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    html += `<button class="page-btn ${i===current?"active":""}" onclick="loadDocuments(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="loadDocuments(${current+1})" ${current>=totalPages?"disabled":""}>→</button>`;
+  document.getElementById("pagination").innerHTML = html;
+}
+
+/* ============================================================
+   POLLING (Status check)
+============================================================ */
+function startPollingDocument(docId) {
+  if (pollIntervals[docId]) return;
+  let attempts = 0;
+  pollIntervals[docId] = setInterval(async () => {
+    attempts++;
+    if (attempts > 60) { clearInterval(pollIntervals[docId]); delete pollIntervals[docId]; return; }
+    try {
+      const res = await fetch(`/api/rag/documents/${docId}/status`);
+      const d = await res.json();
+      const statusEl = document.getElementById(`status-${docId}`);
+      if (statusEl) statusEl.innerHTML = statusBadge(d.upload_status, d.sync_status);
+
+      if (d.upload_status === "ready" && d.sync_status === "synced") {
+        clearInterval(pollIntervals[docId]); delete pollIntervals[docId];
+        toast(`✅ Tài liệu "${d.file_name}" đã băm xong ${d.chunk_count} chunks!`, "success");
+        loadDocuments(currentPage);
+      }
+      if (d.upload_status === "failed") {
+        clearInterval(pollIntervals[docId]); delete pollIntervals[docId];
+        toast(`❌ Băm vector thất bại: "${d.file_name}"`, "error");
+      }
+    } catch (_) {}
+  }, 3000);
+}
+
+/* ============================================================
+   EDIT TAGS MODAL
+============================================================ */
+function openEditTags(docId, fileName, currentTags) {
+  document.getElementById("modal-doc-id").value = docId;
+  document.getElementById("modal-doc-name").value = fileName;
+  modalSelectedTags = [...currentTags];
+  renderTagGrid("modal-tags-grid", modalSelectedTags, "toggleModalTag");
+  document.getElementById("modal-edit-tags").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal-edit-tags").classList.remove("open");
+}
+
+async function saveDocumentTags() {
+  const docId = document.getElementById("modal-doc-id").value;
+  try {
+    const res = await fetch(`/api/rag/documents/${docId}/tags`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_tags: modalSelectedTags })
+    });
+    if (!res.ok) { const e = await res.json(); toast(`❌ ${e.detail}`, "error"); return; }
+    toast("🔄 Đã gửi yêu cầu cập nhật tags. Celery đang đồng bộ ngầm...", "info");
+    closeModal();
+    setTimeout(() => { loadDocuments(currentPage); }, 1000);
+    const statusEl = document.getElementById(`status-${docId}`);
+    if (statusEl) statusEl.innerHTML = statusBadge("ready", "syncing");
+    startPollingDocument(docId);
+  } catch (e) { toast("❌ Lỗi kết nối", "error"); }
+}
+
+/* ============================================================
+   DELETE
+============================================================ */
+async function deleteDocument(docId, fileName) {
+  if (!confirm(`Xóa tài liệu "${fileName}"?\n\nDữ liệu sẽ bị xóa mềm và biến mất khỏi tất cả retrieval.`)) return;
+  try {
+    const res = await fetch(`/api/rag/documents/${docId}`, { method: "DELETE" });
+    if (!res.ok) { const e = await res.json(); toast(`❌ ${e.detail}`, "error"); return; }
+    toast(`🗑️ "${fileName}" đang được xóa ngầm...`, "info");
+    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+    if (row) { row.style.opacity = "0.3"; row.style.pointerEvents = "none"; }
+    setTimeout(() => loadDocuments(currentPage), 2000);
+  } catch (e) { toast("❌ Lỗi kết nối", "error"); }
+}
+
+/* ============================================================
+   RAG PLAYGROUND
+============================================================ */
+async function runTestRetrieval() {
+  const query = document.getElementById("pg-query").value.trim();
+  if (query.length < 3) { toast("Query phải có ít nhất 3 ký tự!", "error"); return; }
+
+  const btn = document.getElementById("btn-test");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> Đang truy vấn...';
+
+  const panel = document.getElementById("pg-results");
+  panel.innerHTML = `<div class="empty-state"><div class="spin" style="font-size:32px">⟳</div><div>Đang truy vấn HNSW Index...</div></div>`;
+
+  try {
+    const payload = {
+      query,
+      access_tags: selectedPlaygroundTags,
+      limit: parseInt(document.getElementById("pg-limit").value) || 5
+    };
+    if (WORKSPACE_ID) payload.workspace_id = WORKSPACE_ID;
+    else {
+      // Auto-detect workspace_id
+      const docsRes = await fetch("/api/rag/tags");
+      const docsData = await docsRes.json();
+      payload.workspace_id = docsData.workspace_id;
+    }
+
+    const res = await fetch("/api/rag/test-retrieval", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    document.getElementById("pg-elapsed").textContent = `⚡ Thời gian: ${data.elapsed_ms} ms | Tìm thấy: ${data.result_count} chunks`;
+
+    if (!data.results?.length) {
+      panel.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>Không tìm thấy kết quả phù hợp với tags: [${payload.access_tags.join(", ")}]</div></div>`;
+      return;
+    }
+
+    panel.innerHTML = data.results.map((r, i) => {
+      const pct = Math.round(r.similarity_score * 100);
+      const tags = (r.access_tags || []).map(t => {
+        const tag = allTags.find(at => at.tag_name === t);
+        return `<span class="tag-chip" style="color:${tag?.color||'#6366f1'};padding:2px 7px;font-size:11px">${t}</span>`;
+      }).join(" ");
+      return `
+        <div class="result-item" style="animation: toastIn 0.3s ease ${i * 0.08}s both">
+          <div class="result-meta">
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:12px;color:var(--text-muted)">#${i+1}</span>
+              ${tags}
+            </div>
+            <div class="result-score">🎯 ${pct}%</div>
+          </div>
+          <div class="result-content">${r.content_preview || ""}${r.content_full?.length > 300 ? "..." : ""}</div>
+          <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    }).join("");
+
+  } catch (e) {
+    panel.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>Lỗi kết nối API: ${e.message}</div></div>`;
+    toast("❌ Lỗi khi gọi test retrieval", "error");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "🚀 Chạy Retrieval";
+}
+
+// Close modal on overlay click
+document.getElementById("modal-edit-tags").addEventListener("click", function(e) {
+  if (e.target === this) closeModal();
+});
+
+/* ============================================================
+   INIT
+============================================================ */
+(async function init() {
+  await loadTags();
+  await loadDocuments();
+})();
+</script>
+</body>
+</html>

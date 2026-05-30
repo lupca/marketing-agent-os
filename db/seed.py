@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal, is_mock
-from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService, RAGKnowledgebase, IntentRoutingKnowledge
+from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService, RAGDocument, RAGChunk, IntentRoutingKnowledge
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_seeder")
@@ -143,9 +143,49 @@ def seed_database(db: Session):
         logger.info("Product Service already exists.")
         
     # 6. Seed Default RAG Knowledgebase entries for Facebook / TikTok Ad Policy
-    from core.rag import store_knowledge
-    
-    policies_exist = db.query(RAGKnowledgebase).filter_by(category="policies").first()
+    from core.ollama_client import get_embedding
+    from core.parser import semantic_chunk_text
+
+    def seed_knowledge(file_name: str, content: str, access_tags: list):
+        # Check if document already exists
+        existing = db.query(RAGDocument).filter_by(workspace_id=default_ws.id, file_name=file_name).first()
+        if existing:
+            return existing
+
+        doc = RAGDocument(
+            workspace_id=default_ws.id,
+            file_name=file_name,
+            file_key=None,
+            access_tags=access_tags,
+            upload_status="ready",
+            sync_status="synced"
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+
+        chunks = semantic_chunk_text(content)
+        inserted = 0
+        for idx, chunk_content in enumerate(chunks):
+            vector = get_embedding(chunk_content)
+            chunk_obj = RAGChunk(
+                document_id=doc.document_id,
+                workspace_id=default_ws.id,
+                content=chunk_content,
+                embedding=vector,
+                chunk_index=idx,
+                access_tags=access_tags,
+                is_deleted=False
+            )
+            db.add(chunk_obj)
+            inserted += 1
+        
+        doc.chunk_count = inserted
+        db.commit()
+        logger.info(f"Seeded Document: {file_name} with {inserted} chunks.")
+        return doc
+
+    policies_exist = db.query(RAGDocument).filter_by(workspace_id=default_ws.id, file_name="Facebook_Ad_Policy_Guidelines.txt").first()
     if not policies_exist:
         logger.info("Seeding Facebook and TikTok advertising policy guidelines...")
         fb_policy = (
@@ -162,26 +202,41 @@ def seed_database(db: Session):
             "- Cơ chế hoạt động: TikTok quét cả văn bản caption bài đăng, chữ hiển thị đè trên video (text overlays) và đặc biệt là giọng nói lồng trong video (voiceover) thông qua công nghệ chuyển đổi giọng nói thành văn bản tự động (ASR - Automatic Speech Recognition). Do đó, việc chèn chữ hoặc nói các từ cấm đều bị hệ thống phát hiện ngay lập tức."
         )
         
-        store_knowledge(
-            db=db,
-            workspace_id=default_ws.id,
-            category="policies",
-            source_name="Facebook_Ad_Policy_Guidelines.txt",
-            content=fb_policy,
-            metadata={"platform": "facebook", "type": "policy"}
-        )
-        
-        store_knowledge(
-            db=db,
-            workspace_id=default_ws.id,
-            category="policies",
-            source_name="TikTok_Ad_Policy_Guidelines.txt",
-            content=tiktok_policy,
-            metadata={"platform": "tiktok", "type": "policy"}
-        )
+        seed_knowledge("Facebook_Ad_Policy_Guidelines.txt", fb_policy, ["policies", "global"])
+        seed_knowledge("TikTok_Ad_Policy_Guidelines.txt", tiktok_policy, ["policies", "global"])
         logger.info("Successfully seeded advertising policy guidelines in pgvector!")
     else:
         logger.info("Advertising policy guidelines already seeded.")
+
+    economics_exist = db.query(RAGDocument).filter_by(workspace_id=default_ws.id, file_name="Case_Study_SMEs_02_2026.txt").first()
+    if not economics_exist:
+        logger.info("Seeding historical campaign performance case studies for G-Agent Tech...")
+        cs1 = (
+            "Chiến dịch 'Tối ưu CPA Doanh Nghiệp SMEs' tháng 02/2026 cho G-Agent Tech.\n"
+            "- Ngân sách chạy thử: 15,000,000 VNĐ.\n"
+            "- CPA mục tiêu (target CPA): 900,000 VNĐ.\n"
+            "- CPA thực tế trung bình đạt được: 780,000 VNĐ nhờ tối ưu phân phối tự động bằng LangGraph.\n"
+            "- Hiệu suất: Đem lại 19 chuyển đổi chất lượng cao."
+        )
+        cs2 = (
+            "Chiến dịch 'Tự động hóa phòng Marketing' tháng 12/2025 cho G-Agent Tech.\n"
+            "- Ngân sách chạy thử: 10,000,000 VNĐ.\n"
+            "- CPA mục tiêu: 850,000 VNĐ.\n"
+            "- CPA thực tế đạt: 820,000 VNĐ.\n"
+            "- Chiến thuật: Đánh mạnh vào nỗi đau 'giải phóng 80% thời gian'."
+        )
+        cs3 = (
+            "Chiến dịch 'Nhận diện thương hiệu G-Agent' tháng 04/2026 cho G-Agent Tech.\n"
+            "- Ngân sách chạy thử: 5,000,000 VNĐ.\n"
+            "- CPA thực tế đạt: 1,100,000 VNĐ.\n"
+            "- Bài học kinh nghiệm (Anti-pattern): CPA cao vượt kiểm soát do thông điệp giới thiệu sản phẩm quá chung chung, không nhấn mạnh tính năng cụ thể. Cần định hướng tập trung vào các tính năng cốt lõi như 'Analyst Node' hay 'Tự động hóa'."
+        )
+        seed_knowledge("Case_Study_SMEs_02_2026.txt", cs1, ["economics", "global"])
+        seed_knowledge("Case_Study_Automation_12_2025.txt", cs2, ["economics", "global"])
+        seed_knowledge("Case_Study_Brand_Awareness_04_2026.txt", cs3, ["anti_patterns"])
+        logger.info("Successfully seeded historical economics case studies!")
+    else:
+        logger.info("Historical campaign performance case studies already seeded.")
         
     # 7. Seed Semantic Router Utterances
     seed_semantic_router(db)

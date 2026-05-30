@@ -49,42 +49,47 @@ class TestMultiAgentWorkflow(unittest.TestCase):
             "killed_variants_feedback": []
         }
         
-        # 1. Step through LangGraph
-        print("Stepping through LangGraph Nodes...")
-        current_stage = "triage"
-        state_values = {}
-        
+        # 1. Step through LangGraph (Phase 1: Triage -> Analyst -> Draft Approval pause)
+        print("Stepping through LangGraph Nodes (Phase 1)...")
         for event in graph.stream(initial_state, config=config, stream_mode="updates"):
             for node_name, node_update in event.items():
                 print(f" -> Completed Node: '{node_name}'")
-                
-                # Assertions on key SOP anchors
                 if node_name == "analyst":
                     self.assertIn("target_cpa", node_update)
                     self.assertIn("test_budget", node_update)
-                    # Retail 5,000,000 - Cost 1,500,000 = Margin 3,500,000. 30% of Margin = 1,050,000
                     self.assertEqual(node_update["target_cpa"], 1050000.0)
                     self.assertEqual(node_update["test_budget"], 2000000.0)
                     print(f"    [CHECK] Analyst Node calculated CPA target successfully: {node_update['target_cpa']} VNĐ")
                     
-                elif node_name == "strategist":
+        # Verify graph paused at draft approval barrier (waiting_draft_approval)
+        current_state = graph.get_state(config)
+        self.assertTrue(len(current_state.next) > 0)
+        self.assertEqual(current_state.next[0], "waiting_draft_approval")
+        print("    [SUCCESS] LangGraph successfully paused at draft approval barrier!")
+        
+        # Resume Phase 2: Approve the draft plan to trigger strategist, copywriter, and brand guardian
+        print("CMO approved draft plan. Resuming to Creative Graph (Phase 2)...")
+        graph.update_state(config, {"draft_approved": True})
+        
+        for event in graph.stream(None, config=config, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                print(f" -> Completed Node: '{node_name}'")
+                if node_name == "strategist":
                     self.assertIn("current_angle", node_update)
                     print(f"    [CHECK] Strategist selected Angle: {node_update['current_angle'].get('angle_name')}")
-                    
                 elif node_name == "copywriter":
                     self.assertIn("master_content", node_update)
                     self.assertIn("variants", node_update)
                     print(f"    [CHECK] Copywriter drafted Core message: \"{node_update['master_content'].get('core_message')}\"")
-                    
                 elif node_name == "guardian":
                     self.assertIn("feedback_log", node_update)
                     print(f"    [CHECK] Brand Guardian logs: {node_update['feedback_log'][-1]}")
                     
-        # 2. Verify graph paused at approval barrier (waiting_approval_barrier)
+        # 2. Verify graph paused at copy approval barrier (waiting_approval_barrier)
         current_state = graph.get_state(config)
         self.assertTrue(len(current_state.next) > 0)
         self.assertEqual(current_state.next[0], "waiting_approval_barrier")
-        print("    [SUCCESS] LangGraph successfully paused at approval barrier for Human-in-the-loop!")
+        print("    [SUCCESS] LangGraph successfully paused at copy approval barrier for Human-in-the-loop!")
         
         # 3. Resume the graph (Approve the proposed copy)
         print("CEO approved kịch bản. Resuming LangGraph workflow...")

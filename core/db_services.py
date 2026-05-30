@@ -55,7 +55,10 @@ def get_product_context(product_id: uuid.UUID) -> dict:
         "description": "",
         "usp": "",
         "key_features": [],
-        "key_benefits": []
+        "key_benefits": [],
+        "price": 0.0,
+        "cost": 0.0,
+        "margin": 0.0
     }
     try:
         product = db.query(ProductService).filter_by(id=product_id).first()
@@ -65,6 +68,14 @@ def get_product_context(product_id: uuid.UUID) -> dict:
             product_data["usp"] = product.usp or ""
             product_data["key_features"] = product.key_features or []
             product_data["key_benefits"] = product.key_benefits or []
+            if product.default_offer and ";" in product.default_offer:
+                try:
+                    price_str, cost_str = product.default_offer.split(";")
+                    product_data["price"] = float(price_str)
+                    product_data["cost"] = float(cost_str)
+                    product_data["margin"] = product_data["price"] - product_data["cost"]
+                except Exception as pe:
+                    logger.error(f"Error parsing default offer pricing: {pe}")
     except Exception as e:
         logger.error(f"Error in get_product_context: {e}")
     finally:

@@ -290,17 +290,44 @@ class VideoJob(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-# 20. Model: RAGKnowledgebase
-class RAGKnowledgebase(Base):
-    __tablename__ = "rag_knowledgebase"
-    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
-    category = Column(String(50), nullable=False)
-    source_name = Column(String(255))
-    content = Column(Text, nullable=False)
-    meta_data = Column("metadata", JSON_TYPE, default=dict)
-    embedding = Column(VECTOR_TYPE)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+# 20. Model: RAGAccessTag (Master Tags)
+class RAGAccessTag(Base):
+    __tablename__ = "rag_access_tags"
+    tag_id       = Column("tag_id", UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    tag_name     = Column(String(100), nullable=False)
+    description  = Column(String(500))
+    color        = Column(String(7), nullable=False, default="#6366f1")
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+# 21a. Model: RAGDocument (Parent)
+class RAGDocument(Base):
+    __tablename__ = "rag_documents"
+    document_id     = Column("document_id", UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id    = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    file_name       = Column(String(255), nullable=False)
+    file_key        = Column(Text)                              # MinIO object key
+    access_tags     = Column(JSON_TYPE, nullable=False, default=lambda: ["global"])
+    upload_status   = Column(String(50), nullable=False, default="processing")
+    sync_status     = Column(String(50), nullable=False, default="synced")
+    chunk_count     = Column(Integer, nullable=False, default=0)
+    file_size_bytes = Column("file_size_bytes", Integer, nullable=False, default=0)
+    is_deleted      = Column(Boolean, nullable=False, default=False)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at      = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+# 21b. Model: RAGChunk (Child — Vector Store)
+class RAGChunk(Base):
+    __tablename__ = "rag_chunks"
+    chunk_id     = Column("chunk_id", UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    document_id  = Column(UUID_TYPE, ForeignKey("rag_documents.document_id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    content      = Column(Text, nullable=False)
+    embedding    = Column(VECTOR_TYPE)
+    chunk_index  = Column(Integer, nullable=False, default=0)
+    # Phi chuẩn hóa từ rag_documents (Zero-JOIN)
+    access_tags  = Column(JSON_TYPE, nullable=False, default=lambda: ["global"])
+    is_deleted   = Column(Boolean, nullable=False, default=False)
 
 # 21. Model: IntentRoutingKnowledge
 class IntentRoutingKnowledge(Base):

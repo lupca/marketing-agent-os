@@ -60,6 +60,11 @@ def analyst_node(state: AgencyState) -> dict:
     return {
         "target_cpa": target_cpa,
         "test_budget": test_budget,
+        "draft_plan": {
+            "test_budget": test_budget,
+            "target_cpa": target_cpa,
+            "notes_for_creative": ""
+        },
         "sop_stage": "cpa_calculation",
         "messages": [AIMessage(content=analyst_msg)]
     }

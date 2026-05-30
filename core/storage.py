@@ -38,7 +38,7 @@ try:
         "s3",
         endpoint_url=endpoint_url,
         aws_access_key_id=MINIO_ACCESS_KEY,
-        aws_secret_key_id=MINIO_SECRET_KEY,
+        aws_secret_access_key=MINIO_SECRET_KEY,
         config=boto3.session.Config(signature_version="s3v4")
     )
     
@@ -99,3 +99,32 @@ def upload_file(local_file_path: str, object_key: str) -> str:
 def is_mock_storage():
     """Helper to check if currently running on local storage fallback."""
     return IS_MOCK_STORAGE
+
+def download_file_from_minio(object_key: str, dest_path: str) -> str:
+    """
+    Download file từ MinIO S3 về local path.
+    Dùng bởi Celery worker để lấy file gốc về xử lý embedding.
+
+    Returns: dest_path sau khi download thành công.
+    """
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    if not IS_MOCK_STORAGE and s3_client:
+        try:
+            logger.info(f"[storage] Downloading s3://{MINIO_BUCKET}/{object_key} → {dest_path}")
+            s3_client.download_file(MINIO_BUCKET, object_key, dest_path)
+            logger.info(f"[storage] Download OK: {dest_path}")
+            return dest_path
+        except Exception as e:
+            logger.error(f"[storage] MinIO download failed: {e}. Trying local fallback.")
+
+    # Local filesystem fallback
+    local_path = os.path.join(LOCAL_STORAGE_DIR, object_key.replace("/", os.sep))
+    if os.path.exists(local_path):
+        shutil.copy2(local_path, dest_path)
+        logger.info(f"[storage] [MOCK] Copied from local: {local_path} → {dest_path}")
+        return dest_path
+
+    raise FileNotFoundError(
+        f"File không tìm thấy cả trên MinIO lẫn local fallback: {object_key}"
+    )

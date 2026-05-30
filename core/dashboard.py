@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from core.models import (
     Workspace, ProductService, MarketingCampaign, MasterContent,
-    PlatformVariant, RAGKnowledgebase, Lead, User
+    PlatformVariant, RAGDocument, RAGChunk, Lead, User
 )
+from sqlalchemy import text
 
 logger = logging.getLogger("core_dashboard")
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +29,7 @@ def auto_seed_dashboard_data(db: Session):
         return
         
     variant_count = db.query(PlatformVariant).filter(PlatformVariant.workspace_id == ws.id).count()
-    rag_count = db.query(RAGKnowledgebase).filter(RAGKnowledgebase.category == "anti_patterns").count()
+    rag_count = db.execute(text("SELECT COUNT(*) FROM rag_chunks WHERE access_tags ?| ARRAY['anti_patterns']")).scalar()
     
     # 1. Seed Campaigns & Platform Variants if count is low
     if variant_count < 5:
@@ -267,7 +268,7 @@ def auto_seed_dashboard_data(db: Session):
         logger.info(f"Low RAG anti_patterns count ({rag_count}). Seeding lessons learned...")
         
         # Delete existing to prevent collisions and keep it clean
-        db.query(RAGKnowledgebase).filter(RAGKnowledgebase.category == "anti_patterns").delete()
+        db.execute(text("DELETE FROM rag_documents WHERE access_tags ?| ARRAY['anti_patterns']"))
         db.commit()
         
         lessons = [
@@ -278,20 +279,32 @@ def auto_seed_dashboard_data(db: Session):
             "Thiếu liên kết định dạng (Media Mismatch): Sử dụng kịch bản TikTok Ads định dạng dọc nhưng lại chèn video tỷ lệ 16:9 nằm ngang, bị che khuất văn bản và logo. Kết quả: Khách hàng lướt qua nhanh chóng, conversion rate giảm còn 0.2%."
         ]
         
+        doc = RAGDocument(
+            document_id=uuid.uuid4(),
+            workspace_id=ws.id,
+            file_name="cmo_failed_ads_lessons.txt",
+            file_key=None,
+            access_tags=["anti_patterns"],
+            upload_status="ready",
+            sync_status="synced",
+            chunk_count=len(lessons)
+        )
+        db.add(doc)
+        db.commit()
+
         for idx, text_content in enumerate(lessons):
-            # Create a mock vector (1024 floats of zero for SQLite or pgvector fallback)
             mock_emb = [0.0] * 1024
-            
-            kb = RAGKnowledgebase(
-                id=uuid.uuid4(),
+            chunk_obj = RAGChunk(
+                chunk_id=uuid.uuid4(),
+                document_id=doc.document_id,
                 workspace_id=ws.id,
-                category="anti_patterns",
-                source_name="cmo_failed_ads_lessons.txt",
                 content=text_content,
-                meta_data={"lesson_index": idx, "failed_cpa": 1450000.0, "target_cpa": 1050000.0},
-                embedding=mock_emb
+                embedding=mock_emb,
+                chunk_index=idx,
+                access_tags=["anti_patterns"],
+                is_deleted=False
             )
-            db.add(kb)
+            db.add(chunk_obj)
         
         db.commit()
         logger.info("Successfully seeded high-fidelity RAG anti_patterns!")
@@ -431,14 +444,16 @@ def get_dashboard_analytics(db: Session) -> dict:
     ).count()
     
     # Retrieve top 5 RAG anti-patterns
-    rag_list = db.query(RAGKnowledgebase).filter(
-        RAGKnowledgebase.category == "anti_patterns"
-    ).order_by(RAGKnowledgebase.created_at.desc()).limit(5).all()
+    rag_list = db.query(RAGChunk, RAGDocument.file_name).join(
+        RAGDocument, RAGChunk.document_id == RAGDocument.document_id
+    ).filter(
+        text("rag_chunks.access_tags ?| ARRAY['anti_patterns']")
+    ).limit(5).all()
     
     rag_data = [{
-        "id": str(r.id),
-        "source_name": r.source_name,
-        "content": r.content
+        "id": str(r[0].chunk_id),
+        "source_name": r[1],
+        "content": r[0].content
     } for r in rag_list]
     
     # Bi-weekly CPA Trend Data for Chart.js

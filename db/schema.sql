@@ -284,20 +284,63 @@ CREATE TABLE video_jobs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 20. Table: rag_knowledgebase (Semantic Vector Memory)
-CREATE TABLE rag_knowledgebase (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE, -- NULL means global
-    category VARCHAR(50) NOT NULL, -- 'economics', 'psychology', 'anti_patterns', 'user_upload'
-    source_name VARCHAR(255),      -- Original filename
-    content TEXT NOT NULL,
-    metadata JSONB DEFAULT '{}',
-    embedding VECTOR(1024),        -- Dimension: 1024 for bge-m3 embedding model
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- 20. Table: rag_access_tags (Master Tags — RAG Permission System)
+-- Quản lý danh sách tag hợp lệ per-workspace, ngăn insert sai chính tả
+CREATE TABLE IF NOT EXISTS rag_access_tags (
+    tag_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    tag_name     VARCHAR(100) NOT NULL,
+    description  VARCHAR(500),
+    color        VARCHAR(7) NOT NULL DEFAULT '#6366f1', -- Mã màu hex cho UI badge
+    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_tag_per_workspace UNIQUE (workspace_id, tag_name)
+);
+CREATE INDEX IF NOT EXISTS idx_rag_access_tags_workspace ON rag_access_tags (workspace_id);
+
+-- 21a. Table: rag_documents (Parent — Quản lý file gốc)
+CREATE TABLE IF NOT EXISTS rag_documents (
+    document_id      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id     UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    file_name        VARCHAR(255) NOT NULL,
+    file_key         TEXT,                              -- MinIO object key
+    access_tags      JSONB NOT NULL DEFAULT '["global"]',
+    upload_status    VARCHAR(50) NOT NULL DEFAULT 'processing', -- 'processing'|'ready'|'failed'
+    sync_status      VARCHAR(50) NOT NULL DEFAULT 'synced',     -- 'synced'|'syncing'|'failed'
+    chunk_count      INT NOT NULL DEFAULT 0,
+    file_size_bytes  BIGINT NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_rag_documents_workspace_active
+    ON rag_documents (workspace_id, created_at DESC) WHERE is_deleted = FALSE;
+
+-- 21b. Table: rag_chunks (Child — Vector Store, Phi chuẩn hóa Zero-JOIN)
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    chunk_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id  UUID NOT NULL REFERENCES rag_documents(document_id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    content      TEXT NOT NULL,
+    embedding    VECTOR(1024),              -- bge-m3 1024-dim
+    chunk_index  INT NOT NULL DEFAULT 0,    -- Thứ tự chunk trong document
+
+    -- Phi chuẩn hóa: copy từ cha để bỏ JOIN khi query HNSW
+    access_tags  JSONB NOT NULL DEFAULT '["global"]',
+    is_deleted   BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- HNSW Index for ultra-fast vector cosine similarity searches
-CREATE INDEX IF NOT EXISTS idx_rag_kb_embedding ON rag_knowledgebase USING hnsw (embedding vector_cosine_ops);
+-- HNSW Index: m=16, ef_construction=128 (nâng từ 64 để đảm bảo recall khi scale > 100K vectors)
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_embedding
+    ON rag_chunks USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 128);
+
+-- GIN Index cho JSONB tag filter (Pre-Retrieval Filtering)
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_tags ON rag_chunks USING GIN (access_tags);
+
+-- Partial Index: workspace + soft-delete (query phổ biến nhất)
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_active
+    ON rag_chunks (workspace_id, document_id) WHERE is_deleted = FALSE;
 
 -- 21. Table: intent_routing_knowledge (Dynamic Semantic Router)
 CREATE TABLE intent_routing_knowledge (

@@ -15,9 +15,9 @@ from sqlalchemy import text
 # Import backend modules
 from db.connection import SessionLocal, is_mock
 from core.models import Workspace, ProductService
-from core.parser import extract_text_from_file, chunk_text
+from core.parser import extract_text_from_file, semantic_chunk_text
 from core.storage import upload_file
-from core.rag import store_knowledge
+from core.rag import store_document, inject_antipatterns_to_prompt
 from graphs.main_router import graph
 from core.decision_logger import log_decision
 
@@ -26,6 +26,10 @@ from chainlit.server import app as fastapi_app
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi import Request
 from core.dashboard import get_dashboard_analytics, simulate_scenario
+
+# Mount RAG API Routes
+from api.rag_routes import rag_router
+fastapi_app.include_router(rag_router)
 
 @fastapi_app.middleware("http")
 async def custom_dashboard_middleware(request: Request, call_next):
@@ -71,6 +75,14 @@ async def custom_dashboard_middleware(request: Request, call_next):
         template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "vault.html"))
         if not os.path.exists(template_path):
             return HTMLResponse(content="<h1>Approved Asset Vault Template Not Found</h1><p>Please ensure data/templates/vault.html exists.</p>", status_code=404)
+        with open(template_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+
+    elif path == "/knowledge-base" and request.method == "GET":
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "public", "knowledge-base.html"))
+        if not os.path.exists(template_path):
+            return HTMLResponse(content="<h1>Knowledge Base UI Not Found</h1><p>Please ensure public/knowledge-base.html exists.</p>", status_code=404)
         with open(template_path, "r", encoding="utf-8") as f:
             content = f.read()
         return HTMLResponse(content=content)
@@ -145,6 +157,120 @@ logging.basicConfig(level=logging.INFO)
 # Default workspace and product identifiers (Matching database seeds)
 SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
 SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
+
+# ----------------- v3.2 Track Messages & Render Draft Card -----------------
+
+def track_msg_id(msg_id):
+    """Tracks a UI message ID for this turn so it can be mapped to the checkpoint on completion."""
+    if not msg_id:
+        return
+    turn_ids = cl.user_session.get("current_turn_msg_ids") or []
+    if msg_id not in turn_ids:
+        turn_ids.append(msg_id)
+        cl.user_session.set("current_turn_msg_ids", turn_ids)
+        logger.info(f"Tracked message ID for current turn: {msg_id}")
+
+async def associate_messages_with_current_checkpoint(config):
+    """Maps the tracked message IDs from this turn to the current active checkpoint ID."""
+    state = await graph.aget_state(config)
+    chk_id = state.config["configurable"].get("checkpoint_id")
+    if chk_id:
+        msg_ids = cl.user_session.get("current_turn_msg_ids") or []
+        if msg_ids:
+            mappings = cl.user_session.get("checkpoint_ui_mappings") or {}
+            existing = mappings.get(chk_id) or []
+            mappings[chk_id] = list(set(existing + msg_ids))
+            cl.user_session.set("checkpoint_ui_mappings", mappings)
+            cl.user_session.set("current_turn_msg_ids", []) # clear turn list
+            logger.info(f"Successfully mapped message IDs {msg_ids} to checkpoint {chk_id}")
+
+async def render_draft_card(config, state_values):
+    """Renders the HTML Draft Card showing current NegotiationState values and history select dropdown."""
+    history_checkpoints = []
+    try:
+        async for state in graph.aget_state_history(config):
+            draft = state.values.get("draft_plan")
+            chk_id = state.config["configurable"].get("checkpoint_id")
+            if draft and draft.get("test_budget") and state.next and state.next[0] == "waiting_draft_approval" and chk_id:
+                created_at = state.metadata.get("created_at") or "Vừa xong"
+                if "T" in created_at:
+                    time_part = created_at.split("T")[1].split(".")[0][:5]
+                    date_part = created_at.split("T")[0][5:]
+                    created_at = f"{time_part} ({date_part})"
+                
+                if not any(cp["checkpoint_id"] == chk_id for cp in history_checkpoints):
+                    history_checkpoints.append({
+                        "checkpoint_id": chk_id,
+                        "timestamp": created_at,
+                        "budget": draft.get("test_budget"),
+                        "cpa": draft.get("target_cpa")
+                    })
+    except Exception as he:
+        logger.error(f"Error fetching state history: {he}")
+        
+    draft = state_values.get("draft_plan") or {}
+    budget = draft.get("test_budget") or state_values.get("test_budget") or 2000000.0
+    cpa = draft.get("target_cpa") or state_values.get("target_cpa") or 150000.0
+    notes = draft.get("notes_for_creative") or "(Không có)"
+
+    is_preserved = False
+    if len(history_checkpoints) >= 2:
+        prev_budget = history_checkpoints[1]["budget"]
+        prev_cpa = history_checkpoints[1]["cpa"]
+        if abs(budget - prev_budget) < 0.01 and abs(cpa - prev_cpa) < 0.01:
+            is_preserved = True
+
+    badge_html = ""
+    if is_preserved:
+        badge_html = '<span style="font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 4px 8px; border-radius: 12px; font-weight: bold; border: 1px solid #1a73e8; margin-left: auto; display: inline-flex; align-items: center; gap: 4px;">ℹ️ Giải thích thắc mắc - Số liệu được bảo toàn</span>'
+
+    options_html = '<option value="" disabled selected>Chọn phiên bản để tua ngược...</option>'
+    for idx, cp in enumerate(history_checkpoints):
+        options_html += f'<option value="{cp["checkpoint_id"]}">Bản nháp v{len(history_checkpoints)-idx} ({cp["timestamp"]} - CPA: {cp["cpa"]:,.0f}đ)</option>'
+        
+    html_card = f"""
+<div class="draft-card" style="border: 2px solid #1a73e8; padding: 16px; border-radius: 12px; background: #f8f9fa; box-shadow: 0 4px 6px rgba(0,0,0,0.05); font-family: sans-serif;">
+  <h3 style="margin-top: 0; color: #1a73e8; display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap;">
+    <span style="display: flex; align-items: center; gap: 8px;">📋 BẢN THẢO CHIẾN DỊCH CHỜ DUYỆT</span>
+    {badge_html}
+  </h3>
+  <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px;">
+    <div style="background: #ffffff; padding: 8px 12px; border-radius: 6px; border-left: 4px solid #34a853;">
+      <span style="font-size: 12px; color: #666; display: block;">💵 Ngân sách chạy thử:</span>
+      <strong style="font-size: 16px; color: #202124;">{budget:,.0f} VNĐ</strong>
+    </div>
+    <div style="background: #ffffff; padding: 8px 12px; border-radius: 6px; border-left: 4px solid #ea4335;">
+      <span style="font-size: 12px; color: #666; display: block;">🎯 CPA mục tiêu:</span>
+      <strong style="font-size: 16px; color: #202124;">{cpa:,.0f} VNĐ</strong>
+    </div>
+    <div style="background: #ffffff; padding: 8px 12px; border-radius: 6px; border-left: 4px solid #fbbc05;">
+      <span style="font-size: 12px; color: #666; display: block;">📝 Định hướng / Ghi chú đàm phán:</span>
+      <span style="font-size: 14px; color: #202124; font-style: italic;">"{notes}"</span>
+    </div>
+  </div>
+  <div style="margin-top: 15px; border-top: 1px dashed #dadce0; padding-top: 12px;">
+    <label style="display: block; font-size: 12px; font-weight: bold; color: #5f6368; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+      📜 Lịch sử bản nháp ({len(history_checkpoints)} phiên bản):
+    </label>
+    <select onchange="window.triggerRewind(this.value)" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #dadce0; width: 100%; font-size: 14px; background: #ffffff; color: #3c4043; cursor: pointer; outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+      {options_html}
+    </select>
+  </div>
+</div>
+"""
+    
+    actions = [
+        cl.Action(name="approve_draft", payload={"value": "approved"}, label="Duyệt Khởi Chạy 🚀"),
+        cl.Action(name="reject_draft", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
+    ]
+    for cp in history_checkpoints:
+        actions.append(cl.Action(name="rewind_draft", payload={"value": cp["checkpoint_id"]}, label=f"rewind-{cp['checkpoint_id']}"))
+        
+    msg = cl.Message(content=html_card, actions=actions)
+    sent_msg = await msg.send()
+    track_msg_id(sent_msg.id)
+    await associate_messages_with_current_checkpoint(config)
+
 
 
 @cl.on_chat_start
@@ -241,73 +367,66 @@ async def on_chat_start():
                     f"Sếp xem và duyệt chiến dịch vĩ mô này:"
                 )
                 actions = [
-                    cl.Action(name="cmo_approve", value="approved", label="Duyệt và Đăng 🚀"),
-                    cl.Action(name="cmo_reject", value="rejected", label="Yêu cầu sửa ✍️")
+                    cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                    cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
                 ]
                 await cl.Message(content=approval_card, actions=actions).send()
+                
+            elif state.next and state.next[0] == "waiting_draft_approval":
+                logger.info("Restoring active draft card onto UI for thread...")
+                await render_draft_card(config, state.values)
     except Exception as e:
         logger.error(f"Error restoring past conversation onto UI: {e}")
 
 async def run_vectorization_pipeline(element) -> str:
-    """Run S3 upload, parsing, text chunking, and pgvector database storing asynchronously."""
+    """
+    Upload file lên MinIO + tạo RAG document record + kick Celery ingestion task.
+    Xử lý hoàn toàn async — không block UI.
+    """
     db: Session = SessionLocal()
     workspace_id = cl.user_session.get("workspace_id")
-    
+
     # Write incoming stream to temp file
     temp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "temp"))
     os.makedirs(temp_dir, exist_ok=True)
     temp_file_path = os.path.join(temp_dir, element.name)
-    
+
     with open(temp_file_path, "wb") as f:
         f.write(element.content)
-        
+
     try:
+        file_size = len(element.content)
+
         # 1. Upload to MinIO S3
-        object_key = f"workspaces/{workspace_id}/knowledge/{element.name}"
-        file_url = upload_file(temp_file_path, object_key)
-        
-        # 2. Extract Text
-        text_content = extract_text_from_file(temp_file_path)
-        
-        # 3. Chunk Text
-        chunks = chunk_text(text_content, chunk_size=500, overlap=50)
-        
-        # 4. Generate Embeddings & Store in pgvector
-        stored_count = 0
-        for i, chunk in enumerate(chunks):
-            metadata = {
-                "source_file": element.name,
-                "file_url": file_url,
-                "chunk_index": i,
-                "start_idx": chunk["start_idx"],
-                "end_idx": chunk["end_idx"]
-            }
-            store_knowledge(
-                db=db,
-                workspace_id=uuid.UUID(workspace_id),
-                category="user_upload",
-                source_name=element.name,
-                content=chunk["content"],
-                metadata=metadata
-            )
-            stored_count += 1
-            
+        object_key = f"rag/{workspace_id}/{uuid.uuid4()}{os.path.splitext(element.name)[-1]}"
+        upload_file(temp_file_path, object_key)
+
+        # 2. Tạo rag_documents record + Kick Celery ingest task (async)
+        doc = store_document(
+            db=db,
+            workspace_id=workspace_id,
+            file_name=element.name,
+            file_key=object_key,
+            access_tags=["marketing", "global"],
+            file_size_bytes=file_size,
+        )
+
         success_msg = (
-            f"### ✅ Vector hóa tài liệu thành công!\n"
+            f"### ✅ Tài liệu đã được nhận và đang xử lý!\n"
             f"- **Tên file:** `{element.name}`\n"
-            f"- **S3 Storage URL:** [Xem tệp tin]({file_url})\n"
-            f"- **Số phân đoạn tri thức đã nạp:** `{stored_count} chunks`\n\n"
-            f"Ban Sáng Tạo đã tiếp thu tri thức này và sẵn sàng áp dụng cho các bài viết tiếp theo!"
+            f"- **Document ID:** `{doc.document_id}`\n"
+            f"- **Tags:** `marketing, global`\n\n"
+            f"⚙️ Hệ thống đang băm vector ngầm (Celery). "
+            f"Truy cập **[Knowledge Base](/knowledge-base)** để theo dõi trạng thái và quản lý tags!"
         )
         db.close()
         return success_msg
-        
+
     except Exception as e:
-        logger.error(f"Error vectorizing file: {e}")
+        logger.error(f"Error in run_vectorization_pipeline: {e}", exc_info=True)
         db.close()
         return f"❌ Lỗi xử lý tài liệu '{element.name}': {str(e)}"
     finally:
-        # Clean up temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
@@ -386,11 +505,40 @@ async def on_message(message: cl.Message):
     
     # NEW: Check if the graph is currently waiting for approval at approval barrier!
     current_state = await graph.aget_state(config)
-    if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
+    if current_state and current_state.next and current_state.next[0] == "waiting_draft_approval":
+        # User typed feedback during draft negotiation
+        logger.info("Human typed chat message while graph paused at draft approval barrier. Intercepting as negotiation feedback.")
+        feedback_text = message.content.strip()
+        track_msg_id(message.id)
+        
+        user_msg = HumanMessage(content=feedback_text, additional_kwargs={"cl_msg_id": message.id})
+        state_update = {
+            "messages": [user_msg],
+            "draft_approved": False
+        }
+        await graph.aupdate_state(config, state_update)
+        
+        async for event in graph.astream(None, config=config, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                if node_name == "negotiator":
+                    new_msgs = node_update.get("messages", [])
+                    if new_msgs:
+                        ans_msg = new_msgs[-1].content
+                        sent_msg = await cl.Message(content=ans_msg).send()
+                        track_msg_id(sent_msg.id)
+                        
+        await associate_messages_with_current_checkpoint(config)
+        new_state = await graph.aget_state(config)
+        await render_draft_card(config, new_state.values)
+        return
+
+    elif current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
         # If they typed a message, treat it exactly as CMO reject feedback!
         logger.info("Human typed chat message while graph paused at approval barrier. Intercepting as edit feedback.")
         feedback_text = message.content.strip()
-        await cl.Message(content=f"✍️ **Ghi nhận ý kiến phản hồi của Sếp:** *\"{feedback_text}\"*... Đang chuyển lại Copywriter viết lại bản thảo mới.").send()
+        track_msg_id(message.id)
+        sent_msg = await cl.Message(content=f"✍️ **Ghi nhận ý kiến phản hồi của Sếp:** *\"{feedback_text}\"*... Đang chuyển lại Copywriter viết lại bản thảo mới.").send()
+        track_msg_id(sent_msg.id)
         
         state_values = current_state.values if current_state else {}
         variants = state_values.get("variants", [])
@@ -407,17 +555,20 @@ async def on_message(message: cl.Message):
         
         db = SessionLocal()
         try:
-            store_knowledge(
+            # Lưu feedback vào RAG dưới dạng document anti-pattern
+            import tempfile, json as _json
+            tmp_fb = tempfile.mktemp(suffix=".txt")
+            with open(tmp_fb, "w", encoding="utf-8") as _f:
+                _f.write(feedback_content)
+            fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
+            upload_file(tmp_fb, fb_key)
+            store_document(
                 db=db,
-                workspace_id=uuid.UUID(workspace_id),
-                category="manager_feedback",
-                source_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
-                content=feedback_content,
-                metadata={
-                    "failed_cpa": state_values.get("target_cpa", 0.0),
-                    "cmo_feedback": feedback_text,
-                    "old_script": old_copy
-                }
+                workspace_id=workspace_id,
+                file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
+                file_key=fb_key,
+                access_tags=["manager_feedback", "anti_patterns"],
+                file_size_bytes=len(feedback_content.encode()),
             )
         except Exception as ve:
             logger.error(f"Failed to vectorize feedback: {ve}")
@@ -451,11 +602,14 @@ async def on_message(message: cl.Message):
                         f"✍️ **[Bản Thảo Viết Lại của Copywriter]**\n"
                         f"```text\n{var.get('adapted_copy')}\n```"
                     )
-                    await cl.Message(content=copy_msg).send()
+                    sent = await cl.Message(content=copy_msg).send()
+                    track_msg_id(sent.id)
                 elif node_name == "guardian":
                     logs = node_update.get("feedback_log", [])
-                    await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
+                    sent = await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
+                    track_msg_id(sent.id)
                     
+        await associate_messages_with_current_checkpoint(config)
         # Check if paused again
         current_state = await graph.aget_state(config)
         if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
@@ -465,10 +619,12 @@ async def on_message(message: cl.Message):
                 f"```text\n{var.get('adapted_copy')}\n```"
             )
             new_actions = [
-                cl.Action(name="cmo_approve", value="approved", label="Duyệt và Đăng 🚀"),
-                cl.Action(name="cmo_reject", value="rejected", label="Yêu cầu sửa tiếp ✍️")
+                cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
             ]
-            await cl.Message(content=approval_card, actions=new_actions).send()
+            sent = await cl.Message(content=approval_card, actions=new_actions).send()
+            track_msg_id(sent.id)
+            await associate_messages_with_current_checkpoint(config)
         return
 
     initial_state = {
@@ -480,20 +636,17 @@ async def on_message(message: cl.Message):
         "feedback_log": [],
         "killed_variants_feedback": []
     }
+    track_msg_id(message.id)
     
     # Run Compiled LangGraph Asynchronously
-    # We step through nodes to stream intermediate thoughts cleanly
     cb = cl.LangchainCallbackHandler()
     logger.info("Triggering LangGraph state stream...")
     
     async for event in graph.astream(initial_state, config=RunnableConfig(callbacks=[cb], **config), stream_mode="updates"):
-        # Detect active node execution
         for node_name, node_update in event.items():
             logger.info(f"Node '{node_name}' finished execution.")
             
-            # Stream custom logs based on active channels
             if node_name == "triage":
-                # Intent analysis feedback
                 stage = node_update.get("sop_stage")
                 logger.info(f"Triage complete. Stage: {stage}")
                 
@@ -506,16 +659,16 @@ async def on_message(message: cl.Message):
                     f"- **CPA Target:** `{cpa:,.0f} VNĐ` / đơn hàng.\n"
                     f"- **Ngân sách Test tối đa:** `{budget:,.0f} VNĐ`."
                 )
-                await cl.Message(content=analyst_msg).send()
+                sent = await cl.Message(content=analyst_msg).send()
+                track_msg_id(sent.id)
                 
             elif node_name == "performance":
-                # Show premium reports if available
                 new_msgs = node_update.get("messages", [])
                 if new_msgs:
                     report = new_msgs[-1].content
-                    await cl.Message(content=report).send()
+                    sent = await cl.Message(content=report).send()
+                    track_msg_id(sent.id)
                 else:
-                    # Fallback to old scale/kill UI output
                     killed = node_update.get("killed_variants_feedback", [])
                     if killed:
                         t_cpa = killed[0].get("target_cpa", 1050000.0)
@@ -525,9 +678,11 @@ async def on_message(message: cl.Message):
                             f"- variant_id: `{killed[0].get('variant_id')}` bị TẮT (Killed) do CPA đạt `{killed[0].get('failed_cpa'):,.0f} VNĐ` > Target `{t_cpa:,.0f} VNĐ`.\n"
                             f"👉 **Giao thức cãi nhau:** Gửi phản hồi nóng bắt Ban Sáng Tạo đổi Angle viết lại!"
                         )
-                        await cl.Message(content=kill_msg).send()
+                        sent = await cl.Message(content=kill_msg).send()
+                        track_msg_id(sent.id)
                     else:
-                        await cl.Message(content="📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn.").send()
+                        sent = await cl.Message(content="📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn.").send()
+                        track_msg_id(sent.id)
                     
             elif node_name == "strategist":
                 angle = node_update.get("current_angle", {})
@@ -538,10 +693,10 @@ async def on_message(message: cl.Message):
                     f"- **Nỗi đau đánh trúng:** \"{angle.get('pain_point_focus')}\"\n"
                     f"- **Tập trung:** {angle.get('psychological_angle')}"
                 )
-                await cl.Message(content=strat_msg).send()
+                sent = await cl.Message(content=strat_msg).send()
+                track_msg_id(sent.id)
                 
             elif node_name == "copywriter":
-                # Copy writing completed
                 var = node_update.get("variants", [])[0]
                 copy_msg = (
                     f"✍️ **[Phòng Sáng Tạo - Copywriter]**\n"
@@ -550,12 +705,13 @@ async def on_message(message: cl.Message):
                     f"```text\n{var.get('adapted_copy')}\n```\n"
                     f"- **Tags:** {', '.join(var.get('hashtags', []))}"
                 )
-                await cl.Message(content=copy_msg).send()
+                sent = await cl.Message(content=copy_msg).send()
+                track_msg_id(sent.id)
                 
             elif node_name == "guardian":
-                # Scoring validation
                 logs = node_update.get("feedback_log", [])
-                await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{logs[-1]}`").send()
+                sent = await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{logs[-1]}`").send()
+                track_msg_id(sent.id)
                 
             elif node_name == "researcher_agent":
                 new_msgs = node_update.get("messages", [])
@@ -565,31 +721,34 @@ async def on_message(message: cl.Message):
                         f"🎯 **[Ban Nghiên Cứu - Researcher]**\n\n"
                         f"{report}"
                     )
-                    await cl.Message(content=research_msg).send()
-
+                    sent = await cl.Message(content=research_msg).send()
+                    track_msg_id(sent.id)
+ 
             elif node_name == "creative_report_agent":
                 new_msgs = node_update.get("messages", [])
                 if new_msgs:
                     report = new_msgs[-1].content
-                    await cl.Message(content=report).send()
-
+                    sent = await cl.Message(content=report).send()
+                    track_msg_id(sent.id)
+ 
             elif node_name == "chat_agent":
                 new_msgs = node_update.get("messages", [])
                 if new_msgs:
                     report = new_msgs[-1].content
-                    await cl.Message(content=report).send()
-
+                    sent = await cl.Message(content=report).send()
+                    track_msg_id(sent.id)
+ 
+    await associate_messages_with_current_checkpoint(config)
+    
     # 4. Detect if graph is paused or finished
     current_state = await graph.aget_state(config)
     
     # Handle casual chat (END state) gracefully on UI
     if not current_state or not current_state.next:
-        # Check if the intent was already handled by specialized nodes, just return!
         intent = current_state.values.get("intent_classification") if current_state and current_state.values else "chat"
         if intent in ["research", "chat", "creative_report"]:
             return
             
-        # Fallback for truly unhandled small talk categorized directly as END without node
         from core.ollama_client import generate_text
         prompt = (
             f"Bạn là trợ lý Marketing Agent OS. Hãy trả lời thân thiện bằng Tiếng Việt câu hỏi này của Sếp:\n"
@@ -601,9 +760,10 @@ async def on_message(message: cl.Message):
         except Exception:
             response_text = "Dạ, em nghe đây ạ! Em là hệ điều hành Marketing Agent OS. Sếp cần em giúp gì hôm nay ạ? 💻"
             
-        await cl.Message(content=response_text).send()
-
-        # Save casual chat reply to graph state checkpoint so it is persistent
+        sent = await cl.Message(content=response_text).send()
+        track_msg_id(sent.id)
+        await associate_messages_with_current_checkpoint(config)
+ 
         if current_state:
             try:
                 await graph.aupdate_state(config, {"messages": [AIMessage(content=response_text)]})
@@ -611,13 +771,17 @@ async def on_message(message: cl.Message):
             except Exception as se:
                 logger.error(f"Failed to persist casual chat in checkpointer: {se}", exc_info=True)
         return
-
-    # 5. Detect if graph is paused at Approval Barrier (waiting_approval_barrier)
+ 
+    # 5. Detect if graph is paused at Approval Barriers
     current_state = await graph.aget_state(config)
-    if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
+    if current_state and current_state.next and current_state.next[0] == "waiting_draft_approval":
+        logger.info("Draft approval barrier detected! Rendering draft card.")
+        await render_draft_card(config, current_state.values)
+        return
+        
+    elif current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
         logger.info("Approval barrier detected! Rendering action buttons for CEO.")
         
-        # Fetch proposed copy from state
         state_values = current_state.values
         var = state_values.get("variants", [{}])[0]
         cpa = state_values.get("target_cpa", 0.0)
@@ -632,11 +796,13 @@ async def on_message(message: cl.Message):
         )
         
         actions = [
-            cl.Action(name="cmo_approve", value="approved", label="Duyệt và Đăng 🚀"),
-            cl.Action(name="cmo_reject", value="rejected", label="Yêu cầu sửa ✍️")
+            cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+            cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
         ]
         
-        await cl.Message(content=approval_card, actions=actions).send()
+        sent = await cl.Message(content=approval_card, actions=actions).send()
+        track_msg_id(sent.id)
+        await associate_messages_with_current_checkpoint(config)
 
 @cl.action_callback("cmo_approve")
 async def on_approve(action: cl.Action):
@@ -748,19 +914,21 @@ async def on_reject(action: cl.Action):
         
         db = SessionLocal()
         try:
-            store_knowledge(
+            import tempfile
+            tmp_fb = tempfile.mktemp(suffix=".txt")
+            with open(tmp_fb, "w", encoding="utf-8") as _f:
+                _f.write(feedback_content)
+            fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
+            upload_file(tmp_fb, fb_key)
+            store_document(
                 db=db,
-                workspace_id=uuid.UUID(workspace_id),
-                category="manager_feedback",
-                source_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
-                content=feedback_content,
-                metadata={
-                    "failed_cpa": state_values.get("target_cpa", 0.0),
-                    "cmo_feedback": feedback_text,
-                    "old_script": old_copy
-                }
+                workspace_id=workspace_id,
+                file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
+                file_key=fb_key,
+                access_tags=["manager_feedback", "anti_patterns"],
+                file_size_bytes=len(feedback_content.encode()),
             )
-            logger.info("Successfully vectorized CMO feedback into rag_knowledgebase!")
+            logger.info("Successfully queued CMO feedback vectorization via Celery!")
         except Exception as ve:
             logger.error(f"Failed to vectorize CMO feedback: {ve}", exc_info=True)
         finally:
@@ -809,9 +977,225 @@ async def on_reject(action: cl.Action):
                 f"```text\n{var.get('adapted_copy')}\n```"
             )
             new_actions = [
-                cl.Action(name="cmo_approve", value="approved", label="Duyệt và Đăng 🚀"),
-                cl.Action(name="cmo_reject", value="rejected", label="Yêu cầu sửa tiếp ✍️")
+                cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
             ]
             await cl.Message(content=approval_card, actions=new_actions).send()
 
     await action.remove()
+
+
+@cl.action_callback("approve_draft")
+async def on_approve_draft(action: cl.Action):
+    """CMO approved the draft plan! Resume graph to proceed to creative stage."""
+    thread_id = cl.user_session.get("thread_id")
+    workspace_id = cl.user_session.get("workspace_id")
+    product_id = cl.user_session.get("product_id")
+    
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "product_id": product_id
+        }
+    }
+    
+    sent_info = await cl.Message(content="✅ **Sếp đã duyệt Bản thảo chiến dịch!** Đang chuyển đổi State sạch và khởi chạy Ban Sáng tạo...").send()
+    track_msg_id(sent_info.id)
+    
+    # Update state: set draft_approved = True
+    await graph.aupdate_state(config, {"draft_approved": True})
+    
+    # Resume graph execution
+    cb = cl.LangchainCallbackHandler()
+    async for event in graph.astream(None, config=config, stream_mode="updates"):
+        for node_name, node_update in event.items():
+            if node_name == "strategist":
+                angle = node_update.get("current_angle", {})
+                strat_msg = (
+                    f"🧠 **[Phòng Sáng Tạo - Strategist]**\n"
+                    f"- Đã nghiên cứu RAG và tự động dán RAG bài học thất bại.\n"
+                    f"- **Angle đề xuất:** `{angle.get('angle_name')}`\n"
+                    f"- **Nỗi đau đánh trúng:** \"{angle.get('pain_point_focus')}\"\n"
+                    f"- **Tập trung:** {angle.get('psychological_angle')}"
+                )
+                sent = await cl.Message(content=strat_msg).send()
+                track_msg_id(sent.id)
+                
+            elif node_name == "copywriter":
+                var = node_update.get("variants", [])[0]
+                copy_msg = (
+                    f"✍️ **[Phòng Sáng Tạo - Copywriter]**\n"
+                    f"- Đã xào nấu và tối ưu hóa kịch bản theo target CPA.\n"
+                    f"- **Nội dung nháp Facebook:**\n\n"
+                    f"```text\n{var.get('adapted_copy')}\n```\n"
+                    f"- **Tags:** {', '.join(var.get('hashtags', []))}"
+                )
+                sent = await cl.Message(content=copy_msg).send()
+                track_msg_id(sent.id)
+                
+            elif node_name == "guardian":
+                logs = node_update.get("feedback_log", [])
+                sent = await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả: `{logs[-1]}`").send()
+                track_msg_id(sent.id)
+
+    # Once execution finishes, check if paused at waiting_approval_barrier
+    await associate_messages_with_current_checkpoint(config)
+    current_state = await graph.aget_state(config)
+    if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
+        state_values = current_state.values
+        var = state_values.get("variants", [{}])[0]
+        cpa = state_values.get("target_cpa", 0.0)
+        
+        approval_card = (
+            f"### 📥 KỊCH BẢN CHỜ PHÊ DUYỆT (HUMAN-IN-THE-LOOP)\n"
+            f"- **Kênh đề xuất:** `Facebook Ads`\n"
+            f"- **Ngưỡng target CPA tối đa:** `{cpa:,.0f} VNĐ` / đơn.\n\n"
+            f"**Kịch bản đề xuất:**\n"
+            f"```text\n{var.get('adapted_copy')}\n```\n"
+            f"Sếp xem và duyệt chiến dịch vĩ mô này:"
+        )
+        
+        actions = [
+            cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+            cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
+        ]
+        sent = await cl.Message(content=approval_card, actions=actions).send()
+        track_msg_id(sent.id)
+        await associate_messages_with_current_checkpoint(config)
+        
+    await action.remove()
+
+
+@cl.action_callback("reject_draft")
+async def on_reject_draft(action: cl.Action):
+    """CMO clicked reject draft. Ask for feedback, update state and resume."""
+    thread_id = cl.user_session.get("thread_id")
+    workspace_id = cl.user_session.get("workspace_id")
+    product_id = cl.user_session.get("product_id")
+    
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "product_id": product_id
+        }
+    }
+    
+    res = await cl.AskUserMessage(content="Sếp cần điều chỉnh gì cho Bản thảo chiến dịch? Nhập ý kiến phản hồi tại đây:").send()
+    if res:
+        feedback_text = res["output"]
+        track_msg_id(res["id"])
+        
+        sent_info = await cl.Message(content=f"✍️ Gửi phản hồi đàm phán: *\"{feedback_text}\"*...").send()
+        track_msg_id(sent_info.id)
+        
+        user_msg = HumanMessage(content=feedback_text, additional_kwargs={"cl_msg_id": res["id"]})
+        state_update = {
+            "messages": [user_msg],
+            "draft_approved": False
+        }
+        await graph.aupdate_state(config, state_update)
+        
+        async for event in graph.astream(None, config=config, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                if node_name == "negotiator":
+                    new_msgs = node_update.get("messages", [])
+                    if new_msgs:
+                        ans_msg = new_msgs[-1].content
+                        sent_msg = await cl.Message(content=ans_msg).send()
+                        track_msg_id(sent_msg.id)
+                        
+        await associate_messages_with_current_checkpoint(config)
+        new_state = await graph.aget_state(config)
+        await render_draft_card(config, new_state.values)
+        
+    await action.remove()
+
+
+@cl.action_callback("rewind_draft")
+async def on_rewind_draft(action: cl.Action):
+    """Time Travel: Rewind the graph state to a past checkpoint."""
+    checkpoint_id = action.payload.get("value")
+    thread_id = cl.user_session.get("thread_id")
+    workspace_id = cl.user_session.get("workspace_id")
+    product_id = cl.user_session.get("product_id")
+    
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "product_id": product_id
+        }
+    }
+    
+    logger.info(f"Time Travel Action received: Rewinding to checkpoint {checkpoint_id}")
+    
+    # 1. Fetch checkpoints list to identify the future checkpoints that will be aborted
+    future_checkpoint_ids = []
+    found_target = False
+    
+    history = []
+    async for state in graph.aget_state_history(config):
+        history.append(state)
+        
+    # Reverse history to oldest first
+    history.reverse()
+    
+    for state in history:
+        chk_id = state.config["configurable"].get("checkpoint_id")
+        if found_target:
+            future_checkpoint_ids.append(chk_id)
+        if chk_id == checkpoint_id:
+            found_target = True
+            
+    logger.info(f"Target checkpoint: {checkpoint_id}. Aborting checkpoints: {future_checkpoint_ids}")
+    
+    # 2. Extract and dim any UI messages corresponding to future checkpoints
+    mappings = cl.user_session.get("checkpoint_ui_mappings") or {}
+    for fc_id in future_checkpoint_ids:
+        msg_ids = mappings.get(fc_id) or []
+        for msg_id in msg_ids:
+            try:
+                # Find matching text from history for content restoration
+                original_text = ""
+                for state in history:
+                    if state.config["configurable"].get("checkpoint_id") == fc_id:
+                        msgs = state.values.get("messages", [])
+                        if msgs:
+                            original_text = msgs[-1].content
+                            
+                formatted_content = f'<div class="aborted-message-wrapper">*(Dòng thời gian đã hủy)*<br/>{original_text}</div>'
+                await cl.Message(id=msg_id, content=formatted_content, actions=[]).update()
+                logger.info(f"Dimmed future message ID: {msg_id}")
+            except Exception as me:
+                logger.error(f"Failed to dim message {msg_id}: {me}")
+                
+    # 3. Send visual Divider
+    divider_text = (
+        f"⚡ **🔀 DÒNG THỜI GIAN ĐÃ RẼ NHÁNH TẠI ĐÂY**\n"
+        f"*(Đã tua ngược về phiên bản Draft trước đó)*"
+    )
+    sent_div = await cl.Message(content=divider_text).send()
+    track_msg_id(sent_div.id)
+    
+    # 4. Fork the state in LangGraph Checkpointer
+    target_config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_id": checkpoint_id
+        }
+    }
+    target_state = await graph.aget_state(target_config)
+    
+    new_values = target_state.values.copy()
+    new_values["draft_approved"] = False
+    
+    await graph.aupdate_state(config, new_values)
+    
+    # 5. Render the new Draft Card for the branched state
+    new_state = await graph.aget_state(config)
+    await render_draft_card(config, new_state.values)
+    
+    await action.remove()
+

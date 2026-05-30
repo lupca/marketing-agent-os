@@ -1,142 +1,132 @@
-# TÀI LIỆU THIẾT KẾ KỸ THUẬT: SHADOW STATE & VÒNG LẶP ĐÀM PHÁN KPI
+# TÀI LIỆU THIẾT KẾ KỸ THUẬT: STATE SCHEMA TRANSFORMATION & TIME TRAVEL (v3.2)
 **Chức vụ chịu trách nhiệm:** Chief Technology Officer (CTO)  
 **Dành cho:** Đội ngũ Kỹ sư Phát triển (Core Developers)  
-**Mục tiêu:** Nâng cấp cấu trúc LangGraph, chuyển từ mô hình "Straight-through" (Chạy thẳng) sang "Double-Barrier" (Trạm kiểm soát kép) với cơ chế Draft Plan ảo.
+**Mục tiêu:** Nâng cấp cấu trúc LangGraph lên Agent OS v3.2, áp dụng mô hình "State Schema Transformation" (Chuyển đổi Cấu trúc State) tách biệt không gian đàm phán và sáng tạo, kết hợp tính năng Time Travel để quản lý phiên bản Bản nháp.
 
 ---
 
 ## 1. Triết Lý Kiến Trúc (Architecture Philosophy)
 
-Hệ thống v3.0 sẽ áp dụng triết lý **"State Isolation" (Cô lập Trạng thái)** thông qua khái niệm **Shadow State (Kế hoạch Ảo)**. 
-Thay vì AI phân tích (Analyst) ghi đè trực tiếp tham số sống còn (Target CPA, Budget) vào bộ nhớ trung tâm (`AgencyState`) và chuyển ngay cho phòng Sáng Tạo, hệ thống sẽ:
-1. Sinh ra một bản Nháp (Draft Plan) lưu trong Shadow State.
-2. Tạm dừng đồ thị (Interrupt).
-3. Cho phép CMO tương tác, hỏi đáp, đàm phán với một **Negotiator Agent** (Biết suy luận toán học và tư vấn).
-4. Chỉ khi CMO bấm "Duyệt & Khởi chạy" (Commit), dữ liệu từ Shadow State mới được đổ vào Main State và bàn giao cho phòng Sáng Tạo.
+Hệ thống v3.2 giải quyết triệt để vấn đề phình to bộ nhớ (State Bloat) và rơi rớt ngữ cảnh (Context Loss) bằng triết lý **State Schema Transformation (Phân lập & Chuyển đổi Trạng thái)**:
+1. **Phân lập (Isolation):** Tách đồ thị thành các Sub-graphs độc lập (`Negotiation_Graph` và `Creative_Graph`).
+2. **Khử rác (Garbage Collection tại Biên giới):** Khi chuyển từ Đàm phán sang Sáng tạo, hệ thống chỉ trích xuất dữ liệu "cứng" (Brief), vứt bỏ toàn bộ lịch sử chat (`messages`) cồng kềnh.
+3. **Chủ động hóa (Proactive Context):** Tác tử Đàm phán chủ động truy xuất Case Studies (RAG) và đề xuất số liệu, ép các "ý chỉ ngầm" của CMO thành dữ liệu tĩnh.
+4. **Du hành thời gian (Time Travel):** Không tự build hệ thống versioning cồng kềnh, sử dụng nguyên bản Checkpointer của LangGraph (`thread_ts`) để tua ngược trạng thái (Rewind) thay vì lưu nhiều object Draft.
 
 ---
 
 ## 2. Sơ Đồ Luồng Hoạt Động (Data & Control Flow)
 
-Dưới đây là sơ đồ luồng LangGraph thể hiện rõ sự cô lập và vòng lặp đàm phán:
-
 ```mermaid
-stateDiagram-v2
-    direction TB
-    
-    %% Khai báo Node ngoài
-    User : CMO/CEO
-    Triage : Triage Router
-    Analyst : Analyst Node (Tính toán cơ sở)
-    Commit : Commit Node (Chốt kế hoạch)
-    Strategist : Strategist Node (Phòng Sáng Tạo)
-    
-    %% Vùng đệm
-    state "Vùng Đệm Đàm Phán (Shadow State Loop)" as Sandbox {
-        Barrier : Draft Approval Barrier
-        Negotiator : Negotiator Agent (Tư vấn & Sửa số)
-        Barrier --> Negotiator : (Tạm dừng chờ chat)
-        Negotiator --> Barrier : Cập nhật Draft
-    }
-    
-    %% Luồng đi
-    User --> Triage: "Lên chiến dịch mới"
-    Triage --> Analyst: Intent create_campaign
-    Analyst --> Barrier: Khởi tạo Draft Plan
-    
-    %% Vòng lặp đàm phán & Chốt
-    Barrier --> User: Hiển thị Card Preview Draft
-    User --> Negotiator: Chat hỏi/sửa số
-    
-    %% Quyết định chốt
-    User --> Commit: Bấm [Duyệt Kế Hoạch]
-    Commit --> Strategist: Copy Draft -> Main State
+graph TD
+    %% TẦNG UI
+    subgraph UI_Layer ["Giao Diện Sếp (Chainlit Workspace)"]
+        CEO((CMO / CEO))
+        Channel_Biz["#phong-kinh-doanh"]
+        Channel_Creative["#phong-sang-tao"]
+        CEO <-->|Đàm phán & Tua thời gian| Channel_Biz
+        CEO -.-|Quan sát Bản nháp| Channel_Creative
+    end
+
+    %% TẦNG LANGGRAPH
+    subgraph LangGraph_OS ["Agent OS v3.2 (State Schema Transformation)"]
+        
+        %% Negotiation Sub-graph
+        subgraph Negotiation_Graph ["Vùng Đệm Đàm Phán (NegotiationState)"]
+            Triage[Triage Router]
+            Analyst[Analyst: Tính KPI Cơ Sở]
+            Barrier{Draft Approval Barrier <br/> interrupt_before}
+            Negotiator[Negotiator Agent: Proactive ReAct]
+            
+            Triage --> Analyst
+            Analyst --> Barrier
+            Barrier <=>|CMO Chat / Gọi Tool| Negotiator
+        end
+
+        %% Trạm Biên Giới
+        CommitNode[Node Commit: Chuyển Đổi State]
+        
+        %% Creative Sub-graph
+        subgraph Creative_Graph ["Ban Sáng Tạo (CreativeState)"]
+            Dir[Strategist / Director]
+            Wri[Copywriter]
+            Gua[Brand Guardian]
+            Dir --> Wri
+            Wri <-->|Auto Review| Gua
+        end
+    end
+
+    %% LUỒNG CHUYỂN ĐỔI
+    Barrier -->|Sếp bấm Duyệt Khởi Chạy| CommitNode
+    CommitNode -->|Đúc JSON Brief & Xóa Lịch sử| Dir
+
+    %% KẾT NỐI
+    Channel_Biz <==> Negotiation_Graph
+    Channel_Creative <==> Creative_Graph
 ```
 
 ---
 
 ## 3. Cấu Trúc Dữ Liệu Bộ Nhớ (State Structure)
 
-Tệp `graphs/state.py` cần được cập nhật cấu trúc `AgencyState` để hỗ trợ vùng đệm Sandbox.
+Hệ thống sử dụng các Schema tách biệt. Cần cập nhật vào `graphs/state.py`:
 
 ```python
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import TypedDict, List
 from langchain_core.messages import BaseMessage
-import operator
-from typing_extensions import Annotated
 
 class DraftPlan(TypedDict):
-    """Cấu trúc của Shadow State (Kế hoạch Ảo)"""
     test_budget: float
     target_cpa: float
-    margin: float
-    status: str # "draft", "negotiating", "committed"
     notes_for_creative: str
 
-class AgencyState(TypedDict):
-    messages: Annotated[List[BaseMessage], operator.add]
-    current_channel: str
-    workspace_id: str
+class NegotiationState(TypedDict):
+    """State này chứa mảng messages đàm phán cồng kềnh"""
+    messages: List[BaseMessage]
+    draft_plan: DraftPlan
     campaign_id: str
     product_id: str
-    
-    # --- GLOBAL STATE THẬT (Chỉ được ghi sau khi Commit) ---
-    target_cpa: float
-    test_budget: float
-    
-    # --- SHADOW STATE (Sandbox cho Đàm phán) ---
-    draft_plan: Optional[DraftPlan]
-    
-    # ... (Các state cũ giữ nguyên)
-    sop_stage: str 
-    intent_classification: str
+
+class BusinessBrief(TypedDict):
+    """Cấu trúc dữ liệu sạch, ĐÃ LỌC BỎ RÁC TIN NHẮN"""
+    campaign_id: str
+    product_id: str
+    final_budget: float
+    final_cpa: float
+    strategic_notes: str
+
+class CreativeState(TypedDict):
+    """State khởi tạo của phòng Sáng Tạo - Siêu nhẹ"""
+    messages: List[BaseMessage] # Bắt đầu với mảng rỗng
+    business_brief: BusinessBrief
 ```
 
 ---
 
-## 4. Đặc Tả Tác Tử Đàm Phán (Negotiator Agent)
+## 4. Đặc Tả Tác Tử Đàm Phán Chủ Động (Proactive Negotiator)
 
-Node `negotiator_node` đóng vai trò là "Giám đốc Hiệu suất Ảo". Hoạt động theo cơ chế **ReAct (Reason + Act)**.
-
-### A. Công cụ hỗ trợ (Tool Calling)
-Định nghĩa một Pydantic Schema để Ollama (Qwen2.5) có thể thao tác với Shadow State:
-
-```python
-from pydantic import BaseModel, Field
-
-class UpdateDraftPlanTool(BaseModel):
-    """Công cụ cập nhật Bản nháp Kế hoạch Kinh doanh"""
-    test_budget: Optional[float] = Field(None, description="Ngân sách chạy thử mới (VND)")
-    target_cpa: Optional[float] = Field(None, description="CPA mục tiêu mới (VND)")
-    notes_for_creative: Optional[str] = Field(None, description="Ghi chú thêm cho phòng Sáng tạo")
-```
-
-### B. System Prompt (Logic Suy luận)
-```text
-Bạn là Giám đốc Hiệu suất (Performance Director). Đang thảo luận Bản nháp Kế hoạch (Draft Plan) với CMO.
-- Giá bán SP: {price} | Giá vốn: {cost} | Lợi nhuận gộp: {margin}
-- Trạng thái Nháp hiện tại: Ngân sách {budget}, Target CPA {cpa}. (Dự kiến mang về {leads} đơn).
-
-NHIỆM VỤ:
-1. TRẢ LỜI CÂU HỎI TƯ VẤN: Nếu CMO hỏi "Ngân sách này có ổn không?", "CPA này có mỏng không?". KHÔNG gọi Tool. Hãy phân tích toán học dựa trên Lợi nhuận gộp và số lượng Lead (Ngân sách / CPA) để xem Facebook có đủ data thoát Learning Phase không (cần ~10-50 leads).
-2. THỰC THI MỆNH Lệnh: Nếu CMO yêu cầu sửa số ("Tăng lên 5 củ", "Ép CPA xuống 100k"). Hãy gọi Tool `UpdateDraftPlanTool` để cập nhật hệ thống, sau đó báo cáo lại ngắn gọn.
-Giữ thái độ sắc bén, tôn trọng Sếp nhưng phải bảo vệ số liệu kinh tế.
-```
+Để chống "Rơi rớt ngữ cảnh" (Implicit Context Loss), Agent không được chờ hỏi mới đáp.
+- **Tích hợp RAG (Case Studies):** Agent tự gọi Tool tìm kiếm các Case Study từ chiến dịch quá khứ.
+- **Gợi ý ép kiểu:** Agent tự hỏi ngược lại Sếp. Ví dụ: *"Case study tháng trước CPA là 120k, sếp có muốn chốt mức 100k cho đợt này, kèm định hướng 'nhấn mạnh công năng sản phẩm' không?"*
+- **Lưu trữ triệt để:** Khi CMO "Say Yes", Agent gọi `UpdateDraftPlanTool` để ghi đè số liệu `test_budget`, `target_cpa`, và đặc biệt là gom mọi chỉ đạo ngữ cảnh vào `notes_for_creative`.
 
 ---
 
-## 5. Đặc Tả Giao Diện Kỹ Thuật (Chainlit UI Hooks)
+## 5. Xử Lý "Quay Xe" Bằng Time Travel & UX Chainlit
 
-Phía Client (UI) cần bắt được trạng thái Graph đang dừng tại `draft_approval_barrier` để render giao diện tương tác:
+Thay vì tạo mảng `List[DraftPlan]` cồng kềnh, áp dụng **LangGraph Time Travel (Thread Timestamp - `thread_ts`)**.
+*Ghi chú: Ở giai đoạn MVP hiện tại, tạm thời bỏ qua vấn đề Data Schema Migration khi rollback.*
 
-1.  **Render Draft Card:** Khi Graph paused, bắn ra một `cl.Message` chứa Bảng Markdown tổng hợp các thông số của `state["draft_plan"]`.
-2.  **Render Action Buttons:** Kèm theo 2 nút:
-    *   `[💬 Tiếp tục đàm phán]` (Chỉ là UI hint, thực tế người dùng cứ chat bình thường).
-    *   `[🚀 Chốt Kế Hoạch & Giao Phòng Sáng Tạo]` (Gắn với action callback `commit_draft_plan`).
-3.  **Callback `commit_draft_plan`:**
-    *   Cập nhật state: Chuyển dữ liệu từ `draft_plan` sang `target_cpa` và `test_budget` thật.
-    *   Cập nhật `sop_stage` = `creative_generation`.
-    *   Resume LangGraph để tiếp tục chạy vào `strategist_node`.
+### A. Tầng Backend (LangGraph)
+- Sử dụng Checkpointer (`AsyncPostgresSaver`).
+- Mỗi node thực thi đều tự động lưu lại snapshot. Khi có yêu cầu lấy bản nháp cũ, gọi API lấy state bằng `thread_ts` trong quá khứ và LangGraph sẽ tự động fork ra nhánh (branch) mới.
 
----
-*Tài liệu này là cơ sở để đội ngũ kỹ thuật triển khai bản nâng cấp hệ thống (Patch v3.1).*
+### B. Tầng Frontend (Chainlit UI/UX - Cảm hứng từ "Google Vibe Code")
+Để tránh việc người dùng bị lạc trong các dòng thời gian khi Rewind, UI/UX cần xử lý triệt để như cách các code editor thông minh quản lý version:
+- **Menu Lịch sử:** Trên Draft Card hiện tại có dropdown "Lịch sử bản nháp".
+- **Visual Feedback Rõ Ràng:** Khi Sếp tua về quá khứ:
+  - Bắn event từ Backend sang Chainlit báo trạng thái "Đã Rewind".
+  - UI làm mờ (dim), gạch ngang (strikethrough) hoặc co gọn các tin nhắn thuộc "dòng thời gian tương lai đã bị hủy bỏ".
+  - Vẽ một **Đường phân cách (Divider)** nổi bật báo hiệu sự rẽ nhánh: *"Bắt đầu rẽ nhánh thời gian từ đây"*.
+  - Vô hiệu hóa (disable) tất cả các action button cũ không thuộc nhánh hiện tại để chặn mọi click nhầm.
+  - Mang lại cảm giác an toàn tuyệt đối khi điều hướng qua lại giữa các phiên bản.

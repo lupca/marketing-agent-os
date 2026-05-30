@@ -1,0 +1,7 @@
+.git
+.gitignore
+.pytest_cache
+__pycache__
+reference
+reference(just reference)
+data/mock_database.db
