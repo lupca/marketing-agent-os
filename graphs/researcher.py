@@ -77,7 +77,7 @@ def researcher_node(state: AgencyState) -> dict:
         # Return updated messages and state stage
         return {
             "messages": [AIMessage(content=report)],
-            "sop_stage": "research"
+            "sop_stage": "triage"
         }
     except Exception as e:
         logger.error(f"Researcher node execution failed: {e}")

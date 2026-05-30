@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Configs
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://172.22.45.28:11434")
-OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:7b-instruct")
+OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:14b-instruct")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "bge-m3")
 OLLAMA_RERANK_MODEL = os.getenv("OLLAMA_RERANK_MODEL", "bge-reranker-large:latest")
 

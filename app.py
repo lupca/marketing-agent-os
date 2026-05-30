@@ -146,21 +146,6 @@ logging.basicConfig(level=logging.INFO)
 SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
 SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
 
-@cl.set_chat_profiles
-async def chat_profile():
-    """Setup multi-department channels on UI sidebar."""
-    return [
-        cl.ChatProfile(
-            name="#phong-kinh-doanh",
-            markdown_description="Nơi CMO giám sát chỉ số Ads, tính CPA Target và duyệt Ngân sách vĩ mô.",
-            icon="https://cdn-icons-png.flaticon.com/512/3135/3135706.png"
-        ),
-        cl.ChatProfile(
-            name="#phong-sang-tao",
-            markdown_description="Quan sát Ban Sáng Tạo (Strategist, Copywriter, Guardian) thảo luận và viết kịch bản.",
-            icon="https://cdn-icons-png.flaticon.com/512/3242/3242257.png"
-        )
-    ]
 
 @cl.on_chat_start
 async def on_chat_start():
@@ -213,10 +198,9 @@ async def on_chat_start():
     db_mode = "MOCK SQLite (Offline)" if is_mock() else "PostgreSQL (Online)"
     
     welcome_msg = (
-        f"### 🖥️ Hệ Điều Hành Marketing Agent OS v2.0 Khởi Động!\n"
+        f"### 🖥️ Hệ Điều Hành Marketing Agent OS v3.0 Khởi Động!\n"
         f"- **Môi trường CSDL:** `{db_mode}`\n"
-        f"- **Thread ID:** `{thread_id}`\n"
-        f"- **Kênh đang chọn:** `{profile}`\n\n"
+        f"- **Thread ID:** `{thread_id}`\n\n"
         f"**Sếp cần giao việc gì hôm nay?**\n"
         f"- Để tạo chiến dịch mới, nhập ví dụ: *\"Lên camp mới cho sản phẩm G-Agent Tech\"*\n"
         f"- Để xem báo cáo hiệu suất, nhập ví dụ: *\"Xem báo cáo CPA tuần qua\"*\n"
@@ -525,18 +509,25 @@ async def on_message(message: cl.Message):
                 await cl.Message(content=analyst_msg).send()
                 
             elif node_name == "performance":
-                # Scale / Kill results
-                killed = node_update.get("killed_variants_feedback", [])
-                if killed:
-                    kill_msg = (
-                        f"🚨 **[Phòng Kinh Doanh - Performance]**\n"
-                        f"- Phát hiện `{len(killed)} kịch bản` vượt ngưỡng CPA!\n"
-                        f"- variant_id: `{killed[0].get('variant_id')}` bị TẮT (Killed) do CPA đạt `{killed[0].get('failed_cpa'):,.0f} VNĐ` > Target `{target_cpa:,.0f} VNĐ`.\n"
-                        f"👉 **Giao thức cãi nhau:** Gửi phản hồi nóng bắt Ban Sáng Tạo đổi Angle viết lại!"
-                    )
-                    await cl.Message(content=kill_msg).send()
+                # Show premium reports if available
+                new_msgs = node_update.get("messages", [])
+                if new_msgs:
+                    report = new_msgs[-1].content
+                    await cl.Message(content=report).send()
                 else:
-                    await cl.Message(content="📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn.").send()
+                    # Fallback to old scale/kill UI output
+                    killed = node_update.get("killed_variants_feedback", [])
+                    if killed:
+                        t_cpa = killed[0].get("target_cpa", 1050000.0)
+                        kill_msg = (
+                            f"🚨 **[Phòng Kinh Doanh - Performance]**\n"
+                            f"- Phát hiện `{len(killed)} kịch bản` vượt ngưỡng CPA!\n"
+                            f"- variant_id: `{killed[0].get('variant_id')}` bị TẮT (Killed) do CPA đạt `{killed[0].get('failed_cpa'):,.0f} VNĐ` > Target `{t_cpa:,.0f} VNĐ`.\n"
+                            f"👉 **Giao thức cãi nhau:** Gửi phản hồi nóng bắt Ban Sáng Tạo đổi Angle viết lại!"
+                        )
+                        await cl.Message(content=kill_msg).send()
+                    else:
+                        await cl.Message(content="📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn.").send()
                     
             elif node_name == "strategist":
                 angle = node_update.get("current_angle", {})
@@ -576,18 +567,29 @@ async def on_message(message: cl.Message):
                     )
                     await cl.Message(content=research_msg).send()
 
+            elif node_name == "creative_report_agent":
+                new_msgs = node_update.get("messages", [])
+                if new_msgs:
+                    report = new_msgs[-1].content
+                    await cl.Message(content=report).send()
+
+            elif node_name == "chat_agent":
+                new_msgs = node_update.get("messages", [])
+                if new_msgs:
+                    report = new_msgs[-1].content
+                    await cl.Message(content=report).send()
+
     # 4. Detect if graph is paused or finished
     current_state = await graph.aget_state(config)
     
     # Handle casual chat (END state) gracefully on UI
     if not current_state or not current_state.next:
-        # Check if this was a research query which was already handled
+        # Check if the intent was already handled by specialized nodes, just return!
         intent = current_state.values.get("intent_classification") if current_state and current_state.values else "chat"
-        if intent == "research":
+        if intent in ["research", "chat", "creative_report"]:
             return
             
-        # If the graph has finished (e.g., small talk categorized as END / 'chat')
-        # We query the LLM directly or show a standard friendly message
+        # Fallback for truly unhandled small talk categorized directly as END without node
         from core.ollama_client import generate_text
         prompt = (
             f"Bạn là trợ lý Marketing Agent OS. Hãy trả lời thân thiện bằng Tiếng Việt câu hỏi này của Sếp:\n"

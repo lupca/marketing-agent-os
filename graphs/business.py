@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy.orm import Session
 from db.connection import SessionLocal
 from core.models import ProductService, PlatformVariant, MarketingCampaign
+from core.db_services import get_cpa_anchor
 from graphs.state import AgencyState
 from core.decision_logger import log_decision
 from langchain_core.messages import AIMessage
@@ -17,54 +18,17 @@ def analyst_node(state: AgencyState) -> dict:
     Calculates Target CPA and Test Budget from Product Master Data.
     Acts as the economic anchor of the system.
     """
-    logger.info("Executing Analyst Node (CPA Anchor Calculation)...")
-    db: Session = SessionLocal()
+    logger.info("Executing Analyst Node (CPA Anchor Calculation via DB Services)...")
     
     workspace_id = state.get("workspace_id")
     product_id = state.get("product_id")
-    
-    # 1. Fetch Product Pricing
-    product = None
-    if product_id:
-        try:
-            product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
-        except Exception:
-            pass
-            
-    if not product:
-        # Fallback to seeded default product
-        product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
-        
-    if not product:
-        db.close()
-        raise ValueError("Lỗi SOP: Không tìm thấy bất kỳ sản phẩm nào trong CSDL để tính CPA Target. Hủy luồng.")
-
-    # Parse pricing from default_offer e.g., "5000000;1500000"
-    try:
-        price_str, cost_str = product.default_offer.split(";")
-        price = float(price_str)
-        cost = float(cost_str)
-    except Exception:
-        # Hard fallback
-        price = 5000000.0
-        cost = 1500000.0
-
-    margin = price - cost
-    # Target CPA = 30% of Margin
-    target_cpa = round(margin * 0.3, 0)
-    
-    # Fetch test budget limit from active campaign or default to 2M VND
-    test_budget = 2000000.0
     campaign_id = state.get("campaign_id")
-    if campaign_id:
-        try:
-            camp = db.query(MarketingCampaign).filter_by(id=uuid.UUID(str(campaign_id))).first()
-            if camp and camp.budget > 0:
-                test_budget = float(camp.budget)
-        except Exception:
-            pass
-            
-    db.close()
+    
+    # Calculate target CPA and test budget limit dynamically via CSDL Service Layer
+    target_cpa, test_budget = get_cpa_anchor(
+        uuid.UUID(str(product_id)) if product_id else None,
+        uuid.UUID(str(campaign_id)) if campaign_id else None
+    )
 
     # SOP RULE: Check Anchor Values
     if target_cpa <= 0 or test_budget <= 0:
@@ -103,10 +67,11 @@ def analyst_node(state: AgencyState) -> dict:
 def performance_node(state: AgencyState) -> dict:
     """
     Performance Node (Ban Kinh Doanh).
-    Monitors active campaigns. Shuts down failing variants (killed)
-    and registers feedback payload for the Creative department.
+    Monitors active campaigns. Shuts down failing variants (killed),
+    registers feedback payload for the Creative department, and calls
+    Ollama Qwen2.5 to synthesize a highly premium Performance Report for the CMO.
     """
-    logger.info("Executing Performance Node (Scale/Kill Optimization)...")
+    logger.info("Executing Performance Node (Scale/Kill Optimization & Premium Report)...")
     db: Session = SessionLocal()
     
     workspace_id = state.get("workspace_id")
@@ -157,6 +122,8 @@ def performance_node(state: AgencyState) -> dict:
                     publish_status="published",
                     metric_views=120,
                     metric_likes=5,
+                    metric_shares=2,
+                    metric_comments=1,
                     # We store metric_cpa or cost in metadata since SQL schema stores metrics views/likes
                     meta_data={"metric_cpa": 1400000.0} # Failing CPA
                 )
@@ -219,21 +186,99 @@ def performance_node(state: AgencyState) -> dict:
                 )
                 
     db.commit()
+    
+    # 2. Gather views, likes, shares, comments, CPA targets for LLM synthesis report
+    total_views = sum(v.metric_views or 0 for v in variants)
+    total_likes = sum(v.metric_likes or 0 for v in variants)
+    total_shares = sum(v.metric_shares or 0 for v in variants)
+    total_comments = sum(v.metric_comments or 0 for v in variants)
+    
+    total_variants = len(variants)
+    killed_count = sum(1 for v in variants if v.publish_status == "killed")
+    scaled_count = sum(1 for v in variants if v.publish_status == "scaled")
+    published_count = sum(1 for v in variants if v.publish_status == "published")
+    
+    variant_details = []
+    for i, v in enumerate(variants):
+        metrics = v.meta_data or {}
+        cpa = metrics.get("metric_cpa", 0.0)
+        variant_details.append(
+            f"{i+1}. Kịch bản ID: {v.id}\n"
+            f"   - Kênh phân phối: {v.platform.upper()}\n"
+            f"   - Trạng thái tối ưu: {v.publish_status.upper()}\n"
+            f"   - Chỉ số tương tác: Lượt xem = {v.metric_views or 0:,} | Lượt thích = {v.metric_likes or 0:,} | Chia sẻ = {v.metric_shares or 0:,} | Bình luận = {v.metric_comments or 0:,}\n"
+            f"   - CPA thực tế: {cpa:,.0f} VNĐ\n"
+            f"   - CPA Mục tiêu (Target CPA): {target_cpa:,.0f} VNĐ\n"
+            f"   - Nội dung kịch bản quảng cáo: \"{v.adapted_copy[:150]}...\"\n"
+        )
+    details_str = "\n".join(variant_details) if variant_details else "(Chưa có kịch bản quảng cáo nào được ghi nhận)"
+    
+    # 3. Design the high-quality LLM prompt
+    prompt = (
+        f"Bạn là Trợ lý Báo cáo Hiệu suất (Performance Reporter Agent) của ban Kinh Doanh.\n"
+        f"Dưới đây là các số liệu hiệu suất chiến dịch thực tế được truy xuất từ CSDL hệ thống:\n\n"
+        f"TỔNG THỂ HIỆU SUẤT CHIẾN DỊCH:\n"
+        f"- Tổng số kịch bản quảng cáo được đánh giá: {total_variants}\n"
+        f"- Số kịch bản đã tắt (KILLED - do CPA vượt ngưỡng): {killed_count}\n"
+        f"- Số kịch bản được tăng ngân sách (SCALED - hoạt động hiệu quả): {scaled_count}\n"
+        f"- Số kịch bản đang chạy (PUBLISHED): {published_count}\n"
+        f"- Tổng lượt xem (Views): {total_views:,}\n"
+        f"- Tổng lượt thích (Likes): {total_likes:,}\n"
+        f"- Tổng lượt chia sẻ (Shares): {total_shares:,}\n"
+        f"- Tổng lượt bình luận (Comments): {total_comments:,}\n"
+        f"- CPA Target (Ngưỡng tối đa cho phép): {target_cpa:,.0f} VNĐ\n\n"
+        f"CHI TIẾT TỪNG KỊCH BẢN QUẢNG CÁO:\n"
+        f"{details_str}\n\n"
+        f"YÊU CẦU TRẢ LỜI:\n"
+        f"1. Tổng hợp một bản báo cáo hiệu suất bằng Tiếng Việt chuyên nghiệp gửi cho CMO.\n"
+        f"2. Bắt buộc có bảng biểu Markdown hiển thị so sánh hiệu suất giữa các kịch bản quảng cáo. Bảng gồm các cột: Kênh, Lượt xem, Lượt thích, CPA thực tế, CPA Target, Trạng thái tối ưu, Tóm tắt nội dung.\n"
+        f"3. Phân tích cụ thể lý do tại sao một số kịch bản bị khai tử (KILLED) và tại sao một số kịch bản được tăng ngân sách (SCALED). Nhận xét mối quan hệ giữa lượt xem, tương tác và CPA.\n"
+        f"4. Đề xuất các khuyến nghị hành động cụ thể tiếp theo cho CMO để tối ưu hóa hiệu quả kinh doanh của toàn chiến dịch (ví dụ: chuyển ngân sách sang kênh nào, yêu cầu sáng tạo viết lại gì).\n"
+        f"5. Giữ giọng văn cực kỳ chuyên nghiệp, sắc bén của một Performance Marketing Director, phân tích dựa trên dữ liệu cụ thể, không nói chung chung.\n\n"
+        f"BÁO CÁO PHÂN TÍCH HIỆU SUẤT CHI TIẾT:"
+    )
+    
+    try:
+        from core.ollama_client import generate_text
+        logger.info("Calling Ollama to synthesize premium performance report...")
+        report = generate_text(
+            prompt=prompt,
+            system_prompt="Bạn là Performance Reporter Agent chuyên nghiệp. Hãy viết báo cáo phân tích hiệu suất chiến dịch chất lượng cao."
+        )
+    except Exception as e:
+        logger.error(f"Error calling LLM for performance report: {e}")
+        # Robust fallback
+        report = (
+            f"### Báo Cáo Hiệu Suất Chiến Dịch (Fallback từ CSDL)\n\n"
+            f"Do sự cố kết nối LLM, dưới đây là tóm tắt thô từ CSDL:\n\n"
+            f"| Kênh | Lượt xem | Lượt thích | CPA thực tế | CPA Target | Trạng thái tối ưu |\n"
+            f"| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+        )
+        for v in variants:
+            metrics = v.meta_data or {}
+            cpa = metrics.get("metric_cpa", 0.0)
+            report += f"| {v.platform.upper()} | {v.metric_views or 0:,} | {v.metric_likes or 0:,} | {cpa:,.0f} VNĐ | {target_cpa:,.0f} VNĐ | {v.publish_status.upper()} |\n"
+            
+    # Log the decision to generate the report
+    log_decision(
+        workspace_id=workspace_id,
+        campaign_id=state.get("campaign_id"),
+        agent_name="Performance Reporter",
+        action="Synthesize Performance Report",
+        decision_status="success",
+        reason=f"Đã tổng hợp thành công báo cáo hiệu suất chiến dịch cho CMO dựa trên dữ liệu của {total_variants} platform variants.",
+        metadata={"total_variants": total_variants, "killed_count": killed_count, "scaled_count": scaled_count}
+    )
+    
     db.close()
     
-    # Return updated state with visual message persisted
-    if killed_feedback:
-        perf_msg = (
-            f"🚨 **[Phòng Kinh Doanh - Performance]**\n"
-            f"- Phát hiện `{len(killed_feedback)} kịch bản` vượt ngưỡng CPA!\n"
-            f"- variant_id: `{killed_feedback[0].get('variant_id')}` bị TẮT (Killed) do CPA đạt `{killed_feedback[0].get('failed_cpa'):,.0f} VNĐ` > Target `{target_cpa:,.0f} VNĐ`.\n"
-            f"👉 **Giao thức cãi nhau:** Gửi phản hồi nóng bắt Ban Sáng Tạo đổi Angle viết lại!"
-        )
-    else:
-        perf_msg = "📈 **[Phòng Kinh Doanh - Performance]** Không phát hiện Ads vượt ngưỡng CPA. Mọi thứ vận hành an toàn."
+    perf_msg = (
+        f"📈 **[Ban Kinh Doanh - Performance Reporter]**\n\n"
+        f"{report.strip()}"
+    )
 
     return {
         "killed_variants_feedback": killed_feedback,
-        "sop_stage": "cpa_calculation",
+        "sop_stage": "triage",
         "messages": [AIMessage(content=perf_msg)]
     }

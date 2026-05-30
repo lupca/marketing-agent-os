@@ -1,5 +1,5 @@
 # graphs/state.py
-from typing import TypedDict, List, Annotated, Dict, Any
+from typing import TypedDict, List, Annotated, Dict, Any, Optional
 from langchain_core.messages import BaseMessage
 import operator
 
@@ -22,4 +22,7 @@ class AgencyState(TypedDict):
     variants: List[Dict[str, Any]]       # Generated platform-specific kịch bản
     feedback_log: List[str]              # Logs for Guardian review iteration
     intent_classification: str           # Classified intent: 'chat', 'show_metrics', 'create_campaign', 'research'
+    is_follow_up: bool                   # True nếu tin nhắn là tiếp nối chủ đề trước (context-aware routing)
+    extracted_entities: Dict[str, Any]   # Entities bóc tách từ Triage (budget, product_name, platform...)
+    routing_thought_process: str         # Chain-of-Thought suy luận của Triage Router (Observability)
 
