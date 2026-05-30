@@ -355,4 +355,28 @@ class AgentDecision(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+# 23. Model: AIModel
+class AIModel(Base):
+    __tablename__ = "ai_models"
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    model_id = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
+    provider = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(100), nullable=False) # 'Chat', 'Image', 'Video', 'Speech', 'Embedding', 'Reranker'
+    tags = Column(JSON_TYPE, default=list) # e.g. ["VLM", "MoE", "Reasoning"]
+    series = Column(String(100), nullable=True) # e.g. "DeepSeek", "Qwen", "Kimi"
+    context_window = Column(String(100), nullable=True) # e.g. ">= 8K", ">= 128K"
+    model_size = Column(String(100), nullable=True) # e.g. "Under 10B", "10 ~ 50B", "Over 100B"
+    is_custom = Column(Boolean, default=True)
+    is_new = Column(Boolean, default=False)
+    special_badge = Column(String(100), nullable=True) # e.g. "New 限时优惠"
+    api_url = Column(String(555), nullable=True) # model-specific base url, e.g. http://localhost:11434/v1
+    api_key = Column(String(555), nullable=True) # model-specific api key override, e.g. sk-...
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+
 

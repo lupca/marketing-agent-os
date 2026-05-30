@@ -80,7 +80,8 @@ def run_research(workspace_id: str, query: str, access_tags: list = None) -> str
         logger.info("[run_research] Calling Ollama to synthesize research report...")
         report = generate_text(
             prompt,
-            system_prompt="Bạn là Researcher Agent chuyên nghiệp. Hãy viết báo cáo phân tích tri thức chất lượng cao."
+            system_prompt="Bạn là Researcher Agent chuyên nghiệp. Hãy viết báo cáo phân tích tri thức chất lượng cao.",
+            workspace_id=workspace_id
         )
         return report.strip()
 

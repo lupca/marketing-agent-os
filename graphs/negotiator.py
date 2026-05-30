@@ -143,7 +143,7 @@ def negotiator_node(state: AgencyState) -> dict:
     system_prompt = "You are a master business negotiator. Output JSON only."
     
     try:
-        response_str = generate_text(query_text, system_prompt=prompt, json_format=True)
+        response_str = generate_text(query_text, system_prompt=prompt, json_format=True, workspace_id=workspace_id)
         result = parse_llm_json(response_str, fallback_data={
             "thought_process": "Lỗi phân tích JSON từ LLM. Giữ nguyên chỉ số.",
             "updated_draft_plan": {

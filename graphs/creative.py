@@ -238,7 +238,7 @@ def strategist_node(state: AgencyState) -> dict:
     
     logger.info("Generating marketing angle strategy from Ollama...")
     system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
-    res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True)
+    res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True, workspace_id=workspace_id)
     angle_data = parse_llm_json(res_str, fallback_data=STRATEGIST_FALLBACK)
     
     logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
@@ -270,6 +270,7 @@ def copywriter_node(state: AgencyState) -> dict:
     Constructs creative copies strictly constrained under Target CPA and Budget.
     """
     logger.info("Executing Copywriter Node (Constraint-Driven Content Generation)...")
+    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
     
     target_cpa = state.get("target_cpa", DEFAULT_TARGET_CPA)
     test_budget = state.get("test_budget", DEFAULT_TEST_BUDGET)
@@ -277,13 +278,13 @@ def copywriter_node(state: AgencyState) -> dict:
     # 1. Generate Master Content
     master_prompt = build_copywriter_master_prompt(state, target_cpa, test_budget)
     logger.info("Generating Master Content via Ollama...")
-    master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True)
+    master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
     master_content = parse_llm_json(master_res, fallback_data=COPYWRITER_MASTER_FALLBACK)
 
     # 2. Generate Platform Adaptation (Facebook variant)
     variant_prompt = build_copywriter_variant_prompt(state, master_content, target_cpa, test_budget)
     logger.info("Generating Facebook Platform Variant...")
-    var_res = generate_text(variant_prompt, system_prompt="You are a platform optimization copywriter. Output JSON only.", json_format=True)
+    var_res = generate_text(variant_prompt, system_prompt="You are a platform optimization copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
     fb_variant = parse_llm_json(var_res, fallback_data=FB_VARIANT_FALLBACK)
     fb_variant["platform"] = "facebook"
     
@@ -317,6 +318,7 @@ def brand_guardian_node(state: AgencyState) -> dict:
     Enforces the strict CMO 100-Point compliance check.
     """
     logger.info("Executing Brand Guardian Node (Scoring Compliance Gatekeeper)...")
+    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
     
     master_content = state.get("master_content", {})
     variants = state.get("variants", [])
@@ -330,7 +332,7 @@ def brand_guardian_node(state: AgencyState) -> dict:
     # Run evaluation
     guardian_prompt = build_brand_guardian_prompt(state, master_content, fb_copy)
     logger.info("Running compliance scoring via Ollama...")
-    res_str = generate_text(guardian_prompt, system_prompt="You are the Brand Guardian. Score compliance in valid JSON.", json_format=True)
+    res_str = generate_text(guardian_prompt, system_prompt="You are the Brand Guardian. Score compliance in valid JSON.", json_format=True, workspace_id=workspace_id)
     eval_data = parse_llm_json(res_str, fallback_data=GUARDIAN_FALLBACK)
     
     score = int(eval_data.get("score", 75))

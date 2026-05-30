@@ -22,4 +22,8 @@ psycopg-pool
 langgraph-checkpoint-postgres
 asyncpg
 markitdown[pdf,docx,pptx,xlsx]
+sentence-transformers
+transformers
+torch
+
 

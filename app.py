@@ -160,7 +160,440 @@ async def custom_dashboard_middleware(request: Request, call_next):
             return JSONResponse(content={"error": str(e)}, status_code=500)
         finally:
             db.close()
+
+    elif path == "/api/workspace/settings" and request.method == "GET":
+        db: Session = SessionLocal()
+        try:
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            ws = db.query(Workspace).filter_by(id=ws_id).first()
+            return JSONResponse(content=ws.settings if (ws and ws.settings) else {})
+        except Exception as e:
+            logger.error(f"Error fetching workspace settings: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+
+    elif path == "/api/workspace/settings" and request.method == "POST":
+        ALLOWED_SETTINGS = {"ai_model", "temperature", "max_tokens", "recursion_limit",
+                           "reranker_mode", "siliconflow_api_key", "enable_thinking", "ai_api_url"}
+        db: Session = SessionLocal()
+        try:
+            body = await request.json()
+            # Whitelist validation: only allow known setting keys
+            filtered = {k: v for k, v in body.items() if k in ALLOWED_SETTINGS}
+            if not filtered:
+                return JSONResponse(content={"status": "error", "message": "No valid settings provided"}, status_code=400)
+            # Type coercion & validation
+            if "temperature" in filtered:
+                filtered["temperature"] = max(0.0, min(1.0, float(filtered["temperature"])))
+            if "max_tokens" in filtered:
+                filtered["max_tokens"] = max(4000, min(20000, int(filtered["max_tokens"])))
+            if "recursion_limit" in filtered:
+                filtered["recursion_limit"] = max(2, min(15, int(filtered["recursion_limit"])))
+            if "enable_thinking" in filtered:
+                filtered["enable_thinking"] = bool(filtered["enable_thinking"])
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            ws = db.query(Workspace).filter_by(id=ws_id).first()
+            if ws:
+                current_settings = dict(ws.settings) if ws.settings else {}
+                current_settings.update(filtered)
+                ws.settings = current_settings
+                db.commit()
+                return JSONResponse(content={"status": "success"})
+            return JSONResponse(content={"status": "error", "message": "Workspace not found"}, status_code=404)
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error saving workspace settings: {e}", exc_info=True)
+            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+        finally:
+            db.close()
             
+    elif path == "/api/workspace/models" and request.method == "GET":
+        from core.models import AIModel
+        db: Session = SessionLocal()
+        try:
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
+            if not models:
+                # Seed the table with default models
+                logger.info("No AI models found in PostgreSQL for workspace Team Alpha. Seeding default models...")
+                DEFAULT_MODELS = [
+                    {
+                        "model_id": "deepseek-ai/DeepSeek-V4-Pro",
+                        "name": "DeepSeek-V4-Pro",
+                        "provider": "deepseek-ai",
+                        "description": "DeepSeek-V4-Pro is DeepSeek's flagship open-source MoE model with 1.6T total parameters and 49B activated, purpose-built for frontier-level reasoning, coding, and mathematical tasks.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "862B", "1M"],
+                        "series": "DeepSeek",
+                        "context_window": ">= 128K",
+                        "model_size": "Over 100B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "deepseek-ai/DeepSeek-V4-Flash",
+                        "name": "DeepSeek-V4-Flash",
+                        "provider": "deepseek-ai",
+                        "description": "DeepSeek-V4-Flash is DeepSeek's latest open-source MoE model featuring 284B total parameters with only 13B activated during inference, delivering high-speed generation and excellent general capabilities.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "158B", "1M"],
+                        "series": "DeepSeek",
+                        "context_window": ">= 128K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "moonshotai/Kimi-K2.6",
+                        "name": "Kimi-K2.6",
+                        "provider": "moonshotai",
+                        "description": "Kimi K2.6 is an open-source, native multimodal agentic model by Moonshot AI, achieving open-source state-of-the-art on benchmarks including HLE with tools, SWE-Bench Pro, and long-context reasoning.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Prefix", "Tools", "VLM", "1T", "256K", "MoE", "Reasoning"],
+                        "series": "Kimi",
+                        "context_window": ">= 128K",
+                        "model_size": "Over 100B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New"
+                    },
+                    {
+                        "model_id": "tencent/Hy3-preview",
+                        "name": "Hy3-preview",
+                        "provider": "tencent",
+                        "description": "Hy3 preview is a 295B-parameter Mixture-of-Experts (MoE) language model from Tencent Hunyuan, built for production-grade agent workloads. With only 21B parameters activated per token.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "300B", "131K"],
+                        "series": "Tencent",
+                        "context_window": ">= 128K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "zai-org/GLM-5.1",
+                        "name": "GLM-5.1",
+                        "provider": "zai-org",
+                        "description": "GLM-5.1 is Z.ai's next-generation flagship model built for agentic engineering. It is designed to run continuously for hours or even longer, refining its strategy as it works towards a complex goal.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "MoE", "Reasoning", "744B"],
+                        "series": "GLM",
+                        "context_window": ">= 128K",
+                        "model_size": "Over 100B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New"
+                    },
+                    {
+                        "model_id": "Qwen/Qwen3.5-35B-A3B",
+                        "name": "Qwen3.5-35B-A3B",
+                        "provider": "qwen",
+                        "description": "Qwen3.5-A3B is a large language model from Alibaba's Qwen3.5 series, featuring a Mixture-of-Experts (MoE) architecture with 35 billion total parameters and approximately 3 billion active parameters.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "VLM", "35B", "262K", "MoE", "Reasoning"],
+                        "series": "Qwen",
+                        "context_window": ">= 128K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New"
+                    },
+                    {
+                        "model_id": "Qwen/Qwen3.5-27B",
+                        "name": "Qwen3.5-27B",
+                        "provider": "qwen",
+                        "description": "Qwen3.5-27B is the first open-weight small-to-mid-sized dense model in the Qwen3.5 series, with targeted improvements for code generation, agent workflows, and real-world tools usage.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "VLM", "27B", "262K", "Reasoning"],
+                        "series": "Qwen",
+                        "context_window": ">= 128K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New 限时优惠"
+                    },
+                    {
+                        "model_id": "zai-org/GLM-5V-Turbo",
+                        "name": "GLM-5V-Turbo",
+                        "provider": "zai-org",
+                        "description": "GLM-5V-Turbo is Zhipu's latest flagship multimodal foundation model, optimized for multimodal coding and agent capabilities. It supports up to 200K tokens of image, video, and audio input.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "VLM", "MoE", "Reasoning"],
+                        "series": "GLM",
+                        "context_window": ">= 128K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New"
+                    },
+                    {
+                        "model_id": "Qwen/Qwen3.5-397B-A17B",
+                        "name": "Qwen3.5-397B-A17B",
+                        "provider": "qwen",
+                        "description": "Qwen3.5-397B-A17B is the latest vision-language model in the Qwen series, featuring a Mixture-of-Experts (MoE) architecture with 397B total parameters and 17B activated.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "VLM", "397B", "262K", "Reasoning"],
+                        "series": "Qwen",
+                        "context_window": ">= 128K",
+                        "model_size": "Over 100B",
+                        "is_custom": False,
+                        "is_new": True,
+                        "special_badge": "New"
+                    },
+                    {
+                        "model_id": "Qwen/Qwen3.5-122B-A10B",
+                        "name": "Qwen3.5-122B-A10B",
+                        "provider": "qwen",
+                        "description": "Qwen3.5-122B-A10B is a native multimodal large language model from the Qwen team, with 122B total parameters and only 10B activated. It features an efficient hybrid architecture.",
+                        "category": "Chat",
+                        "tags": ["Chat", "Tools", "VLM", "MoE", "Reasoning"],
+                        "series": "Qwen",
+                        "context_window": ">= 128K",
+                        "model_size": "Over 100B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "black-forest-labs/FLUX.1-schnell",
+                        "name": "FLUX.1-schnell",
+                        "provider": "FLUX",
+                        "description": "FLUX.1-schnell is Black Forest Labs' fastest state-of-the-art open-weights 12B parameter image generation model, optimized for local running or rapid cloud generation.",
+                        "category": "Image",
+                        "tags": ["Image", "Tools", "FIM", "Math"],
+                        "series": "FLUX",
+                        "context_window": ">= 8K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "luma/ray-1.6",
+                        "name": "Ray-1.6 Video",
+                        "provider": "Luma AI",
+                        "description": "Ray-1.6 is a state-of-the-art video generation model by Luma AI, designed for cinematographic realism, dynamic actions, and highly artistic composition.",
+                        "category": "Video",
+                        "tags": ["Video", "Tools", "MoE"],
+                        "series": "Wan",
+                        "context_window": ">= 16K",
+                        "model_size": "10 ~ 50B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "openai/whisper-large-v3",
+                        "name": "Whisper-Large-V3",
+                        "provider": "openai",
+                        "description": "Whisper Large V3 is OpenAI's state-of-the-art automatic speech recognition (ASR) and translation model, supporting multilingual audio transcribing.",
+                        "category": "Speech",
+                        "tags": ["Speech", "Tools"],
+                        "series": "Meta Llama",
+                        "context_window": ">= 32K",
+                        "model_size": "Under 10B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "BAAI/bge-m3",
+                        "name": "BGE-M3 Embeddings",
+                        "provider": "BAAI",
+                        "description": "BAAI's flagship local sentence embedding model natively outputting 1024-dimensional vectors. Exceptionally strong in Vietnamese and multilingual semantic tasks.",
+                        "category": "Embedding",
+                        "tags": ["Embedding", "Math"],
+                        "series": "Qwen",
+                        "context_window": ">= 8K",
+                        "model_size": "Under 10B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    },
+                    {
+                        "model_id": "BAAI/bge-reranker-large",
+                        "name": "BGE-Reranker-Large",
+                        "provider": "BAAI",
+                        "description": "BAAI's large cross-encoder document reranker, optimizing RAG pipeline semantic precision offline at 10ms speed on RTX 4060 Ti GPU VRAM (CUDA).",
+                        "category": "Reranker",
+                        "tags": ["Reranker", "Coder"],
+                        "series": "Qwen",
+                        "context_window": ">= 8K",
+                        "model_size": "Under 10B",
+                        "is_custom": False,
+                        "is_new": False,
+                        "special_badge": None
+                    }
+                ]
+                for m_data in DEFAULT_MODELS:
+                    # Determine a logical default api_url seed
+                    seed_api_url = "https://api.siliconflow.com/v1"
+                    if m_data["category"] in ["Embedding", "Reranker"]:
+                        seed_api_url = "http://localhost:11434/v1"
+                    
+                    db_model = AIModel(
+                        workspace_id=ws_id,
+                        model_id=m_data["model_id"],
+                        name=m_data["name"],
+                        provider=m_data["provider"],
+                        description=m_data["description"],
+                        category=m_data["category"],
+                        tags=m_data["tags"],
+                        series=m_data["series"],
+                        context_window=m_data["context_window"],
+                        model_size=m_data["model_size"],
+                        is_custom=m_data["is_custom"],
+                        is_new=m_data["is_new"],
+                        special_badge=m_data["special_badge"],
+                        api_url=seed_api_url,
+                        api_key=None
+                    )
+                    db.add(db_model)
+                db.commit()
+                # Re-query
+                models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
+            
+            # Serialize
+            data = []
+            for m in models:
+                data.append({
+                    "id": str(m.id),
+                    "model_id": m.model_id,
+                    "name": m.name,
+                    "provider": m.provider,
+                    "description": m.description,
+                    "category": m.category,
+                    "tags": m.tags or [],
+                    "series": m.series,
+                    "context_window": m.context_window,
+                    "model_size": m.model_size,
+                    "is_custom": m.is_custom,
+                    "is_new": m.is_new,
+                    "special_badge": m.special_badge,
+                    "api_url": m.api_url,
+                    "api_key": m.api_key,
+                    "created_at": m.created_at.strftime('%Y-%m-%d %H:%M:%S') if m.created_at else None
+                })
+            return JSONResponse(content={"status": "success", "data": data})
+        except Exception as e:
+            logger.error(f"Error fetching workspace AI models: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+ 
+    elif path == "/api/workspace/models" and request.method == "POST":
+        from core.models import AIModel
+        db: Session = SessionLocal()
+        try:
+            body = await request.json()
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            
+            # Validate required fields
+            model_id = body.get("model_id")
+            name = body.get("name")
+            provider = body.get("provider")
+            category = body.get("category")
+            if not model_id or not name or not provider or not category:
+                return JSONResponse(content={"error": "Missing required fields (model_id, name, provider, category)"}, status_code=400)
+                
+            db_model = AIModel(
+                workspace_id=ws_id,
+                model_id=model_id,
+                name=name,
+                provider=provider,
+                description=body.get("description", ""),
+                category=category,
+                tags=body.get("tags", []),
+                series=body.get("series", provider),
+                context_window=body.get("context_window", ">= 8K"),
+                model_size=body.get("model_size", "Under 10B"),
+                is_custom=True,
+                is_new=body.get("is_new", False),
+                special_badge=body.get("special_badge", None),
+                api_url=body.get("api_url", None),
+                api_key=body.get("api_key", None)
+            )
+            db.add(db_model)
+            db.commit()
+            
+            return JSONResponse(content={
+                "status": "success", 
+                "data": {
+                    "id": str(db_model.id),
+                    "model_id": db_model.model_id,
+                    "name": db_model.name
+                }
+            })
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating workspace AI model: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+ 
+    elif path.startswith("/api/workspace/models/") and request.method == "PUT":
+        from core.models import AIModel
+        db: Session = SessionLocal()
+        try:
+            # Extract id from path "/api/workspace/models/{id}"
+            model_uuid_str = path.split("/")[-1]
+            model_uuid = uuid.UUID(model_uuid_str)
+            body = await request.json()
+            
+            db_model = db.query(AIModel).filter_by(id=model_uuid).first()
+            if not db_model:
+                return JSONResponse(content={"error": "Model not found"}, status_code=404)
+                
+            # Update fields if provided
+            if "model_id" in body: db_model.model_id = body["model_id"]
+            if "name" in body: db_model.name = body["name"]
+            if "provider" in body: db_model.provider = body["provider"]
+            if "description" in body: db_model.description = body["description"]
+            if "category" in body: db_model.category = body["category"]
+            if "tags" in body: db_model.tags = body["tags"]
+            if "series" in body: db_model.series = body["series"]
+            if "context_window" in body: db_model.context_window = body["context_window"]
+            if "model_size" in body: db_model.model_size = body["model_size"]
+            if "is_new" in body: db_model.is_new = bool(body["is_new"])
+            if "special_badge" in body: db_model.special_badge = body["special_badge"]
+            if "api_url" in body: db_model.api_url = body["api_url"]
+            if "api_key" in body: db_model.api_key = body["api_key"]
+            
+            db.commit()
+            return JSONResponse(content={"status": "success"})
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating workspace AI model: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+
+    elif path.startswith("/api/workspace/models/") and request.method == "DELETE":
+        from core.models import AIModel
+        db: Session = SessionLocal()
+        try:
+            # Extract id from path "/api/workspace/models/{id}"
+            model_uuid_str = path.split("/")[-1]
+            model_uuid = uuid.UUID(model_uuid_str)
+            
+            db_model = db.query(AIModel).filter_by(id=model_uuid).first()
+            if not db_model:
+                return JSONResponse(content={"error": "Model not found"}, status_code=404)
+                
+            db.delete(db_model)
+            db.commit()
+            return JSONResponse(content={"status": "success"})
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting workspace AI model: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+
     return await call_next(request)
 
 logger = logging.getLogger("chainlit_app")
@@ -169,6 +602,34 @@ logging.basicConfig(level=logging.INFO)
 # Default workspace and product identifiers (Matching database seeds)
 SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
 SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
+
+def get_workspace_config(thread_id, workspace_id, product_id):
+    """
+    Returns a unified LangGraph config dictionary, dynamically reading
+    recursion_limit from the database workspace settings or falling back to 5.
+    """
+    db = SessionLocal()
+    rec_limit = 5
+    try:
+        ws_id = uuid.UUID(str(workspace_id))
+        ws = db.query(Workspace).filter_by(id=ws_id).first()
+        if ws and ws.settings:
+            # Enforce 5 loops maximum as requested by CTO, but allow dashboard setting
+            rec_limit = int(ws.settings.get("recursion_limit") or ws.settings.get("max_loops") or 5)
+    except Exception as e:
+        logger.error(f"Error loading recursion limit from settings: {e}")
+    finally:
+        db.close()
+        
+    return {
+        "configurable": {
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "product_id": product_id
+        },
+        "recursion_limit": rec_limit
+    }
+
 
 # ----------------- v3.2 Track Messages & Render Draft Card -----------------
 
@@ -348,13 +809,7 @@ async def on_chat_start():
     await cl.Message(content=welcome_msg).send()
 
     # Load and restore past conversation messages onto the UI so history is persistent
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": SEED_WORKSPACE_ID,
-            "product_id": SEED_PRODUCT_ID
-        }
-    }
+    config = get_workspace_config(thread_id, SEED_WORKSPACE_ID, SEED_PRODUCT_ID)
     try:
         state = await graph.aget_state(config)
         if state and state.values and "messages" in state.values:
@@ -545,13 +1000,7 @@ async def on_message(message: cl.Message):
     current_channel = cl.user_session.get("chat_profile", "#phong-kinh-doanh")
     
     # Configure graph runner state
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     # NEW: Check if the graph is currently waiting for approval at approval barrier!
     current_state = await graph.aget_state(config)
@@ -806,7 +1255,8 @@ async def on_message(message: cl.Message):
         )
         try:
             logger.info("Generating casual chat response via Ollama...")
-            response_text = generate_text(prompt, system_prompt="Trả lời ngắn gọn, vui vẻ, lịch sự và chuyên nghiệp.")
+            workspace_id = cl.user_session.get("workspace_id") or SEED_WORKSPACE_ID
+            response_text = generate_text(prompt, system_prompt="Trả lời ngắn gọn, vui vẻ, lịch sự và chuyên nghiệp.", workspace_id=workspace_id)
         except Exception:
             response_text = "Dạ, em nghe đây ạ! Em là hệ điều hành Marketing Agent OS. Sếp cần em giúp gì hôm nay ạ? 💻"
             
@@ -861,13 +1311,7 @@ async def on_approve(action: cl.Action):
     workspace_id = cl.user_session.get("workspace_id")
     product_id = cl.user_session.get("product_id")
     
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     await cl.Message(content="✅ **Sếp đã bấm Duyệt!** Đang đồng bộ CSDL và lên lịch đăng bài tự động...").send()
     
@@ -933,13 +1377,7 @@ async def on_reject(action: cl.Action):
     workspace_id = cl.user_session.get("workspace_id")
     product_id = cl.user_session.get("product_id")
     
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     # Ask sếp what to edit
     res = await cl.AskUserMessage(content="Sếp cần chỉnh sửa những gì? Nhập ý kiến phản hồi tại đây:").send()
@@ -1042,13 +1480,7 @@ async def on_approve_draft(action: cl.Action):
     workspace_id = cl.user_session.get("workspace_id")
     product_id = cl.user_session.get("product_id")
     
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     sent_info = await cl.Message(content="✅ **Sếp đã duyệt Bản thảo chiến dịch!** Đang chuyển đổi State sạch và khởi chạy Ban Sáng tạo...").send()
     track_msg_id(sent_info.id)
@@ -1124,13 +1556,7 @@ async def on_reject_draft(action: cl.Action):
     workspace_id = cl.user_session.get("workspace_id")
     product_id = cl.user_session.get("product_id")
     
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     res = await cl.AskUserMessage(content="Sếp cần điều chỉnh gì cho Bản thảo chiến dịch? Nhập ý kiến phản hồi tại đây:").send()
     if res:
@@ -1171,13 +1597,7 @@ async def on_rewind_draft(action: cl.Action):
     workspace_id = cl.user_session.get("workspace_id")
     product_id = cl.user_session.get("product_id")
     
-    config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        }
-    }
+    config = get_workspace_config(thread_id, workspace_id, product_id)
     
     logger.info(f"Time Travel Action received: Rewinding to checkpoint {checkpoint_id}")
     

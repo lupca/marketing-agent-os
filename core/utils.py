@@ -58,7 +58,7 @@ def trim_and_log(
     
     # 1. Standard Short-Term Message Trimming logic
     raw_messages = state.get("messages", [])
-    get_trimmed_context(raw_messages, max_tokens=14000)
+    get_trimmed_context(raw_messages, max_tokens=14000, workspace_id=str(workspace_id) if workspace_id else None)
     
     # 2. Automatically deduce agent name if not provided
     if not agent_name:

@@ -185,7 +185,7 @@ def retrieve_chunks_reranked(
         return []
 
     logger.info(f"[retrieve_chunks_reranked] Reranking {len(candidates)} candidates...")
-    reranked = rerank_documents(query, candidates)
+    reranked = rerank_documents(query, candidates, workspace_id=str(workspace_id))
 
     final_limit = limit or RAG_RETRIEVAL_LIMIT
     return reranked[:final_limit]

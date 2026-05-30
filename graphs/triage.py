@@ -153,7 +153,7 @@ def _retrieve_few_shot_examples(query: str, top_k: int = TRIAGE_FEW_SHOT_COUNT) 
 # LAYER 3: LLM Router (Chain-of-Thought + Structured JSON)
 # ---------------------------------------------------------------------------
 
-def _run_llm_router(context: dict, few_shot_examples: str) -> RoutingDecision:
+def _run_llm_router(context: dict, few_shot_examples: str, workspace_id: str = "00000000-0000-0000-0000-000000000002") -> RoutingDecision:
     """
     Layer 3 — LLM Router với Chain-of-Thought.
     Điền ngữ cảnh + few-shot vào System Prompt → gọi Qwen2.5 → parse RoutingDecision.
@@ -175,7 +175,7 @@ def _run_llm_router(context: dict, few_shot_examples: str) -> RoutingDecision:
     )
 
     try:
-        raw_response = generate_text(prompt=context["current_query"], system_prompt=prompt, json_format=True)
+        raw_response = generate_text(prompt=context["current_query"], system_prompt=prompt, json_format=True, workspace_id=workspace_id)
         logger.info(f"Layer 3 LLM Raw Response: {raw_response[:200]}...")
 
         parsed_dict = parse_llm_json(raw_response, fallback_data={
@@ -244,9 +244,12 @@ def triage_node(state: AgencyState) -> dict:
     logger.info("Layer 2: Retrieving few-shot examples from pgvector...")
     few_shot_examples = _retrieve_few_shot_examples(context["current_query"])
 
+    # Workspace ID for multi-tenant isolation
+    ws_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+
     # --- Layer 3: LLM Router ---
     logger.info("Layer 3: Running LLM Router (Chain-of-Thought)...")
-    decision = _run_llm_router(context, few_shot_examples)
+    decision = _run_llm_router(context, few_shot_examples, workspace_id=ws_id)
 
     # --- Layer 4: State Injector ---
     logger.info("Layer 4: Injecting routing decision into AgencyState...")
@@ -262,7 +265,7 @@ def triage_node(state: AgencyState) -> dict:
     channel = channel_map.get(decision.intent, "#phong-sang-tao")
 
     # Log quyết định vào AgentDecision table (Observability)
-    ws_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+
     log_decision(
         workspace_id=ws_id,
         agent_name="Intelligent Supervisor Hub",

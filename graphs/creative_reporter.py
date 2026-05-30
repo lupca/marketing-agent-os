@@ -60,7 +60,8 @@ def creative_report_node(state: AgencyState) -> dict:
         logger.info("Calling Ollama to synthesize creative activity report...")
         report = generate_text(
             prompt=prompt,
-            system_prompt="Bạn là Creative Reporter Agent chuyên nghiệp. Hãy viết báo cáo đánh giá sáng tạo chất lượng cao."
+            system_prompt="Bạn là Creative Reporter Agent chuyên nghiệp. Hãy viết báo cáo đánh giá sáng tạo chất lượng cao.",
+            workspace_id=workspace_id
         )
         
         # Log quyết định vào CSDL

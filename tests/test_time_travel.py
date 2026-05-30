@@ -11,19 +11,22 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db.connection import SessionLocal
 from db.seed import seed_database
 from graphs.main_router import graph
+from tests.mock_ollama import LocalOllamaTestCase
 
 SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
 SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
 
-class TestTimeTravelAndTransformation(unittest.TestCase):
+class TestTimeTravelAndTransformation(LocalOllamaTestCase):
     
     def setUp(self):
+        super().setUp()
         self.db = SessionLocal()
         seed_database(self.db)
         self.thread_id = str(uuid.uuid4())
         
     def tearDown(self):
         self.db.close()
+        super().tearDown()
         
     def test_draft_negotiation_and_time_travel(self):
         """Verify the draft negotiation loop, checkpointer history, and fork-based Time Travel."""

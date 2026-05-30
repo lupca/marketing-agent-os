@@ -12,20 +12,23 @@ from db.connection import SessionLocal
 from db.seed import seed_database
 from core.models import PlatformVariant, MasterContent
 from graphs.main_router import graph
+from tests.mock_ollama import LocalOllamaTestCase
 
 # Default IDs matching seeds
 SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
 SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
 
-class TestMultiAgentWorkflow(unittest.TestCase):
+class TestMultiAgentWorkflow(LocalOllamaTestCase):
     
     def setUp(self):
+        super().setUp()
         self.db = SessionLocal()
         seed_database(self.db)
         self.thread_id = str(uuid.uuid4())
         
     def tearDown(self):
         self.db.close()
+        super().tearDown()
         
     def test_full_agent_workflow(self):
         """Simulate the complete SOP sequence and verify that it halts at the approval barrier."""

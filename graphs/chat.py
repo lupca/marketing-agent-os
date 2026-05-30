@@ -59,7 +59,8 @@ def chat_node(state: AgencyState) -> dict:
     try:
         response = generate_text(
             prompt=query,
-            system_prompt=chat_system_prompt
+            system_prompt=chat_system_prompt,
+            workspace_id=ws_id
         )
 
         log_decision(

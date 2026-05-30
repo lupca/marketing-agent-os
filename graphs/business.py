@@ -248,7 +248,8 @@ def performance_node(state: AgencyState) -> dict:
         logger.info("Calling Ollama to synthesize premium performance report...")
         report = generate_text(
             prompt=prompt,
-            system_prompt="Bạn là Performance Reporter Agent chuyên nghiệp. Hãy viết báo cáo phân tích hiệu suất chiến dịch chất lượng cao."
+            system_prompt="Bạn là Performance Reporter Agent chuyên nghiệp. Hãy viết báo cáo phân tích hiệu suất chiến dịch chất lượng cao.",
+            workspace_id=workspace_id
         )
     except Exception as e:
         logger.error(f"Error calling LLM for performance report: {e}")

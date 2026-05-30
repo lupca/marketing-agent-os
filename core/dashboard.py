@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from core.models import (
     Workspace, ProductService, MarketingCampaign, MasterContent,
-    PlatformVariant, RAGDocument, RAGChunk, Lead, User
+    PlatformVariant, RAGDocument, RAGChunk, Lead, User, AgentDecision
 )
 from sqlalchemy import text
 
@@ -522,8 +522,29 @@ def get_dashboard_analytics(db: Session) -> dict:
             "labels": trend_labels,
             "values": trend_values
         },
-        "channel_data": channel_list
+        "channel_data": channel_list,
+        "audit_logs": _get_billing_audit_logs(db, ws.id)
     }
+
+def _get_billing_audit_logs(db: Session, workspace_id) -> list:
+    """Fetch billing audit log entries from agent_decisions table for token monitoring."""
+    try:
+        rows = db.query(AgentDecision).filter(
+            AgentDecision.workspace_id == workspace_id,
+            AgentDecision.action == "Execution Billing Audit"
+        ).order_by(AgentDecision.created_at.desc()).limit(50).all()
+        
+        return [{
+            "id": str(r.id),
+            "agent_name": r.agent_name,
+            "action": r.action,
+            "reason": r.reason,
+            "metadata": r.meta_data,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        } for r in rows]
+    except Exception as e:
+        logger.error(f"Error fetching billing audit logs: {e}")
+        return []
 
 def simulate_scenario(test_budget: float, price: float, cost: float, db: Session) -> dict:
     """
