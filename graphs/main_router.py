@@ -16,7 +16,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from db.connection import POSTGRES_URL
+from db.connection import POSTGRES_URL, PSYCOPG_CONNINFO
 
 logger = logging.getLogger("graphs_main_router")
 logging.basicConfig(level=logging.INFO)
@@ -105,7 +105,7 @@ if is_testing:
 else:
     # Establish Connection Pool for LangGraph AsyncPostgresSaver checkpointer in production
     postgres_pool = AsyncConnectionPool(
-        conninfo=POSTGRES_URL,
+        conninfo=PSYCOPG_CONNINFO,
         max_size=10,
         open=False, # Prevent opening immediately during module import without a running loop
         kwargs={"autocommit": True, "row_factory": dict_row}

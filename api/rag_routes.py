@@ -88,7 +88,7 @@ def _validate_tags_exist(db: Session, workspace_id: str, tags: List[str]) -> Non
     if not tags:
         return
     rows = db.execute(
-        text("SELECT tag_name FROM rag_access_tags WHERE workspace_id = :ws_id::uuid"),
+        text("SELECT tag_name FROM rag_access_tags WHERE workspace_id = CAST(:ws_id AS UUID)"),
         {"ws_id": workspace_id}
     ).fetchall()
     valid_tags = {r.tag_name for r in rows}
@@ -113,7 +113,7 @@ async def list_tags(
         text("""
             SELECT tag_id::TEXT, tag_name, description, color, created_at
             FROM rag_access_tags
-            WHERE workspace_id = :ws_id::uuid
+            WHERE workspace_id = CAST(:ws_id AS UUID)
             ORDER BY tag_name
         """),
         {"ws_id": ws_id}
@@ -141,7 +141,7 @@ async def list_tags(
 async def create_tag(payload: CreateTagRequest, db: Session = Depends(get_db)):
     # Kiểm tra unique
     existing = db.execute(
-        text("SELECT tag_id FROM rag_access_tags WHERE workspace_id=:ws::uuid AND tag_name=:name"),
+        text("SELECT tag_id FROM rag_access_tags WHERE workspace_id = CAST(:ws AS UUID) AND tag_name = :name"),
         {"ws": payload.workspace_id, "name": payload.tag_name}
     ).fetchone()
     if existing:
@@ -151,7 +151,7 @@ async def create_tag(payload: CreateTagRequest, db: Session = Depends(get_db)):
     db.execute(
         text("""
             INSERT INTO rag_access_tags (tag_id, workspace_id, tag_name, description, color)
-            VALUES (:tag_id::uuid, :ws::uuid, :name, :desc, :color)
+            VALUES (CAST(:tag_id AS UUID), CAST(:ws AS UUID), :name, :desc, :color)
         """),
         {
             "tag_id": tag_id,
@@ -269,7 +269,7 @@ async def list_documents(
                 chunk_count, file_size_bytes,
                 created_at, updated_at
             FROM rag_documents
-            WHERE workspace_id = :ws_id::uuid
+            WHERE workspace_id = CAST(:ws_id AS UUID)
               AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
@@ -278,7 +278,7 @@ async def list_documents(
     ).fetchall()
 
     total_row = db.execute(
-        text("SELECT COUNT(*) FROM rag_documents WHERE workspace_id=:ws::uuid AND is_deleted=FALSE"),
+        text("SELECT COUNT(*) FROM rag_documents WHERE workspace_id = CAST(:ws AS UUID) AND is_deleted = FALSE"),
         {"ws": ws_id}
     ).scalar()
 
@@ -314,7 +314,7 @@ async def get_document_status(document_id: str, db: Session = Depends(get_db)):
         text("""
             SELECT upload_status, sync_status, chunk_count, file_name, updated_at
             FROM rag_documents
-            WHERE document_id = :doc_id::uuid AND is_deleted = FALSE
+            WHERE document_id = CAST(:doc_id AS UUID) AND is_deleted = FALSE
         """),
         {"doc_id": document_id}
     ).fetchone()
@@ -343,7 +343,7 @@ async def update_document_tags(
 ):
     # Kiểm tra document tồn tại
     row = db.execute(
-        text("SELECT workspace_id FROM rag_documents WHERE document_id=:id::uuid AND is_deleted=FALSE"),
+        text("SELECT workspace_id FROM rag_documents WHERE document_id = CAST(:id AS UUID) AND is_deleted = FALSE"),
         {"id": document_id}
     ).fetchone()
     if not row:
@@ -354,7 +354,7 @@ async def update_document_tags(
 
     # Cập nhật sync_status → syncing ngay lập tức
     db.execute(
-        text("UPDATE rag_documents SET sync_status='syncing', updated_at=NOW() WHERE document_id=:id::uuid"),
+        text("UPDATE rag_documents SET sync_status = 'syncing', updated_at = NOW() WHERE document_id = CAST(:id AS UUID)"),
         {"id": document_id}
     )
     db.commit()
@@ -380,7 +380,7 @@ async def update_document_tags(
 @rag_router.delete("/api/rag/documents/{document_id}", status_code=202)
 async def delete_document(document_id: str, db: Session = Depends(get_db)):
     row = db.execute(
-        text("SELECT file_name FROM rag_documents WHERE document_id=:id::uuid AND is_deleted=FALSE"),
+        text("SELECT file_name FROM rag_documents WHERE document_id = CAST(:id AS UUID) AND is_deleted = FALSE"),
         {"id": document_id}
     ).fetchone()
     if not row:
@@ -388,7 +388,7 @@ async def delete_document(document_id: str, db: Session = Depends(get_db)):
 
     # Đặt syncing trước
     db.execute(
-        text("UPDATE rag_documents SET sync_status='syncing', updated_at=NOW() WHERE document_id=:id::uuid"),
+        text("UPDATE rag_documents SET sync_status = 'syncing', updated_at = NOW() WHERE document_id = CAST(:id AS UUID)"),
         {"id": document_id}
     )
     db.commit()

@@ -55,12 +55,18 @@ def store_document(
     db.refresh(doc)
 
     # Kick off async Celery task
-    ingest_document_task.delay(
-        document_id=str(doc.document_id),
-        file_key=file_key,
-        workspace_id=str(workspace_id),
-        access_tags=tags,
-    )
+    try:
+        ingest_document_task.delay(
+            document_id=str(doc.document_id),
+            file_key=file_key,
+            workspace_id=str(workspace_id),
+            access_tags=tags,
+        )
+    except Exception as queue_err:
+        logger.error(f"[store_document] Celery task dispatch failed: {queue_err}", exc_info=True)
+        doc.upload_status = "failed"
+        db.commit()
+        raise queue_err
 
     logger.info(f"[store_document] Created document_id={doc.document_id}, task pushed to Celery.")
     return doc

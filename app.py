@@ -31,6 +31,18 @@ from core.dashboard import get_dashboard_analytics, simulate_scenario
 from api.rag_routes import rag_router
 fastapi_app.include_router(rag_router)
 
+# Prevent Chainlit's catch-all route (/{full_path:path}) from intercepting RAG API routes
+# by moving it to the very end of the route list.
+catch_all_route = None
+for r in fastapi_app.routes:
+    if r.path == "/{full_path:path}":
+        catch_all_route = r
+        break
+if catch_all_route:
+    fastapi_app.routes.remove(catch_all_route)
+    fastapi_app.routes.append(catch_all_route)
+    print("Successfully moved Chainlit catch-all route to the end to prevent API interception.")
+
 @fastapi_app.middleware("http")
 async def custom_dashboard_middleware(request: Request, call_next):
     """

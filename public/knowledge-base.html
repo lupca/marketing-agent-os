@@ -254,7 +254,99 @@
       border-color: currentColor;
       background: rgba(255,255,255,0.06);
     }
-    .tag-chip:hover { opacity: 0.8; }
+    .tag-chip:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tag-chip {
+      position: relative;
+    }
+
+    .tag-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(5px);
+      width: 250px;
+      background: rgba(26, 29, 39, 0.96);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s;
+      z-index: 1000;
+      text-align: left;
+      color: #fff;
+    }
+
+    .tag-tooltip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px;
+      border-style: solid;
+      border-color: rgba(26, 29, 39, 0.96) transparent transparent transparent;
+    }
+
+    .tag-chip:hover .tag-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .tag-tooltip-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 12.5px;
+    }
+
+    .tag-tooltip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .tag-tooltip-desc {
+      font-size: 11px;
+      color: #a0aec0;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      font-weight: 400;
+    }
+
+    .tag-tooltip-footer {
+      font-size: 10.5px;
+      color: #718096;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 400;
+    }
+
+    .tag-explainer-legend {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #a0aec0;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 6px;
+      padding: 8px 12px;
+      border-left: 3px solid var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
 
     .upload-actions {
       margin-top: 16px;
@@ -613,6 +705,9 @@
       <div class="tags-grid" id="tags-grid">
         <div class="text-muted">Đang tải tags...</div>
       </div>
+      <div class="tag-explainer-legend">
+        💡 <b>Mẹo:</b> Rê chuột vào từng tag để xem mô tả chi tiết & quyền truy cập của Agent.
+      </div>
     </div>
 
     <div class="upload-actions">
@@ -678,6 +773,9 @@
           <label>Lọc theo tags (giữ Ctrl để chọn nhiều)</label>
           <div class="tags-grid" id="pg-tags-grid" style="min-height:40px">
             <div class="text-muted">Đang tải...</div>
+          </div>
+          <div class="tag-explainer-legend">
+            💡 Rê chuột vào tag để xem mô tả & quyền truy cập Agent.
           </div>
         </div>
         <div class="input-group">
@@ -805,6 +903,19 @@ async function loadTags() {
   }
 }
 
+function getAgentAccessExplanation(tagName) {
+  switch (tagName) {
+    case "global": return "Tất cả các Agents";
+    case "marketing": return "Creative Agent (Lên ý tưởng)";
+    case "anti_patterns": return "Analyst (Phân tích) & Creative (Sáng tạo)";
+    case "policies": return "Researcher (Tra cứu) & Brand Guardian (Kiểm duyệt)";
+    case "manager_feedback": return "Tất cả Agents (Học từ feedback của CMO)";
+    case "psychology": return "Creative Agent (Tối ưu tâm lý người dùng)";
+    case "economics": return "Analyst Agent (Nghiên cứu thị trường)";
+    default: return "Agents được phân quyền trong Workspace";
+  }
+}
+
 function renderTagGrid(containerId, selected, onToggle, colorize = true) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -817,6 +928,16 @@ function renderTagGrid(containerId, selected, onToggle, colorize = true) {
            onclick="${onToggle}('${t.tag_name}', '${containerId}')">
         <span class="tag-dot" style="background:${t.color}"></span>
         ${t.tag_name}
+        <div class="tag-tooltip">
+          <div class="tag-tooltip-header">
+            <span class="tag-tooltip-dot" style="background:${t.color}"></span>
+            <span class="tag-tooltip-name" style="color:${t.color};font-weight:700">${t.tag_name}</span>
+          </div>
+          <div class="tag-tooltip-desc">${t.description || "Không có mô tả chi tiết."}</div>
+          <div class="tag-tooltip-footer">
+            🔑 Quyền truy cập: ${getAgentAccessExplanation(t.tag_name)}
+          </div>
+        </div>
       </div>`;
   }).join("");
 }
@@ -875,6 +996,14 @@ const dz = new Dropzone("#upload-dropzone", {
       document.getElementById("upload-status-hint").textContent = `📄 ${file.name} (${formatBytes(file.size)}) — Nhấn Upload để bắt đầu`;
     });
 
+    this.on("removedfile", (file) => {
+      if (this.files.length === 0) {
+        document.getElementById("upload-status-hint").textContent = "Chọn file và tags để bắt đầu upload";
+      } else {
+        document.getElementById("upload-status-hint").textContent = `📄 ${this.files[0].name} (${formatBytes(this.files[0].size)}) — Nhấn Upload để bắt đầu`;
+      }
+    });
+
     this.on("sending", (file, xhr, formData) => {
       formData.append("access_tags", JSON.stringify(selectedUploadTags));
       if (WORKSPACE_ID) formData.append("workspace_id", WORKSPACE_ID);
@@ -894,11 +1023,6 @@ const dz = new Dropzone("#upload-dropzone", {
       toast(`❌ Upload thất bại: ${msg}`, "error");
     });
   }
-});
-
-document.getElementById("upload-dropzone").addEventListener("click", () => {
-  if (!dz.getQueuedFiles().length) dz.element.querySelector(".dz-hidden-input").click();
-  else { dz.processQueue(); }
 });
 
 // Thêm nút Upload riêng
