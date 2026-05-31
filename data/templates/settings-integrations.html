@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Agent OS - Workspace Integrations Settings</title>
+    
+    <!-- Google Fonts Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Baseline Premium Theme Stylesheet -->
+    <link rel="stylesheet" href="/public/dashboard.css">
+    
+    <!-- Dedicated Settings Integrations Stylesheet -->
+    <link rel="stylesheet" href="/public/settings-integrations.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <header class="glass-panel dashboard-header">
+            <div class="header-title-section" style="display: flex; align-items: center; gap: 16px;">
+                <button id="btn-toggle-main-sidebar" class="refresh-btn" style="background: rgba(255,255,255,0.03); border-color: var(--border-glass); padding: 10px 14px; font-size: 1.05rem; box-shadow: none; cursor: pointer; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; user-select: none;" title="Đóng/Mở Menu bên trái">
+                    ☰ Menu
+                </button>
+                <div>
+                    <h1>🔌 Tích Hợp Workspace</h1>
+                    <p>Thiết lập API key, tài khoản hoặc mã định danh của bất kỳ công cụ/kênh nào liên kết ở cấp độ Workspace.</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <a href="/dashboard" class="chat-nav-btn" style="background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(167,139,250,0.15)); border-color: rgba(99,102,241,0.45); box-shadow: 0 4px 14px rgba(99,102,241,0.2);">
+                    📊 Quay Lại Dashboard
+                </a>
+                <a href="/" class="chat-nav-btn">
+                    💬 Vào Khung Chat Agent
+                </a>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>ONLINE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Layout Split -->
+        <main class="settings-layout-grid">
+            
+            <!-- Left Sidebar Navigation -->
+            <aside class="glass-panel settings-sidebar collapsed" id="main-settings-sidebar">
+                <div class="settings-sidebar-header">
+                    <span>🛠️ Menu Cấu Hình</span>
+                </div>
+                <a href="/settings" class="settings-nav-item active" style="text-decoration: none;">
+                    <span>🔌 Tích Hợp Workspace</span>
+                </a>
+                <a href="/settings/models" class="settings-nav-item" style="text-decoration: none;">
+                    <span>🤖 Mô Hình & LLM Hệ Thống</span>
+                </a>
+            </aside>
+
+            <!-- Main Pane Content -->
+            <section class="settings-main-pane">
+                <section class="glass-panel" style="border: 1px solid rgba(16, 185, 129, 0.25);">
+                    <div class="panel-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 20px;">
+                        <h2 style="color: var(--color-success);">🔌 Quản Lý Tích Hợp Bên Thứ Ba (Workspace Integrations)</h2>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Tự do quản lý các API key và tài khoản. Dữ liệu thay đổi sẽ được lưu trữ trực tiếp vào cơ sở dữ liệu hệ thống.</p>
+                    </div>
+
+                    <!-- Core Integrations Split Grid -->
+                    <div class="integration-grid">
+                        
+                        <!-- Left: List of Platforms and credentials -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                🔑 Danh sách khóa tích hợp hoạt động
+                            </h3>
+                            <div id="integrations-list-container" style="display: flex; flex-direction: column; gap: 1rem;">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Right: Create/Update form (Completely Free-Form) -->
+                        <div class="glass-panel" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); position: sticky; top: 2rem; height: fit-content;">
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: #818cf8; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                📝 Thêm / Cập Nhật Khóa Tích Hợp
+                            </h3>
+                            <div class="integration-form">
+                                
+                                <div class="input-group">
+                                    <div class="input-label-row">
+                                        <span>🔌 Tên Nền Tảng (Platform Name)</span>
+                                    </div>
+                                    <input type="text" id="form-int-platform" placeholder="Ví dụ: upload-post, serpapi, slack, github, openai..." style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                                    <div class="suggestions-row">
+                                        <span style="font-size: 0.72rem; color: var(--text-muted)">Gợi ý nhanh:</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedPlatform('upload-post')">upload-post</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedPlatform('serpapi')">serpapi</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedPlatform('slack')">slack</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedPlatform('openai')">openai</span>
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <div class="input-label-row">
+                                        <span>🔑 Tên Biến (Config Key)</span>
+                                    </div>
+                                    <input type="text" id="form-int-key" placeholder="Ví dụ: api_key, user, token, webhook_url..." style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                                    <div class="suggestions-row" id="key-suggestions">
+                                        <span style="font-size: 0.72rem; color: var(--text-muted)">Gợi ý nhanh:</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedKey('api_key')">api_key</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedKey('user')">user</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedKey('facebook_page_id')">facebook_page_id</span>
+                                        <span class="suggestion-pill" onclick="selectSuggestedKey('token')">token</span>
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <div class="input-label-row">
+                                        <span>📝 Giá trị (Config Value)</span>
+                                    </div>
+                                    <input type="password" id="form-int-value" placeholder="Nhập API key hoặc giá trị cấu hình tương ứng..." style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 14px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                                </div>
+
+                                <div class="input-group" style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                                        <input type="checkbox" id="form-int-active" checked style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: pointer;">
+                                        <span>🟢 Trạng thái hoạt động (Is Active)</span>
+                                    </label>
+                                </div>
+
+                                <div style="margin-top: 8px;">
+                                    <button id="btn-save-integration" class="chat-nav-btn" style="width: 100%; justify-content: center; background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(52,211,153,0.15)); border: 1px solid rgba(16,185,129,0.3); padding: 12px; font-size: 0.95rem; font-weight: 600; transition: var(--transition-smooth);">
+                                        💾 Lưu Khóa Tích Hợp
+                                    </button>
+                                </div>
+                                
+                                <div id="integration-status" style="display: none; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; text-align: center; transition: var(--transition-smooth);"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <!-- Decoupled Integrations Script -->
+    <script src="/public/settings-integrations.js"></script>
+</body>
+</html>

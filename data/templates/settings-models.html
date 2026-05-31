@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Agent OS - AI Models Library & Parameters</title>
+    
+    <!-- Google Fonts Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Baseline Premium Theme Stylesheet -->
+    <link rel="stylesheet" href="/public/dashboard.css">
+    
+    <!-- Dedicated Settings Models Stylesheet -->
+    <link rel="stylesheet" href="/public/settings-models.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <header class="glass-panel dashboard-header">
+            <div class="header-title-section" style="display: flex; align-items: center; gap: 16px;">
+                <button id="btn-toggle-main-sidebar" class="refresh-btn" style="background: rgba(255,255,255,0.03); border-color: var(--border-glass); padding: 10px 14px; font-size: 1.05rem; box-shadow: none; cursor: pointer; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; user-select: none;" title="Đóng/Mở Menu bên trái">
+                    ☰ Menu
+                </button>
+                <div>
+                    <h1>🤖 Mô Hình & LLM Hệ Thống</h1>
+                    <p>Khám phá, quản lý thư viện các mô hình AI và thiết lập các tham số LLM chạy nền cho hệ thống Agent.</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <a href="/dashboard" class="chat-nav-btn" style="background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(167,139,250,0.15)); border-color: rgba(99,102,241,0.45); box-shadow: 0 4px 14px rgba(99,102,241,0.2);">
+                    📊 Quay Lại Dashboard
+                </a>
+                <a href="/" class="chat-nav-btn">
+                    💬 Vào Khung Chat Agent
+                </a>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>ONLINE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Layout Split -->
+        <main class="settings-layout-grid">
+            
+            <!-- Left Sidebar Navigation -->
+            <aside class="glass-panel settings-sidebar collapsed" id="main-settings-sidebar">
+                <div class="settings-sidebar-header">
+                    <span>🛠️ Menu Cấu Hình</span>
+                </div>
+                <a href="/settings" class="settings-nav-item" style="text-decoration: none;">
+                    <span>🔌 Tích Hợp Workspace</span>
+                </a>
+                <a href="/settings/models" class="settings-nav-item active" style="text-decoration: none;">
+                    <span>🤖 Mô Hình & LLM Hệ Thống</span>
+                </a>
+            </aside>
+
+            <!-- Main Pane Content -->
+            <section class="settings-main-pane">
+                <div class="combined-llm-container">
+                    
+                    <!-- Left Panel: Spacious Wide Models Library -->
+                    <div class="models-main-left">
+                        
+                        <!-- Library Toolbar Header -->
+                        <div class="glass-panel" style="background: transparent; border-bottom: 1px solid var(--border-glass); padding-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; gap: 1rem;">
+                            <div class="header-title-section">
+                                <h2 style="background: linear-gradient(135deg, #fff 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 10px; font-size: 1.6rem; font-weight: 800;">🤖 G-Agent OS — Thư Viện Mô Hình AI</h2>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Lọc và tìm kiếm nhanh. Bấm Active để thiết lập mô hình chạy mặc định cho các tác vụ.</p>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0;">
+                                <button id="btn-toggle-config-sidebar" class="chat-nav-btn" style="background: rgba(255,255,255,0.03); border-color: var(--border-glass); box-shadow: none; display: inline-flex; align-items: center; gap: 6px; user-select: none;">
+                                    ⚙️ Cấu Hình Tham Số
+                                </button>
+                                <button id="btn-new-model" class="chat-nav-btn" style="background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(52,211,153,0.15)); border-color: rgba(16,185,129,0.4); box-shadow: 0 4px 14px rgba(16,185,129,0.2);">
+                                    ➕ Đăng Ký Custom
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Models catalog area -->
+                        <div class="models-layout">
+                            
+                            <!-- Left Sidebar Filters inside wide layout (Permanently Open & Visible) -->
+                            <aside class="glass-panel models-sidebar" id="models-sidebar" style="background: rgba(18, 18, 29, 0.4);">
+                                <div class="filter-section">
+                                    <div class="filter-title">
+                                        <span>Loại (Category)</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" onclick="clearFilter('category')">Reset</span>
+                                    </div>
+                                    <div class="filter-pills" id="filter-category">
+                                        <div class="filter-pill" data-value="Chat">Chat</div>
+                                        <div class="filter-pill" data-value="Image">Image</div>
+                                        <div class="filter-pill" data-value="Video">Video</div>
+                                        <div class="filter-pill" data-value="Speech">Speech</div>
+                                        <div class="filter-pill" data-value="Embedding">Embedding</div>
+                                        <div class="filter-pill" data-value="Reranker">Reranker</div>
+                                    </div>
+                                </div>
+
+                                <div class="filter-section">
+                                    <div class="filter-title">
+                                        <span>Tags Phân Loại</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" onclick="clearFilter('tags')">Reset</span>
+                                    </div>
+                                    <div class="filter-pills" id="filter-tags">
+                                        <div class="filter-pill" data-value="VLM">VLM</div>
+                                        <div class="filter-pill" data-value="MoE">MoE</div>
+                                        <div class="filter-pill" data-value="Reasoning">Reasoning</div>
+                                        <div class="filter-pill" data-value="Tools">Tools</div>
+                                        <div class="filter-pill" data-value="FIM">FIM</div>
+                                        <div class="filter-pill" data-value="Math">Math</div>
+                                        <div class="filter-pill" data-value="Coder">Coder</div>
+                                    </div>
+                                </div>
+
+                                <div class="filter-section">
+                                    <div class="filter-title">
+                                        <span>Họ Mô Hình (Series)</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" onclick="clearFilter('series')">Reset</span>
+                                    </div>
+                                    <div class="filter-pills" id="filter-series">
+                                        <div class="filter-pill" data-value="DeepSeek">DeepSeek</div>
+                                        <div class="filter-pill" data-value="Qwen">Qwen</div>
+                                        <div class="filter-pill" data-value="Kimi">Kimi</div>
+                                        <div class="filter-pill" data-value="GLM">GLM</div>
+                                        <div class="filter-pill" data-value="FLUX">FLUX</div>
+                                        <div class="filter-pill" data-value="Tencent">Tencent</div>
+                                        <div class="filter-pill" data-value="Wan">Wan</div>
+                                        <div class="filter-pill" data-value="Meta Llama">Llama</div>
+                                    </div>
+                                </div>
+
+                                <div class="filter-section">
+                                    <div class="filter-title">
+                                        <span>Context Window</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" onclick="clearFilter('context')">Reset</span>
+                                    </div>
+                                    <div class="filter-pills" id="filter-context">
+                                        <div class="filter-pill" data-value=">= 8K">&ge; 8K</div>
+                                        <div class="filter-pill" data-value=">= 16K">&ge; 16K</div>
+                                        <div class="filter-pill" data-value=">= 32K">&ge; 32K</div>
+                                        <div class="filter-pill" data-value=">= 128K">&ge; 128K</div>
+                                    </div>
+                                </div>
+
+                                <div class="filter-section">
+                                    <div class="filter-title">
+                                        <span>Kích Thước Model</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" onclick="clearFilter('size')">Reset</span>
+                                    </div>
+                                    <div class="filter-pills" id="filter-size">
+                                        <div class="filter-pill" data-value="Under 10B">&lt; 10B</div>
+                                        <div class="filter-pill" data-value="10 ~ 50B">10-50B</div>
+                                        <div class="filter-pill" data-value="50 ~ 100B">50-100B</div>
+                                        <div class="filter-pill" data-value="Over 100B">&gt; 100B</div>
+                                    </div>
+                                </div>
+                            </aside>
+
+                            <!-- Main Catalog Library -->
+                            <main class="models-main">
+                                <div class="models-search-bar" style="background: rgba(18, 18, 29, 0.45); border: 1px solid var(--border-glass);">
+                                    <div class="search-input-container" style="width: 100%;">
+                                        <input type="text" id="model-search-query" placeholder="Tìm kiếm mô hình bằng tên, ID định danh hoặc mô tả..." style="width: 100%;">
+                                        <svg class="search-icon-svg" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                    </div>
+                                </div>
+
+                                <div class="models-grid" id="models-grid">
+                                    <!-- Loaded dynamically via JS -->
+                                </div>
+                            </main>
+                        </div>
+                    </div>
+
+                    <!-- Right Panel: Compact LLM Configurations Sidebar -->
+                    <section class="glass-panel config-sidebar-right collapsed" id="llm-form-panel" style="border: 1px solid rgba(129, 140, 248, 0.25);">
+                        <div class="panel-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 16px;">
+                            <h3 style="color: #818cf8; font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                                ⚙️ Tham Số LLM
+                            </h3>
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Cấu hình đang chạy của hệ thống.</p>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            <div class="input-group">
+                                <div class="input-label-row">
+                                    <span style="font-size: 0.8rem; font-weight: 600;">🧠 Mô Hình AI Đang Sử Dụng</span>
+                                </div>
+                                <select id="setting-ai-model" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; cursor: pointer; font-size: 0.85rem;">
+                                    <option value="Qwen/Qwen3.6-35B-A3B">⚡ Qwen 3.6 - 35B - A3B</option>
+                                    <option value="Qwen/Qwen3-32B">💰 Qwen 3 - 32B</option>
+                                    <option value="deepseek-ai/DeepSeek-V3">🧪 DeepSeek V3</option>
+                                    <option value="Qwen/Qwen2.5-7B-Instruct">💻 Qwen 2.5 - 7B - Local</option>
+                                    <option value="custom">✏️ Nhập model tùy chọn khác...</option>
+                                </select>
+                                <div id="custom-model-container" style="display: none; margin-top: 6px;">
+                                    <input type="text" id="setting-custom-ai-model" placeholder="Ví dụ: Qwen/Qwen2.5-7B-Instruct" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; font-size: 0.85rem;">
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>🎨 Độ Sáng Tạo (Temp)</span>
+                                    <span class="input-value" id="setting-temp-val" style="font-size: 0.85rem; color: #818cf8;">0.2</span>
+                                </div>
+                                <input type="range" id="setting-temp" min="0" max="1" step="0.05" value="0.2">
+                            </div>
+
+                            <div class="input-group">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>📏 Cắt Ngữ Cảnh (Context)</span>
+                                    <span class="input-value" id="setting-context-val" style="font-size: 0.85rem; color: #818cf8;">14,000</span>
+                                </div>
+                                <input type="range" id="setting-context" min="4000" max="20000" step="1000" value="14000">
+                            </div>
+
+                            <div class="input-group" style="margin-bottom: 4px;">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>🔄 Giới Hạn Vòng Lặp Agent</span>
+                                    <span class="input-value" id="setting-recursion-val" style="font-size: 0.85rem; color: #818cf8;">5</span>
+                                </div>
+                                <input type="range" id="setting-recursion" min="2" max="15" step="1" value="5">
+                            </div>
+
+                            <div class="input-group">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>🔍 Lớp Reranker</span>
+                                </div>
+                                <select id="setting-rerank-mode" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; cursor: pointer; font-size: 0.85rem;">
+                                    <option value="local">🔴 GPU Local (bge-reranker-large)</option>
+                                    <option value="cloud">🌐 Cloud API (SiliconFlow Rerank)</option>
+                                </select>
+                            </div>
+
+                            <div class="input-group">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>🔑 SiliconFlow API Key</span>
+                                </div>
+                                <input type="password" id="setting-api-key" placeholder="sk-................................" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; font-size: 0.85rem;">
+                            </div>
+
+                            <div class="input-group">
+                                <div class="input-label-row" style="font-size: 0.8rem;">
+                                    <span>🌐 LLM API Base URL</span>
+                                </div>
+                                <input type="text" id="setting-api-url" placeholder="Mặc định: https://api.siliconflow.com/v1" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; font-size: 0.85rem;">
+                            </div>
+
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 0.8rem;">
+                                    <input type="checkbox" id="setting-enable-thinking" style="width: 16px; height: 16px; accent-color: #818cf8; cursor: pointer;">
+                                    <span>🧪 Bật Chế Độ Suy Luận</span>
+                                </label>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 4px;">
+                                <button id="btn-save-settings" class="chat-nav-btn" style="width: 100%; justify-content: center; background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(129,140,248,0.15)); border: 1px solid rgba(129,140,248,0.3); padding: 10px; font-size: 0.85rem; font-weight: 600; transition: var(--transition-smooth);">
+                                    💾 Lưu Cấu Hình LLM
+                                </button>
+                            </div>
+
+                            <!-- Status indicator -->
+                            <div id="settings-status" style="display: none; padding: 6px 10px; border-radius: 8px; font-size: 0.75rem; text-align: center; transition: var(--transition-smooth);"></div>
+                        </div>
+                    </section>
+
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ✏️ ADD / EDIT MODEL MODAL POPUP -->
+    <div id="model-form-modal" class="models-modal">
+        <div class="models-modal-content" style="max-width: 700px; background: rgba(18, 18, 29, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(129, 140, 248, 0.3);">
+            <h3 id="modal-form-title" style="font-size: 1.3rem; font-weight: 800; color: #818cf8; margin-bottom: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                ✏️ Cấu Cấu Custom
+            </h3>
+            
+            <input type="hidden" id="form-model-uuid">
+
+            <div class="simulator-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Tên Mô Hình (Display Name)</span>
+                    <input type="text" id="form-model-name" placeholder="Ví dụ: Qwen 2.5 - 7B - Local" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Mã Định Danh (Model ID)</span>
+                    <input type="text" id="form-model-id" placeholder="Ví dụ: Qwen/Qwen2.5-7B-Instruct" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+            </div>
+
+            <div class="simulator-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Nhà Cung Cấp (Provider)</span>
+                    <input type="text" id="form-model-provider" placeholder="Ví dụ: deepseek-ai, qwen, custom" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Loại Mô Hình (Category)</span>
+                    <select id="form-model-category" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; cursor: pointer;">
+                        <option value="Chat">Chat (Mô hình hội thoại sinh chữ)</option>
+                        <option value="Image">Image (Mô hình vẽ sinh ảnh)</option>
+                        <option value="Video">Video (Mô hình tạo video)</option>
+                        <option value="Speech">Speech (Mô hình chuyển giọng nói)</option>
+                        <option value="Embedding">Embedding (Mô hình nhúng vector)</option>
+                        <option value="Reranker">Reranker (Mô hình tái xếp hạng)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="simulator-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Họ Mô Hình (Series)</span>
+                    <input type="text" id="form-model-series" placeholder="Ví dụ: Qwen, DeepSeek, Kimi" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Context Window</span>
+                    <select id="form-model-context" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; cursor: pointer;">
+                        <option value=">= 8K">&ge; 8K tokens</option>
+                        <option value=">= 16K">&ge; 16K tokens</option>
+                        <option value=">= 32K">&ge; 32K tokens</option>
+                        <option value=">= 128K">&ge; 128K tokens</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="simulator-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Kích Cỡ Mô Hình (Model Size)</span>
+                    <select id="form-model-size" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; cursor: pointer;">
+                        <option value="Under 10B">Under 10B (Siêu nhẹ, tối ưu RAM)</option>
+                        <option value="10 ~ 50B">10B ~ 50B (Cân bằng tốt)</option>
+                        <option value="50 ~ 100B">50B ~ 100B (Phục vụ Agent thông minh)</option>
+                        <option value="Over 100B">Over 100B (Cấp độ Enterprise/MoE)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Huy Hiệu Đặc Biệt (Glow Tag)</span>
+                    <input type="text" id="form-model-badge" placeholder="Ví dụ: New, HOT" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 10px;">
+                <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Tags Phân Loại (Ngăn cách bằng dấu phẩy)</span>
+                <input type="text" id="form-model-tags" placeholder="Ví dụ: Chat, Tools, MoE" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+            </div>
+
+            <div class="simulator-grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">🌐 LLM API Base URL (AI URL Override)</span>
+                    <input type="text" id="form-model-api-url" placeholder="Ví dụ: https://api.siliconflow.com/v1" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+                <div class="input-group">
+                    <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">🔑 API Key Override (Khóa bảo mật riêng)</span>
+                    <input type="password" id="form-model-api-key" placeholder="Để trống nếu sử dụng khóa hệ thống" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%;">
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 14px;">
+                <span class="kpi-title" style="font-size: 0.72rem; margin-bottom: 4px; display: block;">Mô Tả Chi Tiết (Description)</span>
+                <textarea id="form-model-description" placeholder="Nhập mô tả về thế mạnh hoặc thông số..." rows="2" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 8px; color: #fff; outline: none; width: 100%; resize: none;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="btn-close-form" class="refresh-btn" style="background: rgba(255,255,255,0.05); border-color: var(--border-glass); box-shadow: none; padding: 8px 16px; font-size: 0.85rem;">
+                    ❌ Hủy Bỏ
+                </button>
+                <button id="btn-save-form" class="chat-nav-btn" style="background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(129,140,248,0.15)); border-color: rgba(129,140,248,0.3); padding: 8px 16px; font-size: 0.85rem;">
+                    💾 Lưu Cấu Hình
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decoupled Models Script -->
+    <script src="/public/settings-models.js"></script>
+</body>
+</html>

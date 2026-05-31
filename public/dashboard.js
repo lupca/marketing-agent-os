@@ -1,39 +1,20 @@
 /**
- * G-Agent Marketing OS v2.0 - CMO Strategic BI Dashboard Core Interactivity Script
- * Structured under strict Clean Code Guidelines:
- * - Separation of Concerns: Scoped inside an IIFE to avoid global pollution.
- * - Single Responsibility: Core modules broken down into clear, small functions.
- * - DRY (Don't Repeat Yourself): Unified API wrapper with consistent error handling.
- * - Programmatic Event Handlers: Dynamically binds listeners instead of inline HTML hooks.
+ * G-Agent Marketing OS v2.0 - CMO Strategic BI Dashboard Client Script
+ * Focuses exclusively on business analytics, simulation metrics, and billing visual charts.
+ * All system settings and third-party integrations are decoupled and managed inside /settings.
  */
-
-(() => {
-    "use strict";
-
-    // =========================================================================
-    // 1. STATE & GLOBAL CONFIGURATION
-    // =========================================================================
+(function() {
+    // Shared Chart Variables
     let cpaChart = null;
     let funnelChart = null;
     let tokenChart = null;
-    let loadedModels = [];
     
-    // Store channel CPAs to calculate budget simulator weighting on-the-fly
-    const globalChannelCPA = {}; 
+    // Loaded Cache Metrics
+    const globalChannelCPA = {};
 
-    // Active filters for the Models Library
-    const activeFilters = {
-        category: new Set(),
-        tags: new Set(),
-        series: new Set(),
-        context: new Set(),
-        size: new Set(),
-        release: new Set()
-    };
-
-    // DOM Cache Object to avoid repeated document lookups
+    // DOM Elements Cache Store
     const DOM = {
-        // Dashboard Core
+        // Business Intelligence Panels
         kpisSection: null,
         fatigueContainer: null,
         fatigueList: null,
@@ -42,7 +23,7 @@
         antiPatternsList: null,
         btnRefreshMetrics: null,
 
-        // Range Sliders for Simulator
+        // What-If Simulation Controls
         simBudget: null,
         simPrice: null,
         simCost: null,
@@ -55,63 +36,12 @@
         resRoas: null,
         advisorAllocations: null,
 
-        // Core AI Settings Inputs
-        settingAiModel: null,
-        customModelContainer: null,
-        settingCustomAiModel: null,
-        settingTemp: null,
-        settingTempVal: null,
-        settingContext: null,
-        settingContextVal: null,
-        settingRecursion: null,
-        settingRecursionVal: null,
-        settingRerankMode: null,
-        settingApiKey: null,
-        settingApiUrl: null,
-        settingEnableThinking: null,
-        btnSaveSettings: null,
-        settingsStatus: null,
-
         // Token Usage Visualizers
         tokenTotalPrompt: null,
         tokenTotalCompletion: null,
         tokenTotalCost: null,
-        tokenTotalCalls: null,
-
-        // Models Library Layout
-        modelsOverlay: null,
-        modelsSidebar: null,
-        modelsGrid: null,
-        modelSearchQuery: null,
-        btnOpenModels: null,
-        btnCloseModels: null,
-        btnToggleSidebar: null,
-        toggleFilterText: null,
-
-        // Model Form Modal
-        modelFormModal: null,
-        modalFormTitle: null,
-        formModelUuid: null,
-        formModelName: null,
-        formModelId: null,
-        formModelProvider: null,
-        formModelCategory: null,
-        formModelSeries: null,
-        formModelContext: null,
-        formModelSize: null,
-        formModelBadge: null,
-        formModelTags: null,
-        formModelApiUrl: null,
-        formModelApiKey: null,
-        formModelDescription: null,
-        btnNewModel: null,
-        btnSaveForm: null,
-        btnCloseForm: null
+        tokenTotalCalls: null
     };
-
-    // =========================================================================
-    // 2. DRY UTILITY FUNCTIONS & API WRAPPERS
-    // =========================================================================
 
     /**
      * Cache all critical DOM elements.
@@ -137,58 +67,14 @@
         DOM.resRoas = document.getElementById("res-roas");
         DOM.advisorAllocations = document.getElementById("advisor-allocations");
 
-        DOM.settingAiModel = document.getElementById("setting-ai-model");
-        DOM.customModelContainer = document.getElementById("custom-model-container");
-        DOM.settingCustomAiModel = document.getElementById("setting-custom-ai-model");
-        DOM.settingTemp = document.getElementById("setting-temp");
-        DOM.settingTempVal = document.getElementById("setting-temp-val");
-        DOM.settingContext = document.getElementById("setting-context");
-        DOM.settingContextVal = document.getElementById("setting-context-val");
-        DOM.settingRecursion = document.getElementById("setting-recursion");
-        DOM.settingRecursionVal = document.getElementById("setting-recursion-val");
-        DOM.settingRerankMode = document.getElementById("setting-rerank-mode");
-        DOM.settingApiKey = document.getElementById("setting-api-key");
-        DOM.settingApiUrl = document.getElementById("setting-api-url");
-        DOM.settingEnableThinking = document.getElementById("setting-enable-thinking");
-        DOM.btnSaveSettings = document.getElementById("btn-save-settings");
-        DOM.settingsStatus = document.getElementById("settings-status");
-
         DOM.tokenTotalPrompt = document.getElementById("token-total-prompt");
         DOM.tokenTotalCompletion = document.getElementById("token-total-completion");
         DOM.tokenTotalCost = document.getElementById("token-total-cost");
         DOM.tokenTotalCalls = document.getElementById("token-total-calls");
-
-        DOM.modelsOverlay = document.getElementById("models-management-overlay");
-        DOM.modelsSidebar = document.getElementById("models-sidebar");
-        DOM.modelsGrid = document.getElementById("models-grid");
-        DOM.modelSearchQuery = document.getElementById("model-search-query");
-        DOM.btnOpenModels = document.getElementById("btn-open-models");
-        DOM.btnCloseModels = document.getElementById("btn-close-models");
-        DOM.btnToggleSidebar = document.getElementById("toggle-filter-btn");
-        DOM.toggleFilterText = document.getElementById("toggle-filter-text");
-
-        DOM.modelFormModal = document.getElementById("model-form-modal");
-        DOM.modalFormTitle = document.getElementById("modal-form-title");
-        DOM.formModelUuid = document.getElementById("form-model-uuid");
-        DOM.formModelName = document.getElementById("form-model-name");
-        DOM.formModelId = document.getElementById("form-model-id");
-        DOM.formModelProvider = document.getElementById("form-model-provider");
-        DOM.formModelCategory = document.getElementById("form-model-category");
-        DOM.formModelSeries = document.getElementById("form-model-series");
-        DOM.formModelContext = document.getElementById("form-model-context");
-        DOM.formModelSize = document.getElementById("form-model-size");
-        DOM.formModelBadge = document.getElementById("form-model-badge");
-        DOM.formModelTags = document.getElementById("form-model-tags");
-        DOM.formModelApiUrl = document.getElementById("form-model-api-url");
-        DOM.formModelApiKey = document.getElementById("form-model-api-key");
-        DOM.formModelDescription = document.getElementById("form-model-description");
-        DOM.btnNewModel = document.getElementById("btn-new-model");
-        DOM.btnSaveForm = document.getElementById("btn-save-form");
-        DOM.btnCloseForm = document.getElementById("btn-close-form");
     }
 
     /**
-     * Unified, robust API Request helper that enforces clean async error handling.
+     * Unified API Request helper that enforces clean async error handling.
      */
     async function apiRequest(url, options = {}) {
         try {
@@ -214,7 +100,7 @@
     }
 
     // =========================================================================
-    // 3. CORE METRICS & ANALYTICS LOADING
+    // A. CORE METRICS & ANALYTICS LOADING
     // =========================================================================
 
     /**
@@ -233,7 +119,7 @@
             const data = await apiRequest("/api/dashboard/metrics");
             
             if (data.error) {
-                showModalAlert("Lỗi tải báo cáo: " + data.error, "error");
+                alert("Lỗi tải báo cáo: " + data.error);
                 return;
             }
 
@@ -273,10 +159,9 @@
                 }
             });
 
-            // Show a high-fidelity toast notification
             showToast("Đã đồng bộ số liệu thời gian thực thành công!", "success");
         } catch (error) {
-            showModalAlert("Không thể kết nối máy chủ để tải số liệu thời gian thực.", "error");
+            alert("Không thể kết nối máy chủ để tải số liệu thời gian thực.");
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -405,7 +290,7 @@
 
         // Render Defunct (Killed) Script Board
         if (!killed || killed.length === 0) {
-            DOM.killedBoard.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 2rem;">Chưa có kịch bản nào bị Agent khai tử. Hệ thống an toàn!</div>';
+            DOM.killedBoard.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 2rem;">Chưa có kịch bản nào bị Agent khai tử. Kênh ổn định!</div>';
         } else {
             DOM.killedBoard.innerHTML = killed.map(variant => `
                 <div class="variant-card" style="border-color: rgba(239, 68, 68, 0.15)">
@@ -426,7 +311,7 @@
     }
 
     /**
-     * Renders flagged RAG failures (Anti-Patterns) pulled from postgres pgvector.
+     * Renders flagged RAG failures (Anti-Patterns) pulled from RAG.
      */
     function populateAntiPatterns(ragList) {
         if (!DOM.antiPatternsList) return;
@@ -448,7 +333,7 @@
     }
 
     // =========================================================================
-    // 4. CHART RENDERING CONFIGURATIONS (CHART.JS)
+    // B. CHART RENDERING CONFIGURATIONS (CHART.JS)
     // =========================================================================
 
     /**
@@ -520,8 +405,8 @@
         
         const labels = channelData.map(ch => ch.name);
         const viewsData = channelData.map(ch => ch.views);
-        const clicksData = channelData.map(ch => ch.clicks * 10); // Scale up clicks x10 for pleasant visual contrast
-        const conversionsData = channelData.map(ch => ch.conversions * 100); // Scale leads x100 for visual stacking
+        const clicksData = channelData.map(ch => ch.clicks * 10); // Scale clicks x10 for pleasing contrast
+        const conversionsData = channelData.map(ch => ch.conversions * 100); // Scale conversions x100
         
         funnelChart = new Chart(ctx, {
             type: "bar",
@@ -569,7 +454,7 @@
     }
 
     // =========================================================================
-    // 5. REACTIVE WHAT-IF SENSITIVITY CALCULATOR
+    // C. REACTIVE WHAT-IF SENSITIVITY CALCULATOR
     // =========================================================================
 
     /**
@@ -582,12 +467,10 @@
         const price = parseFloat(DOM.simPrice.value);
         const cost = parseFloat(DOM.simCost.value);
         
-        // Dynamic label sync
         DOM.budgetVal.innerText = formatVND(budget);
         DOM.priceVal.innerText = formatVND(price);
         DOM.costVal.innerText = formatVND(cost);
         
-        // Sensitive parameters calculations
         const margin = price - cost;
         const targetCPATarget = margin * 0.3; // Safe CAC target capped at 30% margin
         const breakEvenLeads = margin > 0 ? (budget / margin) : 0;
@@ -595,13 +478,11 @@
         const expectedRevenue = expectedLeads * price;
         const expectedROAS = budget > 0 ? (expectedRevenue / budget) : 0;
         
-        // Update DOM values
         DOM.resMargin.innerText = formatVND(margin);
         DOM.resCpaTarget.innerText = formatVND(targetCPATarget);
         DOM.resBreakeven.innerText = `${breakEvenLeads.toFixed(1)} Leads`;
         DOM.resRoas.innerText = `${expectedROAS.toFixed(2)} x`;
         
-        // Dynamically compute AI budgeting advisor metrics
         runBudgetAllocationAdvisor(budget);
     }
 
@@ -612,14 +493,12 @@
     function runBudgetAllocationAdvisor(totalBudget) {
         if (!DOM.advisorAllocations) return;
 
-        // Retrieve latest channel metrics or configure fallbacks
         const cpas = {
             "Google": globalChannelCPA["Google"] || 680000.0,
             "Facebook": globalChannelCPA["Facebook"] || 720000.0,
             "TikTok": globalChannelCPA["TikTok"] || 880000.0
         };
         
-        // Compute total inverse weighting sum
         let sumInverse = 0.0;
         const weights = {};
         for (const channel in cpas) {
@@ -656,153 +535,7 @@
     }
 
     // =========================================================================
-    // 6. SYSTEM AI CONFIGURATION MANAGEMENT
-    // =========================================================================
-
-    /**
-     * Toggles optional custom input rendering depending on LLM Model drop-down selection.
-     */
-    function toggleCustomModelInput() {
-        if (!DOM.settingAiModel || !DOM.customModelContainer || !DOM.settingCustomAiModel) return;
-
-        const selection = DOM.settingAiModel.value;
-        if (selection === "custom") {
-            DOM.customModelContainer.style.display = "block";
-            DOM.settingCustomAiModel.focus();
-        } else {
-            DOM.customModelContainer.style.display = "none";
-        }
-    }
-
-    /**
-     * Retrieve running LLM system configuration metrics dynamically from postgres API.
-     */
-    async function loadAISettings() {
-        try {
-            const settings = await apiRequest("/api/workspace/settings");
-            
-            if (settings.ai_model) {
-                const predefined = [
-                    "Qwen/Qwen3.6-35B-A3B",
-                    "Qwen/Qwen3-32B",
-                    "deepseek-ai/DeepSeek-V3",
-                    "Qwen/Qwen2.5-7B-Instruct"
-                ];
-                
-                if (predefined.includes(settings.ai_model)) {
-                    DOM.settingAiModel.value = settings.ai_model;
-                    DOM.customModelContainer.style.display = "none";
-                } else {
-                    DOM.settingAiModel.value = "custom";
-                    DOM.customModelContainer.style.display = "block";
-                    DOM.settingCustomAiModel.value = settings.ai_model;
-                }
-            }
-            
-            if (settings.temperature !== undefined) {
-                DOM.settingTemp.value = settings.temperature;
-                DOM.settingTempVal.innerText = parseFloat(settings.temperature).toFixed(2);
-            }
-            if (settings.max_tokens) {
-                DOM.settingContext.value = settings.max_tokens;
-                DOM.settingContextVal.innerText = Number(settings.max_tokens).toLocaleString();
-            }
-            if (settings.recursion_limit) {
-                DOM.settingRecursion.value = settings.recursion_limit;
-                DOM.settingRecursionVal.innerText = settings.recursion_limit;
-            }
-            if (settings.reranker_mode) {
-                DOM.settingRerankMode.value = settings.reranker_mode;
-            }
-            if (settings.siliconflow_api_key) {
-                DOM.settingApiKey.value = settings.siliconflow_api_key;
-            }
-            if (settings.ai_api_url) {
-                DOM.settingApiUrl.value = settings.ai_api_url;
-            }
-            if (settings.enable_thinking !== undefined) {
-                DOM.settingEnableThinking.checked = settings.enable_thinking;
-            }
-        } catch (error) {
-            console.error("Failed to load global workspace settings:", error);
-        }
-    }
-
-    /**
-     * Validates and posts modified LLM settings parameters payload back to postgres.
-     */
-    async function saveAISettings() {
-        if (!DOM.settingsStatus) return;
-
-        const selection = DOM.settingAiModel.value;
-        const modelId = selection === "custom" 
-            ? DOM.settingCustomAiModel.value.trim() 
-            : selection;
-            
-        if (!modelId) {
-            updateSettingsStatus("❌ Lỗi: Vui lòng nhập hoặc chọn tên mô hình AI!", "error");
-            return;
-        }
-
-        const payload = {
-            ai_model: modelId,
-            temperature: parseFloat(DOM.settingTemp.value),
-            max_tokens: parseInt(DOM.settingContext.value),
-            recursion_limit: parseInt(DOM.settingRecursion.value),
-            reranker_mode: DOM.settingRerankMode.value,
-            siliconflow_api_key: DOM.settingApiKey.value,
-            ai_api_url: DOM.settingApiUrl.value.trim(),
-            enable_thinking: DOM.settingEnableThinking.checked
-        };
-
-        updateSettingsStatus("⏳ Đang lưu cấu hình...", "info");
-
-        try {
-            const data = await apiRequest("/api/workspace/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            if (data.status === "success") {
-                updateSettingsStatus("✅ Lưu thành công! Các Agent sẽ lập tức chạy trên cấu hình mới.", "success");
-            } else {
-                updateSettingsStatus("❌ Lỗi: " + (data.message || "Không rõ nguyên nhân"), "error");
-            }
-        } catch (error) {
-            updateSettingsStatus("❌ Lỗi kết nối: " + error.message, "error");
-        }
-    }
-
-    /**
-     * Renders settings visual feedbacks.
-     */
-    function updateSettingsStatus(message, type) {
-        if (!DOM.settingsStatus) return;
-
-        DOM.settingsStatus.style.display = "block";
-        DOM.settingsStatus.textContent = message;
-
-        if (type === "success") {
-            DOM.settingsStatus.style.background = "rgba(16,185,129,0.15)";
-            DOM.settingsStatus.style.color = "var(--color-success)";
-        } else if (type === "error") {
-            DOM.settingsStatus.style.background = "rgba(239,68,68,0.15)";
-            DOM.settingsStatus.style.color = "var(--color-danger)";
-        } else {
-            DOM.settingsStatus.style.background = "rgba(99,102,241,0.15)";
-            DOM.settingsStatus.style.color = "#818cf8";
-        }
-
-        if (type !== "info") {
-            setTimeout(() => { 
-                DOM.settingsStatus.style.display = "none"; 
-            }, 4000);
-        }
-    }
-
-    // =========================================================================
-    // 7. TOKEN USAGE & API AUDIT COSTING PLOTS
+    // D. TOKEN USAGE & API AUDIT COSTING PLOTS
     // =========================================================================
 
     /**
@@ -862,7 +595,7 @@
     }
 
     /**
-     * Configures high-end visual stacked token usage bars layout via Chart.js.
+     * Configures stacked token usage bars layout via Chart.js.
      */
     function renderTokenChart(labels, promptData, completionData) {
         const canvas = document.getElementById("tokenUsageChart");
@@ -944,467 +677,8 @@
         });
     }
 
-    // =========================================================================
-    // 8. HIGH-END MODELS LIBRARY OVERLAY MANAGEMENT (CRUD & ADVANCED FILTERS)
-    // =========================================================================
-
     /**
-     * Triggers models library sliding display overlay.
-     */
-    function openModelsOverlay() {
-        if (!DOM.modelsOverlay) return;
-        DOM.modelsOverlay.classList.add("active");
-        document.body.style.overflow = "hidden"; // Clip background scrolling
-        fetchModelsList();
-    }
-
-    /**
-     * Closes models library sliding display overlay.
-     */
-    function closeModelsOverlay() {
-        if (!DOM.modelsOverlay) return;
-        DOM.modelsOverlay.classList.remove("active");
-        document.body.style.overflow = "auto";
-    }
-
-    /**
-     * Toggle models filter left-sidebar layout.
-     */
-    function toggleSidebar() {
-        if (!DOM.modelsSidebar || !DOM.toggleFilterText) return;
-
-        DOM.modelsSidebar.classList.toggle("collapsed");
-        if (DOM.modelsSidebar.classList.contains("collapsed")) {
-            DOM.toggleFilterText.innerText = "Show Filters";
-        } else {
-            DOM.toggleFilterText.innerText = "Hide Filters";
-        }
-    }
-
-    /**
-     * Retrieve all available workspace models library.
-     */
-    async function fetchModelsList() {
-        if (!DOM.modelsGrid) return;
-        DOM.modelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 3rem; font-size: 1.1rem;">🔄 Đang tải thư viện mô hình từ cơ sở dữ liệu...</div>';
-        
-        try {
-            const response = await apiRequest("/api/workspace/models");
-            if (response.status === "success") {
-                loadedModels = response.data;
-                renderModelsGrid();
-                setupFilterListeners();
-            } else {
-                DOM.modelsGrid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--color-danger); padding: 3rem; font-size: 1.1rem;">❌ Lỗi khi tải mô hình: ${response.error || "Unknown"}</div>`;
-            }
-        } catch (error) {
-            DOM.modelsGrid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--color-danger); padding: 3rem; font-size: 1.1rem;">❌ Lỗi kết nối máy chủ.</div>`;
-        }
-    }
-
-    /**
-     * Configures interactive filter pill listeners.
-     */
-    function setupFilterListeners() {
-        const pills = document.querySelectorAll(".models-sidebar .filter-pill");
-        
-        // Safely wipe old listeners via cloning
-        pills.forEach(pill => {
-            const freshPill = pill.cloneNode(true);
-            pill.parentNode.replaceChild(freshPill, pill);
-        });
-
-        // Re-bind fresh click listener logic
-        document.querySelectorAll(".models-sidebar .filter-pill").forEach(pill => {
-            const filterGroup = pill.parentNode.id.replace("filter-", "");
-            
-            pill.addEventListener("click", () => {
-                pill.classList.toggle("active");
-                const value = pill.getAttribute("data-value");
-                
-                if (pill.classList.contains("active")) {
-                    activeFilters[filterGroup].add(value);
-                } else {
-                    activeFilters[filterGroup].delete(value);
-                }
-                renderModelsGrid();
-            });
-        });
-    }
-
-    /**
-     * Clears an active filter set. Expose to window.
-     */
-    function clearFilter(group) {
-        if (!activeFilters[group]) return;
-
-        activeFilters[group].clear();
-        document.querySelectorAll(`#filter-${group} .filter-pill`).forEach(pill => {
-            pill.classList.remove("active");
-        });
-        renderModelsGrid();
-    }
-
-    /**
-     * Filter models collection and updates library grid UI dynamically.
-     */
-    function renderModelsGrid() {
-        if (!DOM.modelsGrid) return;
-
-        const searchQuery = DOM.modelSearchQuery ? DOM.modelSearchQuery.value.toLowerCase().trim() : "";
-        const activeModel = DOM.settingAiModel ? DOM.settingAiModel.value : "";
-        const activeCustomModel = DOM.settingCustomAiModel ? DOM.settingCustomAiModel.value.trim() : "";
-        
-        const currentActiveModelId = activeModel === "custom" ? activeCustomModel : activeModel;
-
-        const filtered = loadedModels.filter(model => {
-            // Apply Search Query matching
-            if (searchQuery) {
-                const matches = model.name.toLowerCase().includes(searchQuery) ||
-                                model.model_id.toLowerCase().includes(searchQuery) ||
-                                (model.description && model.description.toLowerCase().includes(searchQuery));
-                if (!matches) return false;
-            }
-            
-            // Apply Category matching
-            if (activeFilters.category.size > 0 && !activeFilters.category.has(model.category)) {
-                return false;
-            }
-            
-            // Apply Tag list matching
-            if (activeFilters.tags.size > 0) {
-                const tagFound = model.tags.some(tag => activeFilters.tags.has(tag));
-                if (!tagFound) return false;
-            }
-            
-            // Apply Series matching
-            if (activeFilters.series.size > 0 && !activeFilters.series.has(model.series)) {
-                return false;
-            }
-            
-            // Apply Context window matching
-            if (activeFilters.context.size > 0 && !activeFilters.context.has(model.context_window)) {
-                return false;
-            }
-            
-            // Apply Size parameters matching
-            if (activeFilters.size.size > 0 && !activeFilters.size.has(model.model_size)) {
-                return false;
-            }
-
-            return true;
-        });
-
-        if (filtered.length === 0) {
-            DOM.modelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 4rem; font-size: 1.1rem;">🔍 Không tìm thấy mô hình nào khớp với bộ lọc hiện tại.</div>';
-            return;
-        }
-
-        DOM.modelsGrid.innerHTML = filtered.map(model => {
-            const isModelActivated = (model.model_id === currentActiveModelId);
-            
-            const badgesHtml = model.tags.map((tag, idx) => {
-                const classes = ["indigo", "purple", "pink", "teal", "amber", "emerald"];
-                const selectClass = classes[idx % classes.length];
-                return `<span class="model-badge ${selectClass}">${tag}</span>`;
-            }).join(" ");
-
-            const avatarChar = model.name.charAt(0);
-            const activeCardClass = isModelActivated ? "active-model" : "";
-            
-            const activationAction = isModelActivated 
-                ? '<span class="status-badge" style="background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: var(--color-success); font-size: 0.75rem; text-transform: uppercase;">Activated</span>'
-                : `<button class="chat-nav-btn" onclick="activateModel('${model.model_id}')" style="background: rgba(255,255,255,0.03); border-color: var(--border-glass); padding: 6px 12px; font-size: 0.75rem;">✅ Activate</button>`;
-
-            const specialGlowBadge = model.special_badge 
-                ? `<span class="glow-tag">${model.special_badge}</span>` 
-                : (model.is_new ? '<span class="glow-tag">New</span>' : "");
-
-            return `
-                <div class="glass-panel model-card ${activeCardClass}" id="model-card-${model.id}">
-                    ${specialGlowBadge}
-                    <div>
-                        <div class="model-card-header">
-                            <div class="model-avatar">${avatarChar}</div>
-                            <div class="model-identity">
-                                <h3 class="model-card-title" title="${model.name}">${model.name}</h3>
-                                <span class="model-card-provider">${model.provider}</span>
-                            </div>
-                        </div>
-                        <p class="model-card-desc" style="margin-top: 10px;">${model.description || "Không có mô tả cho mô hình này."}</p>
-                    </div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <div class="model-card-tags">${badgesHtml}</div>
-                        <div class="model-card-actions">
-                            <div class="card-left-actions">
-                                <button class="refresh-btn" onclick="openEditModelModal('${model.id}')" style="background: rgba(255,255,255,0.03); border-color: var(--border-glass); padding: 6px 12px; font-size: 0.75rem; box-shadow: none;">✏️ Edit</button>
-                                <button class="refresh-btn" onclick="deleteModel('${model.id}')" style="background: rgba(239,68,68,0.05); border-color: rgba(239,68,68,0.2); color: var(--color-danger); padding: 6px 12px; font-size: 0.75rem; box-shadow: none;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='rgba(239,68,68,0.05)'">❌ Delete</button>
-                            </div>
-                            ${activationAction}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join("");
-    }
-
-    /**
-     * Activates selected model configurations inside the workspace parameters.
-     */
-    function activateModel(modelId) {
-        if (!DOM.settingAiModel || !DOM.settingCustomAiModel) return;
-
-        const predefined = [
-            "Qwen/Qwen3.6-35B-A3B", 
-            "Qwen/Qwen3-32B", 
-            "deepseek-ai/DeepSeek-V3", 
-            "Qwen/Qwen2.5-7B-Instruct"
-        ];
-        
-        if (predefined.includes(modelId)) {
-            DOM.settingAiModel.value = modelId;
-            DOM.customModelContainer.style.display = "none";
-        } else {
-            DOM.settingAiModel.value = "custom";
-            DOM.customModelContainer.style.display = "block";
-            DOM.settingCustomAiModel.value = modelId;
-        }
-
-        // Auto sync corresponding API Key and Base URL parameters
-        const model = loadedModels.find(m => m.model_id === modelId);
-        if (model) {
-            DOM.settingApiUrl.value = model.api_url || "";
-            DOM.settingApiKey.value = model.api_key || "";
-        }
-        
-        showSettingsStatus("Kích hoạt mô hình " + modelId + " thành công! Cổng kết nối & API Key đã được đồng bộ, hãy lưu lại cấu hình.", "success");
-        renderModelsGrid();
-        
-        // Graceful automatic overlay closing with smooth focusing scroll
-        setTimeout(() => {
-            closeModelsOverlay();
-            
-            DOM.settingAiModel.scrollIntoView({ behavior: "smooth" });
-            
-            // Neon Glow visual feedback highlight on parameters panel
-            const panel = DOM.settingAiModel.closest(".glass-panel");
-            if (panel) {
-                panel.style.borderColor = "rgba(99,102,241,0.8)";
-                panel.style.boxShadow = "0 0 30px rgba(99,102,241,0.2)";
-                setTimeout(() => {
-                    panel.style.borderColor = "rgba(129, 140, 248, 0.2)";
-                    panel.style.boxShadow = "none";
-                }, 2000);
-            }
-        }, 500);
-    }
-
-    /**
-     * Visual status feedback message beneath main AI configuration cards.
-     */
-    function showSettingsStatus(message, type) {
-        if (!DOM.settingsStatus) return;
-
-        DOM.settingsStatus.style.display = "block";
-        DOM.settingsStatus.innerText = message;
-
-        if (type === "success") {
-            DOM.settingsStatus.style.background = "rgba(16, 185, 129, 0.15)";
-            DOM.settingsStatus.style.border = "1px solid rgba(16, 185, 129, 0.3)";
-            DOM.settingsStatus.style.color = "var(--color-success)";
-        } else {
-            DOM.settingsStatus.style.background = "rgba(239, 68, 68, 0.15)";
-            DOM.settingsStatus.style.border = "1px solid rgba(239, 68, 68, 0.3)";
-            DOM.settingsStatus.style.color = "var(--color-danger)";
-        }
-
-        setTimeout(() => { 
-            DOM.settingsStatus.style.display = "none"; 
-        }, 5000);
-    }
-
-    // =========================================================================
-    // 9. CRUD MODEL CREATING / EDITING FORMS
-    // =========================================================================
-
-    /**
-     * Initializes blank Add New Model modal parameters.
-     */
-    function openNewModelModal() {
-        if (!DOM.modelFormModal || !DOM.modalFormTitle) return;
-
-        DOM.modalFormTitle.innerText = "➕ Thêm Mô Hình Mới";
-        DOM.formModelUuid.value = "";
-        DOM.formModelName.value = "";
-        DOM.formModelId.value = "";
-        DOM.formModelProvider.value = "";
-        DOM.formModelCategory.value = "Chat";
-        DOM.formModelSeries.value = "";
-        DOM.formModelContext.value = ">= 128K";
-        DOM.formModelSize.value = "10 ~ 50B";
-        DOM.formModelBadge.value = "";
-        DOM.formModelTags.value = "";
-        DOM.formModelApiUrl.value = "";
-        DOM.formModelApiKey.value = "";
-        DOM.formModelDescription.value = "";
-        
-        DOM.modelFormModal.classList.add("active");
-    }
-
-    /**
-     * Retrieves specific model parameters to populate Edit Config Modal.
-     */
-    function openEditModelModal(uuid) {
-        if (!DOM.modelFormModal || !DOM.modalFormTitle) return;
-
-        const model = loadedModels.find(m => m.id === uuid);
-        if (!model) return;
-        
-        DOM.modalFormTitle.innerText = "✏️ Chỉnh Sửa Cấu Hình Mô Hình";
-        DOM.formModelUuid.value = model.id;
-        DOM.formModelName.value = model.name;
-        DOM.formModelId.value = model.model_id;
-        DOM.formModelProvider.value = model.provider;
-        DOM.formModelCategory.value = model.category;
-        DOM.formModelSeries.value = model.series || "";
-        DOM.formModelContext.value = model.context_window || ">= 128K";
-        DOM.formModelSize.value = model.model_size || "10 ~ 50B";
-        DOM.formModelBadge.value = model.special_badge || "";
-        DOM.formModelTags.value = model.tags ? model.tags.join(", ") : "";
-        DOM.formModelApiUrl.value = model.api_url || "";
-        DOM.formModelApiKey.value = model.api_key || "";
-        DOM.formModelDescription.value = model.description || "";
-        
-        DOM.modelFormModal.classList.add("active");
-    }
-
-    /**
-     * Closes current modal.
-     */
-    function closeModelModal() {
-        if (DOM.modelFormModal) {
-            DOM.modelFormModal.classList.remove("active");
-        }
-    }
-
-    /**
-     * Closes modal upon dark-blurred area clicks.
-     */
-    function closeModelModalOnOuterClick(event) {
-        if (event.target.id === "model-form-modal") {
-            closeModelModal();
-        }
-    }
-
-    /**
-     * Form validation & payload submission back to postgres workspace.
-     */
-    async function saveModelForm() {
-        const uuid = DOM.formModelUuid.value;
-        const name = DOM.formModelName.value.trim();
-        const modelId = DOM.formModelId.value.trim();
-        const provider = DOM.formModelProvider.value.trim();
-        const category = DOM.formModelCategory.value;
-        const series = DOM.formModelSeries.value.trim();
-        const contextWindow = DOM.formModelContext.value;
-        const modelSize = DOM.formModelSize.value;
-        const specialBadge = DOM.formModelBadge.value.trim();
-        const tagsText = DOM.formModelTags.value.trim();
-        const apiUrl = DOM.formModelApiUrl.value.trim();
-        const apiKey = DOM.formModelApiKey.value.trim();
-        const description = DOM.formModelDescription.value.trim();
-
-        if (!name || !modelId || !provider || !category) {
-            showModalAlert("Vui lòng điền đầy đủ các trường bắt buộc (Tên, Model ID, Nhà cung cấp, Loại mô hình)!", "error");
-            return;
-        }
-
-        const tags = tagsText 
-            ? tagsText.split(",").map(tag => tag.trim()).filter(tag => tag.length > 0) 
-            : [];
-            
-        const payload = {
-            name, 
-            model_id: modelId, 
-            provider, 
-            category, 
-            series: series || provider, 
-            context_window: contextWindow, 
-            model_size: modelSize,
-            special_badge: specialBadge || null,
-            is_new: !!specialBadge,
-            tags, 
-            description,
-            api_url: apiUrl || null,
-            api_key: apiKey || null
-        };
-
-        const targetUrl = uuid ? `/api/workspace/models/${uuid}` : "/api/workspace/models";
-        const targetMethod = uuid ? "PUT" : "POST";
-
-        try {
-            const response = await apiRequest(targetUrl, {
-                method: targetMethod,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.status === "success") {
-                closeModelModal();
-                fetchModelsList();
-            } else {
-                showModalAlert("Lỗi khi lưu cấu hình: " + (response.error || "Unknown"), "error");
-            }
-        } catch (error) {
-            showModalAlert("Lỗi kết nối máy chủ khi lưu.", "error");
-        }
-    }
-
-    /**
-     * Completely drops specific custom model configuration from DB.
-     */
-    async function deleteModel(uuid) {
-        if (!confirm("Bạn có chắc chắn muốn xóa mô hình này khỏi thư viện cấu hình không?")) {
-            return;
-        }
-
-        try {
-            const response = await apiRequest(`/api/workspace/models/${uuid}`, { 
-                method: "DELETE" 
-            });
-
-            if (response.status === "success") {
-                const card = document.getElementById(`model-card-${uuid}`);
-                if (card) {
-                    // Trigger custom cards fade-out animation first
-                    card.style.opacity = "0";
-                    card.style.transform = "scale(0.9)";
-                    setTimeout(() => { 
-                        fetchModelsList(); 
-                    }, 300);
-                } else {
-                    fetchModelsList();
-                }
-            } else {
-                showModalAlert("Lỗi khi xóa mô hình: " + (response.error || "Unknown"), "error");
-            }
-        } catch (error) {
-            showModalAlert("Lỗi kết nối máy chủ.", "error");
-        }
-    }
-
-    /**
-     * Renders standard fallback alert UI.
-     */
-    function showModalAlert(message, type) {
-        // Fallback to standard alerts, but log beautifully
-        console.warn(`[${type.toUpperCase()}] Dashboard Alert: ${message}`);
-        alert(message);
-    }
-
-    /**
-     * Renders a highly interactive premium floating toast notification.
+     * Renders standard floating toast notification.
      */
     function showToast(message, type = "success") {
         let container = document.getElementById("toast-container");
@@ -1457,11 +731,9 @@
         // Force reflow
         toast.offsetHeight;
         
-        // Slide up & fade in
         toast.style.opacity = "1";
         toast.style.transform = "translateY(0)";
         
-        // Auto remove with slide out
         setTimeout(() => {
             toast.style.opacity = "0";
             toast.style.transform = "translateY(-20px)";
@@ -1472,7 +744,7 @@
     }
 
     // =========================================================================
-    // 10. INITIALIZATION & DYNAMIC EVENT REGISTRATION
+    // E. INITIALIZATION & METRICS BOOTSTRAP
     // =========================================================================
 
     /**
@@ -1483,7 +755,6 @@
         
         // Fetch baseline data
         fetchMetrics();
-        loadAISettings();
 
         // 1. Programmatic What-If range sliders event binding
         const sliders = ["sim-budget", "sim-price", "sim-cost"];
@@ -1496,110 +767,14 @@
 
         // 2. Main Dashboard panel header buttons binding
         if (DOM.btnRefreshMetrics) {
-            // Remove old inline handler to prevent multiple executions
             DOM.btnRefreshMetrics.removeAttribute("onclick");
             DOM.btnRefreshMetrics.addEventListener("click", fetchMetrics);
-        }
-
-        if (DOM.btnOpenModels) {
-            DOM.btnOpenModels.removeAttribute("onclick");
-            DOM.btnOpenModels.addEventListener("click", openModelsOverlay);
-        }
-
-        // 3. System AI settings parameter sliders and triggers binding
-        if (DOM.settingAiModel) {
-            DOM.settingAiModel.removeAttribute("onchange");
-            DOM.settingAiModel.addEventListener("change", toggleCustomModelInput);
-        }
-
-        if (DOM.settingTemp) {
-            DOM.settingTemp.removeAttribute("oninput");
-            DOM.settingTemp.addEventListener("input", event => {
-                if (DOM.settingTempVal) {
-                    DOM.settingTempVal.innerText = parseFloat(event.target.value).toFixed(2);
-                }
-            });
-        }
-
-        if (DOM.settingContext) {
-            DOM.settingContext.removeAttribute("oninput");
-            DOM.settingContext.addEventListener("input", event => {
-                if (DOM.settingContextVal) {
-                    DOM.settingContextVal.innerText = Number(event.target.value).toLocaleString();
-                }
-            });
-        }
-
-        if (DOM.settingRecursion) {
-            DOM.settingRecursion.removeAttribute("oninput");
-            DOM.settingRecursion.addEventListener("input", event => {
-                if (DOM.settingRecursionVal) {
-                    DOM.settingRecursionVal.innerText = event.target.value;
-                }
-            });
-        }
-
-        if (DOM.btnSaveSettings) {
-            DOM.btnSaveSettings.removeAttribute("onclick");
-            DOM.btnSaveSettings.addEventListener("click", saveAISettings);
-        }
-
-        // 4. Models library overlay controls binding
-        if (DOM.btnCloseModels) {
-            DOM.btnCloseModels.removeAttribute("onclick");
-            DOM.btnCloseModels.addEventListener("click", closeModelsOverlay);
-        }
-
-        if (DOM.btnToggleSidebar) {
-            DOM.btnToggleSidebar.removeAttribute("onclick");
-            DOM.btnToggleSidebar.addEventListener("click", toggleSidebar);
-        }
-
-        if (DOM.modelSearchQuery) {
-            DOM.modelSearchQuery.removeAttribute("oninput");
-            DOM.modelSearchQuery.addEventListener("input", renderModelsGrid);
-        }
-
-        // 5. Models CRUD Modal form bindings
-        if (DOM.btnNewModel) {
-            DOM.btnNewModel.removeAttribute("onclick");
-            DOM.btnNewModel.addEventListener("click", openNewModelModal);
-        }
-
-        if (DOM.modelFormModal) {
-            DOM.modelFormModal.removeAttribute("onclick");
-            DOM.modelFormModal.addEventListener("click", closeModelModalOnOuterClick);
-        }
-
-        if (DOM.btnSaveForm) {
-            DOM.btnSaveForm.removeAttribute("onclick");
-            DOM.btnSaveForm.addEventListener("click", saveModelForm);
-        }
-
-        if (DOM.btnCloseForm) {
-            DOM.btnCloseForm.removeAttribute("onclick");
-            DOM.btnCloseForm.addEventListener("click", closeModelModal);
         }
     }
 
     // Register Initialization
     window.addEventListener("DOMContentLoaded", init);
 
-    // =========================================================================
-    // 11. EXPOSE CLEAN SYSTEM INTERFACES (ONLY MINIMUM REQUIRED HANDLERS)
-    // =========================================================================
+    // Expose minimum required handlers globally
     window.fetchMetrics = fetchMetrics;
-    window.openNewModelModal = openNewModelModal;
-    window.openEditModelModal = openEditModelModal;
-    window.closeModelModal = closeModelModal;
-    window.saveModelForm = saveModelForm;
-    window.deleteModel = deleteModel;
-    window.activateModel = activateModel;
-    window.clearFilter = clearFilter;
-    window.openModelsOverlay = openModelsOverlay;
-    window.closeModelsOverlay = closeModelsOverlay;
-    window.toggleSidebar = toggleSidebar;
-    window.saveAISettings = saveAISettings;
-    window.toggleCustomModelInput = toggleCustomModelInput;
-
 })();

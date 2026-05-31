@@ -83,6 +83,25 @@ async def custom_dashboard_middleware(request: Request, call_next):
             content = f.read()
         return HTMLResponse(content=content)
         
+    elif (path == "/settings" or path == "/settings/integrations") and request.method == "GET":
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings-integrations.html"))
+        if not os.path.exists(template_path):
+            # Fallback to old settings.html if new template is missing
+            template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings.html"))
+        if not os.path.exists(template_path):
+            return HTMLResponse(content="<h1>Settings Page Template Not Found</h1><p>Please ensure data/templates/settings-integrations.html exists.</p>", status_code=404)
+        with open(template_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+
+    elif path == "/settings/models" and request.method == "GET":
+        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings-models.html"))
+        if not os.path.exists(template_path):
+            return HTMLResponse(content="<h1>AI Models Library Template Not Found</h1><p>Please ensure data/templates/settings-models.html exists.</p>", status_code=404)
+        with open(template_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+        
     elif (path == "/vault" or path == "/Vault") and request.method == "GET":
         template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "vault.html"))
         if not os.path.exists(template_path):
@@ -204,6 +223,104 @@ async def custom_dashboard_middleware(request: Request, call_next):
         except Exception as e:
             db.rollback()
             logger.error(f"Error saving workspace settings: {e}", exc_info=True)
+            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+        finally:
+            db.close()
+            
+    elif path == "/api/workspace/integrations" and request.method == "GET":
+        from core.models import WorkspaceIntegration
+        db: Session = SessionLocal()
+        try:
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            integrations = db.query(WorkspaceIntegration).filter_by(workspace_id=ws_id).order_by(WorkspaceIntegration.platform_name, WorkspaceIntegration.config_key).all()
+            data = [{
+                "id": str(i.id),
+                "platform_name": i.platform_name,
+                "config_key": i.config_key,
+                "config_value": i.config_value,
+                "is_active": i.is_active,
+                "created_at": i.created_at.strftime('%Y-%m-%d %H:%M:%S') if i.created_at else None
+            } for i in integrations]
+            return JSONResponse(content={"status": "success", "data": data})
+        except Exception as e:
+            logger.error(f"Error fetching workspace integrations: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+        finally:
+            db.close()
+
+    elif path == "/api/workspace/integrations" and request.method == "POST":
+        from core.models import WorkspaceIntegration
+        from sqlalchemy.sql import func
+        db: Session = SessionLocal()
+        try:
+            body = await request.json()
+            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+            
+            record_id = body.get("id")
+            platform_name = body.get("platform_name")
+            config_key = body.get("config_key")
+            config_value = body.get("config_value")
+            is_active = body.get("is_active", True)
+            
+            if not platform_name or not config_key or config_value is None:
+                return JSONResponse(content={"error": "Missing required fields"}, status_code=400)
+                
+            existing = None
+            if record_id:
+                try:
+                    existing = db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(record_id)).first()
+                except Exception:
+                    pass
+            
+            # Fallback to checking by platform and key if no record found by ID
+            if not existing:
+                existing = db.query(WorkspaceIntegration).filter_by(
+                    workspace_id=ws_id,
+                    platform_name=platform_name,
+                    config_key=config_key
+                ).first()
+            
+            if existing:
+                existing.platform_name = platform_name
+                existing.config_key = config_key
+                existing.config_value = str(config_value)
+                existing.is_active = bool(is_active)
+                existing.updated_at = func.now()
+                db.commit()
+                return JSONResponse(content={"status": "success", "message": "Updated successfully"})
+            else:
+                new_integration = WorkspaceIntegration(
+                    workspace_id=ws_id,
+                    platform_name=platform_name,
+                    config_key=config_key,
+                    config_value=str(config_value),
+                    is_active=bool(is_active)
+                )
+                db.add(new_integration)
+                db.commit()
+                return JSONResponse(content={"status": "success", "message": "Created successfully"})
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error saving workspace integration: {e}", exc_info=True)
+            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+        finally:
+            db.close()
+
+    elif path == "/api/workspace/integrations/delete" and request.method == "POST":
+        from core.models import WorkspaceIntegration
+        db: Session = SessionLocal()
+        try:
+            body = await request.json()
+            integration_id = body.get("id")
+            if not integration_id:
+                return JSONResponse(content={"error": "Missing integration id"}, status_code=400)
+                
+            db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(integration_id)).delete()
+            db.commit()
+            return JSONResponse(content={"status": "success", "message": "Deleted successfully"})
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting workspace integration: {e}", exc_info=True)
             return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
         finally:
             db.close()
