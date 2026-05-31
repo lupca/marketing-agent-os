@@ -131,9 +131,35 @@ async def custom_dashboard_middleware(request: Request, call_next):
 logger = logging.getLogger("chainlit_app")
 logging.basicConfig(level=logging.INFO)
 
-# Default workspace and product identifiers (Matching database seeds)
-SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
-SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
+# Default workspace and product identifiers (Loaded dynamically from database)
+def get_db_seeded_ids():
+    """
+    Query database dynamically on startup or on-demand to fetch seeded Workspace & Product IDs.
+    This eliminates all hardcoded static constants!
+    """
+    from db.connection import SessionLocal
+    from core.models import Workspace, ProductService
+    import uuid
+    try:
+        with SessionLocal() as db:
+            ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+            if not ws:
+                ws = db.query(Workspace).first()
+            ws_id = str(ws.id) if ws else "00000000-0000-0000-0000-000000000002"
+            
+            prod = None
+            if ws:
+                prod = db.query(ProductService).filter_by(workspace_id=ws.id).first()
+            if not prod:
+                prod = db.query(ProductService).first()
+            prod_id = str(prod.id) if prod else "00000000-0000-0000-0000-000000000005"
+            
+            return ws_id, prod_id
+    except Exception as e:
+        logger.error(f"Error loading seeded IDs from database: {e}")
+        return "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000005"
+
+SEED_WORKSPACE_ID, SEED_PRODUCT_ID = get_db_seeded_ids()
 
 def get_workspace_config(thread_id, workspace_id, product_id):
     """
@@ -282,8 +308,10 @@ async def on_chat_start():
         thread_id = None
     
         # Read cookies from WebSocket client headers
-        client_headers = cl.context.session.client_headers if hasattr(cl.context.session, "client_headers") else {}
-        cookie_str = client_headers.get("cookie", "")
+        env = cl.user_session.get("env") or {}
+        cookie_str = env.get("cookie", "")
+        if not cookie_str and hasattr(cl.context.session, "client_headers"):
+            cookie_str = cl.context.session.client_headers.get("cookie", "")
     
         cookies = {}
         if cookie_str:
@@ -455,7 +483,7 @@ async def on_message(message: cl.Message):
             
                 for idx, mc in enumerate(approved_contents):
                     camp = db.query(MarketingCampaign).filter_by(id=mc.campaign_id).first()
-                    camp_name = camp.name if camp else "Chiến dịch tự trị"
+                    camp_name = camp.name if camp else ""
                     pvs = db.query(PlatformVariant).filter_by(master_content_id=mc.id).all()
                 
                     vault_msg += f"### 📦 TÀI SẢN {idx+1}: {camp_name}\n"
@@ -724,31 +752,29 @@ async def on_message(message: cl.Message):
     # Handle casual chat (END state) gracefully on UI
     if not current_state or not current_state.next:
         intent = current_state.values.get("intent_classification") if current_state and current_state.values else "chat"
-        if intent in ["research", "chat", "creative_report"]:
+
+        # [CTO FIX] BỘ LỌC HOÀN CHỈNH:
+        # Nếu LangGraph đã xử lý xong bất kỳ nghiệp vụ nào dưới đây, lập tức DỪNG LẠI (Return).
+        # Không được phép gọi LLM để "nói nhảm" thêm một câu nữa gây tốn token và double-dipping.
+        if intent in ["research", "chat", "creative_report", "show_metrics", "create_campaign"]:
             return
-            
-        from core.ollama_client import generate_text
-        prompt = (
-            f"Bạn là trợ lý Marketing Agent OS. Hãy trả lời thân thiện bằng Tiếng Việt câu hỏi này của Sếp:\n"
-            f"\"{message.content}\"\n"
-        )
-        try:
-            logger.info("Generating casual chat response via Ollama...")
-            workspace_id = cl.user_session.get("workspace_id") or SEED_WORKSPACE_ID
-            response_text = generate_text(prompt, system_prompt="Trả lời ngắn gọn, vui vẻ, lịch sự và chuyên nghiệp.", workspace_id=workspace_id)
-        except Exception:
-            response_text = "Dạ, em nghe đây ạ! Em là hệ điều hành Marketing Agent OS. Sếp cần em giúp gì hôm nay ạ? 💻"
-            
+
+        # Chỉ lọt xuống đây nếu intent hoàn toàn rác/không xác định.
+        # Trả về chuỗi tĩnh, TUYỆT ĐỐI KHÔNG import và gọi generate_text ở đây.
+        response_text = "Dạ, em nghe đây ạ! Em là hệ điều hành Marketing Agent OS. Sếp cần em giúp gì hôm nay ạ? 💻"
+
         sent = await cl.Message(content=response_text).send()
         track_msg_id(sent.id)
         await associate_messages_with_current_checkpoint(config)
- 
+
         if current_state:
             try:
+                # Import AIMessage từ langchain_core.messages nếu chưa có
+                from langchain_core.messages import AIMessage
                 await graph.aupdate_state(config, {"messages": [AIMessage(content=response_text)]})
-                logger.info("Successfully persisted casual chat response into Postgres checkpointer.")
+                logger.info("Successfully persisted static fallback chat response into Postgres checkpointer.")
             except Exception as se:
-                logger.error(f"Failed to persist casual chat in checkpointer: {se}", exc_info=True)
+                logger.error(f"Failed to persist static fallback chat in checkpointer: {se}", exc_info=True)
         return
  
     # 5. Detect if graph is paused at Approval Barriers

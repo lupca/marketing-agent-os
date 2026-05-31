@@ -15,10 +15,10 @@ from langchain_core.messages import HumanMessage, AIMessage
 from core.dependencies import get_session
 from core.models import IntentRoutingKnowledge
 from core.ollama_client import get_embedding, generate_text
-from core.utils import parse_llm_json
+from core.utils import parse_llm_json, load_prompt
 from core.decision_logger import log_decision
-from graphs.state import AgencyState
-from graphs.routing_models import RoutingDecision
+from graphs.supervisor.state import AgencyState
+from graphs.supervisor.routing_models import RoutingDecision
 from config.settings import (
     TRIAGE_CONTEXT_MESSAGES,
     TRIAGE_FEW_SHOT_COUNT,
@@ -32,43 +32,7 @@ logging.basicConfig(level=logging.INFO)
 # TRIAGE SYSTEM PROMPT — Layer 3: LLM Router
 # ---------------------------------------------------------------------------
 
-TRIAGE_SYSTEM_PROMPT = """\
-Bạn là Intelligent Supervisor Router của hệ thống Marketing Agent OS.
-Nhiệm vụ: Phân tích ý định người dùng và phân loại vào đúng 1 intent.
-
-## Các Intent hợp lệ:
-- "create_campaign" : Tạo chiến dịch marketing, viết kịch bản, lên brief sáng tạo, lên camp mới.
-- "show_metrics"    : Xem số liệu, báo cáo hiệu suất ban kinh doanh, thống kê chiến dịch, kiểm tra CPA.
-- "creative_report" : Xem báo cáo hoạt động sáng tạo, kịch bản đã viết, điểm tuân thủ ban sáng tạo.
-- "research"        : Hỏi về chính sách quảng cáo, quy định, từ khóa cấm, tra cứu tài liệu.
-- "chat"            : Hội thoại thông thường, chào hỏi, câu hỏi không liên quan marketing cụ thể.
-
-## Quy tắc suy luận (BẮT BUỘC đọc kỹ):
-1. Nếu sop_stage KHÔNG phải "triage" hoặc "chat" (tức là đang ở giữa luồng công việc) VÀ user nhắn ngắn gọn bổ sung thông tin → `is_follow_up=true`, giữ nguyên intent của luồng đó. TUY NHIÊN, nếu câu nói thể hiện rõ sự phủ định, từ chối, phản bác bot hoặc yêu cầu bẻ lái/chuyển chủ đề rõ rệt (ví dụ: "không", "nhầm rồi", "bỏ đi", "chuyển sang...", "tôi muốn xem báo cáo của... cơ") → thiết lập `is_follow_up=false` và đánh giá intent mới tương ứng.
-2. Ưu tiên ngữ cảnh hội thoại gần nhất khi câu nói mơ hồ. Ví dụ: "sửa lại ngân sách thành 5 triệu" khi đang tạo chiến dịch → `create_campaign`, không phải `chat`.
-3. Trích xuất entities (budget, product_name, platform, target_audience...) nếu có trong câu lệnh.
-4. Phải viết `thought_process` step-by-step TRƯỚC khi kết luận intent — không được bỏ qua bước này.
-
-## Ví dụ tham khảo từ cơ sở tri thức hệ thống:
-{few_shot_examples}
-
-## Trạng thái hiện tại:
-- SOP Stage: {sop_stage}
-- Có chiến dịch đang active: {has_active_campaign}
-
-## Lịch sử hội thoại gần đây ({message_count} tin nhắn):
-{conversation_history}
-
-## Tin nhắn mới nhất của người dùng:
-"{current_query}"
-
-Trả về JSON với format chính xác sau (không thêm markdown, không thêm trường khác):
-{{
-  "thought_process": "<suy luận từng bước>",
-  "is_follow_up": <true hoặc false>,
-  "intent": "<một trong: chat | show_metrics | create_campaign | research | creative_report>",
-  "extracted_entities": {{<key: value hoặc để trống {{}}}}
-}}"""
+# Prompt is loaded dynamically from prompts/supervisor/triage_system.txt
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +113,13 @@ def _retrieve_few_shot_examples(query: str, top_k: int = TRIAGE_FEW_SHOT_COUNT) 
 # LAYER 3: LLM Router (Chain-of-Thought + Structured JSON)
 # ---------------------------------------------------------------------------
 
-def _run_llm_router(context: dict, few_shot_examples: str, workspace_id: str = "00000000-0000-0000-0000-000000000002") -> RoutingDecision:
+def _run_llm_router(context: dict, few_shot_examples: str, workspace_id: str = None) -> RoutingDecision:
     """
     Layer 3 — LLM Router với Chain-of-Thought.
     Điền ngữ cảnh + few-shot vào System Prompt → gọi Qwen2.5 → parse RoutingDecision.
     """
-    prompt = TRIAGE_SYSTEM_PROMPT.format(
+    triage_prompt_template = load_prompt("supervisor", "triage_system.txt")
+    prompt = triage_prompt_template.format(
         few_shot_examples=few_shot_examples,
         sop_stage=context["active_sop_stage"],
         has_active_campaign=context["has_active_campaign"],
@@ -163,23 +128,11 @@ def _run_llm_router(context: dict, few_shot_examples: str, workspace_id: str = "
         current_query=context["current_query"]
     )
 
-    fallback_decision = RoutingDecision(
-        thought_process="Fallback: LLM không phản hồi hoặc parse thất bại. Mặc định về research.",
-        is_follow_up=False,
-        intent=TRIAGE_FALLBACK_INTENT,
-        extracted_entities={}
-    )
-
     try:
         raw_response = generate_text(prompt=context["current_query"], system_prompt=prompt, json_format=True, workspace_id=workspace_id)
         logger.info(f"Layer 3 LLM Raw Response: {raw_response[:200]}...")
 
-        parsed_dict = parse_llm_json(raw_response, fallback_data={
-            "thought_process": "Parse thất bại",
-            "is_follow_up": False,
-            "intent": TRIAGE_FALLBACK_INTENT,
-            "extracted_entities": {}
-        })
+        parsed_dict = parse_llm_json(raw_response)
 
         # Validate bằng Pydantic — nếu lỗi field nào sẽ raise ValidationError
         decision = RoutingDecision(**parsed_dict)
@@ -191,8 +144,8 @@ def _run_llm_router(context: dict, few_shot_examples: str, workspace_id: str = "
         return decision
 
     except Exception as e:
-        logger.error(f"Layer 3 LLM Router Error: {e}. Sử dụng fallback decision.")
-        return fallback_decision
+        logger.error(f"Layer 3 LLM Router Error: {e}.")
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +194,26 @@ def triage_node(state: AgencyState) -> dict:
     few_shot_examples = _retrieve_few_shot_examples(context["current_query"])
 
     # Workspace ID for multi-tenant isolation
-    ws_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+    ws_id = state.get("workspace_id")
+
+    # Load unified business context (DNA) once
+    business_context = state.get("business_context")
+    if not business_context:
+        from core.db_services import get_unified_business_context
+        import uuid
+        product_id = state.get("product_id")
+        p_uuid = None
+        if product_id:
+            try:
+                p_uuid = uuid.UUID(str(product_id))
+            except Exception:
+                pass
+        try:
+            ws_uuid = uuid.UUID(str(ws_id))
+            business_context = get_unified_business_context(ws_uuid, p_uuid)
+        except Exception as e:
+            logger.error(f"Error fetching unified business context in Triage: {e}")
+            business_context = {}
 
     # --- Layer 3: LLM Router ---
     logger.info("Layer 3: Running LLM Router (Chain-of-Thought)...")
@@ -293,7 +265,8 @@ def triage_node(state: AgencyState) -> dict:
         "is_follow_up": decision.is_follow_up,
         "extracted_entities": decision.extracted_entities,
         "routing_thought_process": decision.thought_process,
-        "current_channel": channel
+        "current_channel": channel,
+        "business_context": business_context
     }
 
 

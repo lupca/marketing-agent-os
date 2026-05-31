@@ -10,7 +10,7 @@ import uuid
 from core.db_services import get_creative_report_data
 from core.ollama_client import generate_text
 from core.decision_logger import log_decision
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger("graphs_creative_reporter")
@@ -23,7 +23,7 @@ def creative_report_node(state: AgencyState) -> dict:
     """
     logger.info("Executing Creative Reporter Node (DB Services Creative Analysis)...")
     
-    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+    workspace_id = state.get("workspace_id")
     ws_uuid = uuid.UUID(str(workspace_id))
     
     try:
@@ -37,32 +37,28 @@ def creative_report_node(state: AgencyState) -> dict:
         scaled_copies = data["scaled_copies"]
         creative_details_str = data["creative_details_str"]
         
-        # 2. Prompt tổng hợp cho LLM Qwen2.5
-        prompt = (
-            f"Bạn là Trợ lý Báo cáo Sáng tạo (Creative Reporter Agent) của CMO.\n"
-            f"Dưới đây là các số liệu hoạt động thực tế của ban Sáng Tạo được truy xuất từ CSDL hệ thống:\n\n"
-            f"SỐ LIỆU BAN SÁNG TẠO:\n"
-            f"- Tổng số góc tiếp cận chiến lược (Angles) đã xây dựng: {total_angles}\n"
-            f"- Tổng kịch bản được Sếp duyệt đăng (Scheduled): {scheduled_copies}\n"
-            f"- Tổng kịch bản đang chạy thực tế (Published): {published_copies}\n"
-            f"- Tổng kịch bản bị khai tử do CPA vượt ngưỡng (Killed): {killed_copies}\n"
-            f"- Tổng kịch bản được tăng ngân sách hiệu quả (Scaled): {scaled_copies}\n\n"
-            f"CHI TIẾT CÁC GÓC TIẾP CẬN VÀ KỊCH BẢN ĐÃ TẠO:\n"
-            f"{creative_details_str}\n\n"
-            f"YÊU CẦU TRẢ LỜI:\n"
-            f"1. Tổng hợp một bản báo cáo bằng Tiếng Việt chuyên nghiệp, cấu trúc Markdown rõ ràng, gãy gọn, có bảng biểu đẹp mắt.\n"
-            f"2. Đánh giá chất lượng sáng tạo: Các Angle đề xuất (Fear, Gain, v.v.), sự gãy gọn của thông điệp cốt lõi và khả năng chuyển đổi.\n"
-            f"3. Chỉ rõ các điểm sáng của copywriter (kịch bản được duyệt) và các bài học cần rút kinh nghiệm (kịch bản bị tắt/killed due to CPA).\n"
-            f"4. Trả lời với giọng văn của một Tech Lead/Creative Director am hiểu sâu sắc về số liệu và hành vi người dùng, đánh giá khách quan.\n\n"
-            f"BÁO CÁO PHÂN TÍCH CHI TIẾT:"
+        # 2. Load and format the dynamic Creative Reporter Prompt
+        from core.utils import load_prompt
+        creative_reporter_template = load_prompt("creative", "creative_reporter_system.txt")
+        prompt = creative_reporter_template.format(
+            total_angles=total_angles,
+            scheduled_copies=scheduled_copies,
+            published_copies=published_copies,
+            killed_copies=killed_copies,
+            scaled_copies=scaled_copies,
+            creative_details_str=creative_details_str
         )
         
         logger.info("Calling Ollama to synthesize creative activity report...")
-        report = generate_text(
-            prompt=prompt,
-            system_prompt="Bạn là Creative Reporter Agent chuyên nghiệp. Hãy viết báo cáo đánh giá sáng tạo chất lượng cao.",
-            workspace_id=workspace_id
-        )
+        try:
+            report = generate_text(
+                prompt=prompt,
+                system_prompt="Bạn là Creative Reporter Agent chuyên nghiệp. Hãy viết báo cáo đánh giá sáng tạo chất lượng cao.",
+                workspace_id=workspace_id
+            )
+        except Exception as e:
+            logger.error(f"Error calling LLM for creative report: {e}")
+            raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
         
         # Log quyết định vào CSDL
         log_decision(

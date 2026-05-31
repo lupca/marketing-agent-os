@@ -7,9 +7,10 @@ import logging
 import uuid
 from langchain_core.messages import AIMessage
 from core.db_services import get_brand_context, get_product_context
+from core.utils import load_prompt
 from core.ollama_client import generate_text
 from core.decision_logger import log_decision
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 
 logger = logging.getLogger("graphs_chat")
 logging.basicConfig(level=logging.INFO)
@@ -26,34 +27,20 @@ def chat_node(state: AgencyState) -> dict:
     messages = state.get("messages", [])
     query = messages[-1].content.strip() if messages else "Xin chào!"
 
-    # 1. Fetch brand and product context from dynamic DB services layer
-    ws_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
-    prod_id = state.get("product_id") or "00000000-0000-0000-0000-000000000005"
+    ws_id = state.get("workspace_id")
+    prod_id = state.get("product_id")
     
     brand = get_brand_context(uuid.UUID(str(ws_id)))
     product = get_product_context(uuid.UUID(str(prod_id)))
     
-    brand_info = f"Tên thương hiệu: {brand['brand_name']} | Định hướng/Slogan: {brand['slogan']}"
-    product_info = f"Tên sản phẩm: {product['name']} | Mô tả: {product['description']} | USP: {product['usp']}"
+    brand_info = f"Tên thương hiệu: {brand.get('brand_name', '')} | Định hướng/Slogan: {brand.get('slogan', '')}"
+    product_info = f"Tên sản phẩm: {product.get('name', '')} | Mô tả: {product.get('description', '')} | USP: {product.get('usp', '')}"
 
-    # 2. Design the dynamic Chat System Prompt
-    chat_system_prompt = (
-        f"Bạn là trợ lý AI của Marketing Agent OS — một hệ thống quản lý marketing thông minh.\n\n"
-        f"## Ngữ cảnh Doanh nghiệp hiện tại:\n"
-        f"- **Thương hiệu hiện tại:** {brand_info}\n"
-        f"- **Sản phẩm hiện tại:** {product_info}\n\n"
-        f"## Tính cách:\n"
-        f"- Thân thiện, chuyên nghiệp, ngắn gọn.\n"
-        f"- Luôn sẵn sàng giúp đỡ và hướng dẫn người dùng.\n\n"
-        f"## Khi người dùng hỏi về Thương hiệu hiện tại hoặc Sản phẩm hiện tại:\n"
-        f"- Hãy trả lời chính xác dựa trên thông tin Ngữ cảnh Doanh nghiệp được cung cấp ở trên. Tuyệt đối không bịa đặt hoặc trả lời mơ hồ, không dùng các placeholder như [tên thương hiệu].\n\n"
-        f"## Khi người dùng chào hỏi hoặc hỏi tổng quát:\n"
-        f"- Chào lại và giới thiệu ngắn gọn bạn có thể làm gì.\n\n"
-        f"## Các tính năng bạn có thể hướng dẫn:\n"
-        f"1. **Tạo chiến dịch marketing** — 'Lên chiến dịch quảng cáo mới cho [sản phẩm]'\n"
-        f"2. **Xem báo cáo hiệu suất** — 'Báo cáo CPA tuần này', 'Kịch bản nào đang đốt tiền?'\n"
-        f"3. **Tra cứu chính sách & tài liệu** — 'Facebook cấm từ khóa gì?', 'Chính sách TikTok ngành dược'\n\n"
-        f"Hãy trả lời câu hỏi của người dùng bằng Tiếng Việt một cách tự nhiên và hữu ích."
+    # 2. Load and format the dynamic Chat System Prompt
+    chat_system_template = load_prompt("supervisor", "chat_system.txt")
+    chat_system_prompt = chat_system_template.format(
+        brand_info=brand_info,
+        product_info=product_info
     )
 
     try:

@@ -55,7 +55,7 @@ async def update_settings(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Error saving workspace settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@workspace_router.get("/integrations", response_model=List[WorkspaceIntegrationSchema])
+@workspace_router.get("/integrations")
 async def get_integrations(db: Session = Depends(get_db)):
     try:
         ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
@@ -64,15 +64,15 @@ async def get_integrations(db: Session = Depends(get_db)):
         ).all()
         data = []
         for i in integrations:
-            data.append(WorkspaceIntegrationSchema(
-                id=str(i.id),
-                platform_name=i.platform_name,
-                config_key=i.config_key,
-                config_value=i.config_value,
-                is_active=i.is_active,
-                created_at=i.created_at.strftime('%Y-%m-%d %H:%M:%S') if i.created_at else None
-            ))
-        return data
+            data.append({
+                "id": str(i.id),
+                "platform_name": i.platform_name,
+                "config_key": i.config_key,
+                "config_value": i.config_value,
+                "is_active": i.is_active,
+                "created_at": i.created_at.strftime('%Y-%m-%d %H:%M:%S') if i.created_at else None
+            })
+        return {"status": "success", "data": data}
     except Exception as e:
         logger.error(f"Error fetching workspace integrations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -146,7 +146,7 @@ async def delete_integration(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Error deleting workspace integration: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@workspace_router.get("/models", response_model=List[AIModelSchema])
+@workspace_router.get("/models")
 async def get_models(db: Session = Depends(get_db)):
     try:
         ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
@@ -155,8 +155,8 @@ async def get_models(db: Session = Depends(get_db)):
         # For now, let's keep it here but using the new response model.
         if not models:
              # Just return empty list or handle seeding if absolutely necessary
-             return []
-        return [AIModelSchema.model_validate(m) for m in models]
+             return {"status": "success", "data": []}
+        return {"status": "success", "data": [AIModelSchema.model_validate(m).model_dump() for m in models]}
     except Exception as e:
         logger.error(f"Error fetching workspace models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

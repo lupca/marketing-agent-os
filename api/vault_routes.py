@@ -33,7 +33,7 @@ async def get_vault_contents(db: Session = Depends(get_db)):
         
             data.append(VaultContentSchema(
                 id=str(mc.id),
-                campaign_name=camp.name if camp else "Chiến dịch tự trị",
+                campaign_name=camp.name if camp else "",
                 core_message=mc.core_message,
                 created_at=mc.created_at.strftime('%d/%m/%Y %H:%M') if mc.created_at else None,
                 variants=variants_list

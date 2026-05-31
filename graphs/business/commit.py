@@ -1,7 +1,7 @@
 # graphs/commit.py
 import logging
 import uuid
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 from core.decision_logger import log_decision
 
 logger = logging.getLogger("graphs_commit")

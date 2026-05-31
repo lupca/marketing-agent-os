@@ -13,9 +13,23 @@ def log_decision(workspace_id, agent_name: str, action: str, decision_status: st
     """
     with get_session() as db:
         try:
+            ws_id = None
+            if workspace_id:
+                if isinstance(workspace_id, uuid.UUID):
+                    ws_id = workspace_id
+                else:
+                    ws_id = uuid.UUID(str(workspace_id))
+            
+            c_id = None
+            if campaign_id:
+                if isinstance(campaign_id, uuid.UUID):
+                    c_id = campaign_id
+                else:
+                    c_id = uuid.UUID(str(campaign_id))
+                    
             decision = AgentDecision(
-                workspace_id=uuid.UUID(str(workspace_id)) if isinstance(workspace_id, str) else workspace_id,
-                campaign_id=uuid.UUID(str(campaign_id)) if campaign_id else None,
+                workspace_id=ws_id,
+                campaign_id=c_id,
                 agent_name=agent_name,
                 action=action,
                 decision_status=decision_status,

@@ -8,7 +8,7 @@ import logging
 import uuid
 from sqlalchemy.orm import Session
 from core.dependencies import get_session
-from core.models import BrandIdentity, ProductService, MasterContent, PlatformVariant, MarketingCampaign
+from core.models import BrandIdentity, ProductService, MasterContent, PlatformVariant, MarketingCampaign, CustomerPersona
 
 logger = logging.getLogger("core_db_services")
 logging.basicConfig(level=logging.INFO)
@@ -19,28 +19,20 @@ def get_brand_context(workspace_id: uuid.UUID) -> dict:
     Truy vấn thông tin thương hiệu của Workspace hiện tại.
     """
     with get_session() as db:
-        brand_data = {
-            "brand_name": "Không rõ (Chưa thiết lập thương hiệu)",
-            "slogan": "",
-            "keywords": [],
-            "voice_and_tone": "",
-            "dos": [],
-            "donts": []
-        }
         try:
             brand = db.query(BrandIdentity).filter_by(workspace_id=workspace_id).first()
             if brand:
-                brand_data["brand_name"] = brand.brand_name
-                if brand.core_messaging:
-                    brand_data["slogan"] = brand.core_messaging.get("slogan", "")
-                    brand_data["keywords"] = brand.core_messaging.get("keywords", [])
-                brand_data["voice_and_tone"] = brand.voice_and_tone or ""
-                if brand.dos_and_donts:
-                    brand_data["dos"] = brand.dos_and_donts.get("dos", [])
-                    brand_data["donts"] = brand.dos_and_donts.get("donts", [])
+                return {
+                    "brand_name": brand.brand_name or "",
+                    "slogan": brand.core_messaging.get("slogan", "") if brand.core_messaging else "",
+                    "keywords": brand.core_messaging.get("keywords", []) if brand.core_messaging else [],
+                    "voice_and_tone": brand.voice_and_tone or "",
+                    "dos": brand.dos_and_donts.get("dos", []) if brand.dos_and_donts else [],
+                    "donts": brand.dos_and_donts.get("donts", []) if brand.dos_and_donts else []
+                }
         except Exception as e:
             logger.error(f"Error in get_brand_context: {e}")
-        return brand_data
+        return {}
 
 
 def get_product_context(product_id: uuid.UUID) -> dict:
@@ -48,24 +40,19 @@ def get_product_context(product_id: uuid.UUID) -> dict:
     Truy vấn thông tin chi tiết sản phẩm dịch vụ hiện tại.
     """
     with get_session() as db:
-        product_data = {
-            "name": "Không rõ (Chưa thiết lập sản phẩm)",
-            "description": "",
-            "usp": "",
-            "key_features": [],
-            "key_benefits": [],
-            "price": 0.0,
-            "cost": 0.0,
-            "margin": 0.0
-        }
         try:
             product = db.query(ProductService).filter_by(id=product_id).first()
             if product:
-                product_data["name"] = product.name
-                product_data["description"] = product.description or ""
-                product_data["usp"] = product.usp or ""
-                product_data["key_features"] = product.key_features or []
-                product_data["key_benefits"] = product.key_benefits or []
+                product_data = {
+                    "name": product.name or "",
+                    "description": product.description or "",
+                    "usp": product.usp or "",
+                    "key_features": product.key_features or [],
+                    "key_benefits": product.key_benefits or [],
+                    "price": 0.0,
+                    "cost": 0.0,
+                    "margin": 0.0
+                }
                 if product.default_offer and ";" in product.default_offer:
                     try:
                         price_str, cost_str = product.default_offer.split(";")
@@ -74,9 +61,10 @@ def get_product_context(product_id: uuid.UUID) -> dict:
                         product_data["margin"] = product_data["price"] - product_data["cost"]
                     except Exception as pe:
                         logger.error(f"Error parsing default offer pricing: {pe}")
+                return product_data
         except Exception as e:
             logger.error(f"Error in get_product_context: {e}")
-        return product_data
+        return {}
 
 
 def get_cpa_anchor(product_id: uuid.UUID, campaign_id: uuid.UUID = None) -> tuple[float, float]:
@@ -184,3 +172,52 @@ def get_performance_report_data(workspace_id: uuid.UUID) -> list[dict]:
         except Exception as e:
             logger.error(f"Error in get_performance_report_data: {e}")
             return []
+
+
+def get_persona_context(workspace_id: uuid.UUID) -> dict:
+    """
+    Truy vấn thông tin chân dung khách hàng của Workspace hiện tại.
+    """
+    with get_session() as db:
+        try:
+            persona = db.query(CustomerPersona).filter_by(workspace_id=workspace_id).first()
+            if persona:
+                return {
+                    "persona_name": persona.persona_name or "",
+                    "summary": persona.summary or "",
+                    "demographics": persona.demographics or {},
+                    "psychographics": persona.psychographics or {}
+                }
+        except Exception as e:
+            logger.error(f"Error in get_persona_context: {e}")
+        return {}
+
+
+def get_unified_business_context(workspace_id: uuid.UUID, product_id: uuid.UUID = None) -> dict:
+    """
+    Tổng hợp Brand Identity, Product/Service và Customer Persona thành một business_context hoàn chỉnh.
+    """
+    # 1. Lấy Brand Context
+    brand = get_brand_context(workspace_id)
+    
+    # 2. Lấy Product Context
+    p_id = product_id
+    if not p_id:
+        with get_session() as db:
+            try:
+                prod = db.query(ProductService).filter_by(workspace_id=workspace_id).first()
+                if prod:
+                    p_id = prod.id
+            except Exception as e:
+                logger.error(f"Error finding product in get_unified_business_context: {e}")
+    
+    product = get_product_context(p_id) if p_id else {}
+    
+    # 3. Lấy Persona Context
+    persona = get_persona_context(workspace_id)
+    
+    return {
+        "brand": brand,
+        "product": product,
+        "persona": persona
+    }

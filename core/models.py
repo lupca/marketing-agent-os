@@ -393,6 +393,19 @@ class WorkspaceIntegration(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+# 25. Model: ChatThread (Conversation Thread Manager for UI Multi-threading)
+class ChatThread(Base):
+    __tablename__ = "chat_threads"
+    
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    thread_id = Column(String(255), nullable=False, unique=True, index=True)
+    title = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+
 
 
 

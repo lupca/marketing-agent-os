@@ -9,7 +9,7 @@ import logging
 from core.dependencies import get_session
 from core.rag import retrieve_chunks_reranked
 from core.ollama_client import generate_text
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger("graphs_researcher")
@@ -60,34 +60,27 @@ def run_research(workspace_id: str, query: str, access_tags: list = None) -> str
             context_str = "\n\n".join(context_blocks)
 
             # Prompt synthesis
-            prompt = (
-                f"Bạn là Trợ lý Nghiên cứu Chính sách & Quảng cáo (Researcher Agent) của CMO.\n"
-                f"Dựa trên các tài liệu chính sách và tri thức thực tế được truy xuất dưới đây, "
-                f"hãy tổng hợp một câu trả lời chuyên sâu, đầy đủ, có số liệu và danh sách cụ thể "
-                f"để giải đáp câu hỏi của người dùng.\n\n"
-                f"TÀI LIỆU TRUY XUẤT ĐƯỢC:\n"
-                f"{context_str}\n\n"
-                f"CÂU HỎI CỦA NGƯỜI DÙNG:\n"
-                f"\"{query}\"\n\n"
-                f"YÊU CẦU TRẢ LỜI:\n"
-                f"1. Trả lời bằng Tiếng Việt chuyên nghiệp, rõ ràng, gãy gọn, có định dạng Markdown đẹp mắt.\n"
-                f"2. Nêu bật các từ khóa cấm, cơ chế quét tự động của nền tảng (Facebook/TikTok) và hậu quả đối với tài khoản quảng cáo.\n"
-                f"3. Đưa ra lời khuyên thực tế giúp nhà quảng cáo lách hoặc tránh vi phạm một cách an toàn.\n"
-                f"4. Không bịa đặt thông tin không có trong tài liệu.\n\n"
-                f"BÁO CÁO PHÂN TÍCH CHI TIẾT:"
+            from core.utils import load_prompt
+            researcher_template = load_prompt("research", "researcher_system.txt")
+            prompt = researcher_template.format(
+                context_str=context_str,
+                query=query
             )
 
             logger.info("[run_research] Calling Ollama to synthesize research report...")
-            report = generate_text(
-                prompt,
-                system_prompt="Bạn là Researcher Agent chuyên nghiệp. Hãy viết báo cáo phân tích tri thức chất lượng cao.",
-                workspace_id=workspace_id
-            )
+            try:
+                report = generate_text(
+                    prompt,
+                    system_prompt="Bạn là Researcher Agent chuyên nghiệp. Hãy viết báo cáo phân tích tri thức chất lượng cao.",
+                    workspace_id=workspace_id
+                )
+            except Exception as e:
+                raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
             return report.strip()
 
         except Exception as e:
             logger.error(f"[run_research] FATAL ERROR: {e}", exc_info=True)
-            raise RuntimeError(f"Lỗi truy xuất hoặc xử lý tri thức Researcher Agent: {str(e)}") from e
+            raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
 def researcher_node(state: AgencyState) -> dict:
     """LangGraph Node cho Researcher Agent."""
     logger.info("Executing Researcher Node (Zero-JOIN RAG Policy Research)...")

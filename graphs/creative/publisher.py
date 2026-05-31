@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from core.dependencies import get_session
 from core.models import PlatformVariant, MasterContent, Workspace, MarketingCampaign
 from core.decision_logger import log_decision
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 
 logger = logging.getLogger("graphs_publisher")
 logging.basicConfig(level=logging.INFO)

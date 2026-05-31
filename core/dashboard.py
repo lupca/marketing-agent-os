@@ -13,8 +13,6 @@ from sqlalchemy import text
 logger = logging.getLogger("core_dashboard")
 logging.basicConfig(level=logging.INFO)
 
-SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
-SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
 
 def auto_seed_dashboard_data(db: Session):
     """
@@ -23,10 +21,18 @@ def auto_seed_dashboard_data(db: Session):
     to make the CMO BI Dashboard immediately spectacular and responsive.
     """
     logger.info("Checking database data density for CMO BI Dashboard...")
-    ws = db.query(Workspace).filter_by(id=uuid.UUID(SEED_WORKSPACE_ID)).first()
+    ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+    if not ws:
+        ws = db.query(Workspace).first()
     if not ws:
         logger.warning("Default workspace not found, skipping dashboard seeding.")
         return
+        
+    # Get seeded product ID dynamically
+    prod = db.query(ProductService).filter_by(workspace_id=ws.id).first()
+    if not prod:
+        prod = db.query(ProductService).first()
+    product_id = prod.id if prod else None
         
     variant_count = db.query(PlatformVariant).filter(PlatformVariant.workspace_id == ws.id).count()
     rag_count = db.execute(text("SELECT COUNT(*) FROM rag_chunks WHERE access_tags ?| ARRAY['anti_patterns']")).scalar()
@@ -45,7 +51,7 @@ def auto_seed_dashboard_data(db: Session):
         camp = MarketingCampaign(
             id=uuid.uuid4(),
             workspace_id=ws.id,
-            product_id=uuid.UUID(SEED_PRODUCT_ID),
+            product_id=product_id,
             name="Chiến dịch Bùng nổ AI Agent Q2",
             campaign_type="Social + Search Ads",
             status="active",
@@ -318,7 +324,9 @@ def get_dashboard_analytics(db: Session) -> dict:
     # 1. Ensure database is populated with sample data if barren
     auto_seed_dashboard_data(db)
     
-    ws = db.query(Workspace).filter_by(id=uuid.UUID(SEED_WORKSPACE_ID)).first()
+    ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+    if not ws:
+        ws = db.query(Workspace).first()
     if not ws:
         return {"error": "Workspace not found"}
         
@@ -576,11 +584,17 @@ def simulate_scenario(test_budget: float, price: float, cost: float, db: Session
     }
     
     # Try to fetch real average CPAs from platform variants in database
-    ws_id = uuid.UUID(SEED_WORKSPACE_ID)
-    variants = db.query(PlatformVariant).filter(
-        PlatformVariant.workspace_id == ws_id,
-        PlatformVariant.publish_status.in_(["scaled", "published"])
-    ).all()
+    ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+    if not ws:
+        ws = db.query(Workspace).first()
+    ws_id = ws.id if ws else None
+    
+    variants = []
+    if ws_id:
+        variants = db.query(PlatformVariant).filter(
+            PlatformVariant.workspace_id == ws_id,
+            PlatformVariant.publish_status.in_(["scaled", "published"])
+        ).all()
     
     channel_spends = {"Google": 0.0, "Facebook": 0.0, "TikTok": 0.0}
     channel_convs = {"Google": 0, "Facebook": 0, "TikTok": 0}

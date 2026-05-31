@@ -46,12 +46,12 @@ class AIModelSchema(BaseModel):
     model_id: str
     name: str
     provider: str
-    description: str
+    description: Optional[str] = None
     category: str
     tags: List[str]
-    series: str
-    context_window: str
-    model_size: str
+    series: Optional[str] = None
+    context_window: Optional[str] = None
+    model_size: Optional[str] = None
     is_custom: bool
     is_new: bool
     special_badge: Optional[str] = None

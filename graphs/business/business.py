@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from core.dependencies import get_session
 from core.models import ProductService, PlatformVariant, MarketingCampaign
 from core.db_services import get_cpa_anchor
-from graphs.state import AgencyState
+from graphs.supervisor.state import AgencyState
 from core.decision_logger import log_decision
 from langchain_core.messages import AIMessage
+from core.utils import load_prompt, trim_and_log
 
 logger = logging.getLogger("graphs_business")
 logging.basicConfig(level=logging.INFO)
@@ -178,29 +179,19 @@ def performance_node(state: AgencyState) -> dict:
             )
         details_str = "\n".join(variant_details) if variant_details else "(Chưa có kịch bản quảng cáo nào được ghi nhận)"
     
-        # 3. Design the high-quality LLM prompt
-        prompt = (
-            f"Bạn là Trợ lý Báo cáo Hiệu suất (Performance Reporter Agent) của ban Kinh Doanh.\n"
-            f"Dưới đây là các số liệu hiệu suất chiến dịch thực tế được truy xuất từ CSDL hệ thống:\n\n"
-            f"TỔNG THỂ HIỆU SUẤT CHIẾN DỊCH:\n"
-            f"- Tổng số kịch bản quảng cáo được đánh giá: {total_variants}\n"
-            f"- Số kịch bản đã tắt (KILLED - do CPA vượt ngưỡng): {killed_count}\n"
-            f"- Số kịch bản được tăng ngân sách (SCALED - hoạt động hiệu quả): {scaled_count}\n"
-            f"- Số kịch bản đang chạy (PUBLISHED): {published_count}\n"
-            f"- Tổng lượt xem (Views): {total_views:,}\n"
-            f"- Tổng lượt thích (Likes): {total_likes:,}\n"
-            f"- Tổng lượt chia sẻ (Shares): {total_shares:,}\n"
-            f"- Tổng lượt bình luận (Comments): {total_comments:,}\n"
-            f"- CPA Target (Ngưỡng tối đa cho phép): {target_cpa:,.0f} VNĐ\n\n"
-            f"CHI TIẾT TỪNG KỊCH BẢN QUẢNG CÁO:\n"
-            f"{details_str}\n\n"
-            f"YÊU CẦU TRẢ LỜI:\n"
-            f"1. Tổng hợp một bản báo cáo hiệu suất bằng Tiếng Việt chuyên nghiệp gửi cho CMO.\n"
-            f"2. Bắt buộc có bảng biểu Markdown hiển thị so sánh hiệu suất giữa các kịch bản quảng cáo. Bảng gồm các cột: Kênh, Lượt xem, Lượt thích, CPA thực tế, CPA Target, Trạng thái tối ưu, Tóm tắt nội dung.\n"
-            f"3. Phân tích cụ thể lý do tại sao một số kịch bản bị khai tử (KILLED) và tại sao một số kịch bản được tăng ngân sách (SCALED). Nhận xét mối quan hệ giữa lượt xem, tương tác và CPA.\n"
-            f"4. Đề xuất các khuyến nghị hành động cụ thể tiếp theo cho CMO để tối ưu hóa hiệu quả kinh doanh của toàn chiến dịch (ví dụ: chuyển ngân sách sang kênh nào, yêu cầu sáng tạo viết lại gì).\n"
-            f"5. Giữ giọng văn cực kỳ chuyên nghiệp, sắc bén của một Performance Marketing Director, phân tích dựa trên dữ liệu cụ thể, không nói chung chung.\n\n"
-            f"BÁO CÁO PHÂN TÍCH HIỆU SUẤT CHI TIẾT:"
+        # 3. Load and format the dynamic Performance Prompt
+        performance_template = load_prompt("business", "performance_system.txt")
+        prompt = performance_template.format(
+            total_variants=total_variants,
+            killed_count=killed_count,
+            scaled_count=scaled_count,
+            published_count=published_count,
+            total_views=total_views,
+            total_likes=total_likes,
+            total_shares=total_shares,
+            total_comments=total_comments,
+            target_cpa=target_cpa,
+            details_str=details_str
         )
     
         try:
@@ -213,7 +204,7 @@ def performance_node(state: AgencyState) -> dict:
             )
         except Exception as e:
             logger.error(f"Error calling LLM for performance report: {e}")
-            # Robust fallback
+            raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
             report = (
                 f"### Báo Cáo Hiệu Suất Chiến Dịch (Fallback từ CSDL)\n\n"
                 f"Do sự cố kết nối LLM, dưới đây là tóm tắt thô từ CSDL:\n\n"

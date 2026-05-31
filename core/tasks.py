@@ -309,7 +309,7 @@ def publish_to_social(self, variant_id: str):
             from core.utils import get_integration_config
             integration_configs = get_integration_config(variant.workspace_id, "upload-post")
             
-            api_key = integration_configs.get("api_key") or os.getenv("UPLOAD_POST_API_KEY")
+            api_key = integration_configs.get("api_key")
             if not api_key:
                 raise UploadPostAuthError("UPLOAD_POST_API_KEY is not configured in workspace integrations or env.")
             

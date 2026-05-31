@@ -22,7 +22,7 @@ except Exception as e:
         local_reranker = None
 
 
-def rerank_documents(query: str, documents: list, workspace_id: str = "00000000-0000-0000-0000-000000000002") -> list:
+def rerank_documents(query: str, documents: list, workspace_id: str = None) -> list:
     """
     Reranks documents using the local BAAI/bge-reranker-large model running on local GPU.
     Runs fast (~10ms) and costs $0.00!

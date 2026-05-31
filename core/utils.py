@@ -8,13 +8,13 @@ from core.ollama_client import get_trimmed_context
 
 logger = logging.getLogger("core_utils")
 
-def parse_llm_json(response_str: str, fallback_data: dict) -> dict:
+def parse_llm_json(response_str: str) -> dict:
     """
     Cleans and parses the LLM JSON response. 
-    If parsing fails, returns fallback_data.
+    If parsing fails, raises ValueError.
     """
     if not response_str:
-        return fallback_data
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục")
         
     try:
         # Clean potential markdown block wraps
@@ -38,7 +38,7 @@ def parse_llm_json(response_str: str, fallback_data: dict) -> dict:
         return data
     except Exception as e:
         logger.error(f"Error parsing LLM JSON: {e}. Raw response: {response_str[:200]}")
-        return fallback_data
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
 
 def trim_and_log(
     state: Dict[str, Any],
@@ -109,3 +109,14 @@ def get_integration_config(workspace_id: str, platform_name: str) -> dict:
         except Exception as e:
             logger.error(f"Error fetching integration config for platform {platform_name}: {e}")
             return {}
+
+def load_prompt(subfolder: str, filename: str) -> str:
+    """
+    Dynamically loads prompt templates from separate txt files in the prompts/ directory.
+    """
+    import os
+    prompt_path = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "prompts", subfolder, filename
+    ))
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        return f.read().strip()

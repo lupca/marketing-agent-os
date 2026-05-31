@@ -6,21 +6,9 @@ from sqlalchemy.orm import Session
 from core.dependencies import get_session
 from core.models import ProductService
 from core.ollama_client import generate_text
-from graphs.researcher import run_research
-from graphs.state import AgencyState
-from reference.prompt.prompts import (
-    ANGLE_STRATEGIST_PROMPT,
-    MASTER_CONTENT_GENERATOR_PROMPT,
-    PLATFORM_VARIANT_GENERATOR_PROMPT,
-    EDITOR_BRAND_GUARDIAN_PROMPT
-)
-from core.utils import parse_llm_json, trim_and_log
-from reference.prompt.fallbacks import (
-    STRATEGIST_FALLBACK,
-    COPYWRITER_MASTER_FALLBACK,
-    FB_VARIANT_FALLBACK,
-    GUARDIAN_FALLBACK
-)
+from graphs.research.researcher import run_research
+from graphs.supervisor.state import AgencyState, CreativeState
+from core.utils import parse_llm_json, trim_and_log, load_prompt
 from config.settings import (
     MAX_CONTEXT_TOKENS,
     LLM_CTX_WINDOW,
@@ -37,36 +25,53 @@ logging.basicConfig(level=logging.INFO)
 # ==========================================
 
 def build_strategist_prompt(
-    state: AgencyState, 
-    product_name: str, 
-    product_usp: str, 
+    state: dict, 
     anti_patterns_report: str, 
-    insights_str: str,
-    brand_data: dict = None
+    insights_str: str
 ) -> str:
     """Build the prompt for Strategist Agent incorporating RAG findings and dynamic brand identity."""
-    if not brand_data:
-        brand_data = {
-            "brand_name": "G-Agent Tech",
-            "voice_and_tone": "Chuyên nghiệp, sắc bén, số liệu thực tế",
-            "keywords": "AI Agent, LangGraph, Tối ưu CPA"
-        }
+    business_context = state.get("business_context") or {}
+    brand = business_context.get("brand") or {}
+    product = business_context.get("product") or {}
+    persona = business_context.get("persona") or {}
     
-    base_prompt = ANGLE_STRATEGIST_PROMPT.format(
+    brand_name = brand.get("brand_name") or ""
+    brand_voice = brand.get("voice_and_tone") or ""
+    
+    keywords_list = brand.get("keywords") or []
+    brand_keywords = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+    
+    product_name = product.get("name") or ""
+    product_usp = product.get("usp") or ""
+    
+    features_list = product.get("key_features") or []
+    product_features = ", ".join(features_list) if isinstance(features_list, list) else str(features_list)
+    
+    benefits_list = product.get("key_benefits") or []
+    product_benefits = ", ".join(benefits_list) if isinstance(benefits_list, list) else str(benefits_list)
+    
+    persona_name = persona.get("persona_name") or ""
+    persona_goals = persona.get("summary") or ""
+    
+    pains = persona.get("psychographics", {}).get("pains") or []
+    persona_pain_points = ", ".join(pains) if isinstance(pains, list) else str(pains)
+    
+    strategist_template = load_prompt("creative", "strategist.txt")
+    base_prompt = strategist_template.format(
         num_angles=1,
         funnel_stage="Consideration",
-        campaign_name=state.get("campaign_name", "Chiến dịch tăng doanh số"),
+        campaign_name=state.get("campaign_name") or "",
         campaign_goal="Tối ưu chi phí chuyển đổi ads",
-        brand_name=brand_data.get("brand_name", "G-Agent Tech"),
-        brand_voice=brand_data.get("voice_and_tone", "Chuyên nghiệp, sắc bén, số liệu thực tế"),
-        brand_keywords=", ".join(brand_data.get("keywords", [])) if isinstance(brand_data.get("keywords"), list) else brand_data.get("keywords", ""),
+        brand_name=brand_name,
+        brand_voice=brand_voice,
+        brand_keywords=brand_keywords,
         product_name=product_name,
         product_usp=product_usp,
-        product_features="Analyst Node, Copywriter Node, Auto scale/kill ads",
-        product_benefits="Tối ưu CPA 100%, Giải phóng 80% thời gian",
-        persona_name="Sếp CMO bận rộn",
-        persona_goals="Tự động hóa ads, Vít ngân sách ổn định",
-        persona_pain_points="CPA tăng vọt, Thiếu thời gian duyệt kịch bản",
+        product_features=product_features,
+        product_benefits=product_benefits,
+        persona_name=persona_name,
+        persona_goals=persona_goals,
+        persona_pain_points=persona_pain_points,
         language="Vietnamese"
     )
     
@@ -79,11 +84,28 @@ def build_strategist_prompt(
     )
 
 def build_copywriter_master_prompt(
-    state: AgencyState, 
+    state: dict, 
     target_cpa: float, 
     test_budget: float
 ) -> str:
     """Build the prompt for Copywriter Master content generation."""
+    business_context = state.get("business_context") or {}
+    brand = business_context.get("brand") or {}
+    persona = business_context.get("persona") or {}
+    
+    brand_name = brand.get("brand_name") or ""
+    brand_voice = brand.get("voice_and_tone") or ""
+    
+    keywords_list = brand.get("keywords") or []
+    brand_keywords = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+    brand_mission = brand.get("slogan") or ""
+    
+    persona_name = persona.get("persona_name") or ""
+    persona_goals = persona.get("summary") or ""
+    
+    pains = persona.get("psychographics", {}).get("pains") or []
+    persona_pain_points = ", ".join(pains) if isinstance(pains, list) else str(pains)
+
     angle = state.get("current_angle", {})
     feedback_loop = state.get("killed_variants_feedback", [])
     
@@ -107,16 +129,17 @@ def build_copywriter_master_prompt(
                 f"👉 YÊU CẦU: Tuyệt đối KHÔNG sử dụng lại văn phong, tít hoặc lối tiếp cận cũ này. Hãy đổi sang Angle hoàn toàn khác!\n"
             )
             
-    master_prompt = MASTER_CONTENT_GENERATOR_PROMPT.format(
-        campaign_name="Tối ưu chuyển đổi Ads bằng AI",
+    master_template = load_prompt("creative", "master_generator.txt")
+    master_prompt = master_template.format(
+        campaign_name=state.get("campaign_name") or "",
         campaign_goal=f"Đạt CPA dưới {target_cpa} VNĐ",
-        brand_name="G-Agent Tech",
-        brand_mission="Tự động hóa 80% Marketing doanh nghiệp",
-        brand_keywords="AI Agent, LangGraph, Tối ưu CPA",
-        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
-        persona_name="Sếp CMO bận rộn",
-        persona_goals="Vít ads ổn định, tự động hóa duyệt bài",
-        persona_pain_points="CPA ads tăng vọt, tốn thời gian",
+        brand_name=brand_name,
+        brand_mission=brand_mission,
+        brand_keywords=brand_keywords,
+        brand_voice=brand_voice,
+        persona_name=persona_name,
+        persona_goals=persona_goals,
+        persona_pain_points=persona_pain_points,
         language="Vietnamese"
     )
     
@@ -125,12 +148,21 @@ def build_copywriter_master_prompt(
     return master_prompt
 
 def build_copywriter_variant_prompt(
-    state: AgencyState, 
+    state: dict, 
     master_content: dict, 
     target_cpa: float, 
     test_budget: float
 ) -> str:
     """Build the prompt for platform adaptation (Facebook variant)."""
+    business_context = state.get("business_context") or {}
+    brand = business_context.get("brand") or {}
+    persona = business_context.get("persona") or {}
+    
+    brand_voice = brand.get("voice_and_tone") or ""
+    
+    persona_name = persona.get("persona_name") or ""
+    persona_characteristics = persona.get("summary") or ""
+
     feedback_loop = state.get("killed_variants_feedback", [])
     
     cpa_constraints = (
@@ -152,7 +184,8 @@ def build_copywriter_variant_prompt(
                 f"👉 YÊU CẦU: Tuyệt đối KHÔNG sử dụng lại văn phong, tít hoặc lối tiếp cận cũ này. Hãy đổi sang Angle hoàn toàn khác!\n"
             )
             
-    variant_prompt = PLATFORM_VARIANT_GENERATOR_PROMPT.format(
+    variant_template = load_prompt("creative", "platform_variant.txt")
+    variant_prompt = variant_template.format(
         platform="facebook",
         core_message=master_content.get("core_message", ""),
         extended_message=master_content.get("extended_message", ""),
@@ -161,9 +194,9 @@ def build_copywriter_variant_prompt(
         char_limit="63206 chars",
         platform_guidelines="Conversational, community-focused, emoji-driven, rich storytelling",
         content_format="Social Post",
-        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
-        persona_name="Sếp CMO bận rộn",
-        persona_characteristics="Không có thời gian, đau đầu vì CPA tăng vọt",
+        brand_voice=brand_voice,
+        persona_name=persona_name,
+        persona_characteristics=persona_characteristics,
         language="Vietnamese"
     )
     
@@ -171,15 +204,25 @@ def build_copywriter_variant_prompt(
     return variant_prompt
 
 def build_brand_guardian_prompt(
-    state: AgencyState, 
+    state: dict, 
     master_content: dict, 
     fb_copy: str
 ) -> str:
     """Build the compliance check prompt for Brand Guardian."""
-    guardian_prompt = EDITOR_BRAND_GUARDIAN_PROMPT.format(
-        brand_name="G-Agent Tech",
-        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
-        brand_keywords="AI Agent, LangGraph, Tối ưu CPA"
+    business_context = state.get("business_context") or {}
+    brand = business_context.get("brand") or {}
+    
+    brand_name = brand.get("brand_name") or ""
+    brand_voice = brand.get("voice_and_tone") or ""
+    
+    keywords_list = brand.get("keywords") or []
+    brand_keywords = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+
+    brand_guardian_template = load_prompt("creative", "brand_guardian.txt")
+    guardian_prompt = brand_guardian_template.format(
+        brand_name=brand_name,
+        brand_voice=brand_voice,
+        brand_keywords=brand_keywords
     )
     
     guardian_prompt += (
@@ -194,35 +237,33 @@ def build_brand_guardian_prompt(
 # GRAPH NODES
 # ==========================================
 
-def strategist_node(state: AgencyState) -> dict:
+def strategist_node(state: CreativeState) -> dict:
     """
     Strategist Node (Ban Sáng Tạo).
     Reads RAG psychological/economic insights, enforces RAG anti-patterns injection,
     and creates a structured content marketing angle strategy.
     """
     logger.info("Executing Strategist Node (Marketing Angle Formulation)...")
-    from core.db_services import get_brand_context
     workspace_id = state.get("workspace_id")
-    product_id = state.get("product_id")
-
-    with get_session() as db:
-        # 1. Fetch Product details
-        product = None
-        if product_id:
-            try:
-                product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
-            except Exception:
-                pass
-        if not product:
-            product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
-        
-        product_name = product.name if product else "Sản phẩm AI"
-        product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
     
-        # 2. Fetch Brand details dynamically
-        brand_data = get_brand_context(workspace_id)
+    # Safely ensure business_context is present
+    business_context = state.get("business_context")
+    if not business_context:
+        from core.db_services import get_unified_business_context
+        product_id = state.get("product_id")
+        try:
+            ws_uuid = uuid.UUID(str(workspace_id)) if workspace_id else None
+            p_uuid = uuid.UUID(str(product_id)) if product_id else None
+            business_context = get_unified_business_context(ws_uuid, p_uuid)
+            state = dict(state)
+            state["business_context"] = business_context
+        except Exception as e:
+            logger.error(f"Error fetching unified context in strategist_node fallback: {e}")
+            business_context = {}
+            
+    product_name = business_context.get("product", {}).get("name") or ""
 
-    # 3. Get customer insights from Researcher (dùng access_tags phân quyền đúng)
+    # Get customer insights from Researcher (dùng access_tags phân quyền đúng)
     logger.info("Calling Researcher Agent for customer insights...")
     try:
         # Insights tâm lý/chiến lược: truy cập cả marketing, psychology, economics
@@ -242,12 +283,15 @@ def strategist_node(state: AgencyState) -> dict:
         raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo từ Researcher: {e}") from e
     
     # 4. Build Prompt & Generate
-    final_prompt = build_strategist_prompt(state, product_name, product_usp, anti_patterns_report, insights_str, brand_data=brand_data)
+    final_prompt = build_strategist_prompt(state, anti_patterns_report, insights_str)
     
     logger.info("Generating marketing angle strategy from Ollama...")
     system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
     res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True, workspace_id=workspace_id)
-    angle_data = parse_llm_json(res_str, fallback_data=STRATEGIST_FALLBACK)
+    try:
+        angle_data = parse_llm_json(res_str)
+    except Exception as e:
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
 
     logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
 
@@ -272,13 +316,13 @@ def strategist_node(state: AgencyState) -> dict:
         log_metadata=angle_data
     )
 
-def copywriter_node(state: AgencyState) -> dict:
+def copywriter_node(state: CreativeState) -> dict:
     """
     Copywriter Node (Ban Sáng Tạo).
     Constructs creative copies strictly constrained under Target CPA and Budget.
     """
     logger.info("Executing Copywriter Node (Constraint-Driven Content Generation)...")
-    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+    workspace_id = state.get("workspace_id")
     
     target_cpa = state.get("target_cpa", DEFAULT_TARGET_CPA)
     test_budget = state.get("test_budget", DEFAULT_TEST_BUDGET)
@@ -286,14 +330,20 @@ def copywriter_node(state: AgencyState) -> dict:
     # 1. Generate Master Content
     master_prompt = build_copywriter_master_prompt(state, target_cpa, test_budget)
     logger.info("Generating Master Content via Ollama...")
-    master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
-    master_content = parse_llm_json(master_res, fallback_data=COPYWRITER_MASTER_FALLBACK)
+    try:
+        master_res = generate_text(master_prompt, system_prompt="You are a master copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
+        master_content = parse_llm_json(master_res)
+    except Exception as e:
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
 
     # 2. Generate Platform Adaptation (Facebook variant)
     variant_prompt = build_copywriter_variant_prompt(state, master_content, target_cpa, test_budget)
     logger.info("Generating Facebook Platform Variant...")
-    var_res = generate_text(variant_prompt, system_prompt="You are a platform optimization copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
-    fb_variant = parse_llm_json(var_res, fallback_data=FB_VARIANT_FALLBACK)
+    try:
+        var_res = generate_text(variant_prompt, system_prompt="You are a platform optimization copywriter. Output JSON only.", json_format=True, workspace_id=workspace_id)
+        fb_variant = parse_llm_json(var_res)
+    except Exception as e:
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
     fb_variant["platform"] = "facebook"
     
     copy_msg = (
@@ -320,13 +370,13 @@ def copywriter_node(state: AgencyState) -> dict:
         }
     )
 
-def brand_guardian_node(state: AgencyState) -> dict:
+def brand_guardian_node(state: CreativeState) -> dict:
     """
     Brand Guardian Node (Ban Sáng Tạo).
     Enforces the strict CMO 100-Point compliance check.
     """
     logger.info("Executing Brand Guardian Node (Scoring Compliance Gatekeeper)...")
-    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+    workspace_id = state.get("workspace_id")
     
     master_content = state.get("master_content", {})
     variants = state.get("variants", [])
@@ -340,8 +390,11 @@ def brand_guardian_node(state: AgencyState) -> dict:
     # Run evaluation
     guardian_prompt = build_brand_guardian_prompt(state, master_content, fb_copy)
     logger.info("Running compliance scoring via Ollama...")
-    res_str = generate_text(guardian_prompt, system_prompt="You are the Brand Guardian. Score compliance in valid JSON.", json_format=True, workspace_id=workspace_id)
-    eval_data = parse_llm_json(res_str, fallback_data=GUARDIAN_FALLBACK)
+    try:
+        res_str = generate_text(guardian_prompt, system_prompt="You are the Brand Guardian. Score compliance in valid JSON.", json_format=True, workspace_id=workspace_id)
+        eval_data = parse_llm_json(res_str)
+    except Exception as e:
+        raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
     
     score = int(eval_data.get("score", 75))
     reason = eval_data.get("feedback_reason" if "feedback_reason" in eval_data else "reason", "Chưa đạt tiêu chí Hook hoặc CTA.")

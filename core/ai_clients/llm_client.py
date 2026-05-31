@@ -99,7 +99,7 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
         except Exception as e:
             logger.error(f"Error loading dynamic LLM client: {e}")
             raise
-def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False, workspace_id: str = "00000000-0000-0000-0000-000000000002") -> str:
+def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False, workspace_id: str = None) -> str:
     """Generate text using SiliconFlow ChatOpenAI model dynamically configured by workspace settings."""
     try:
         model = get_dynamic_llm_client(str(workspace_id), json_format=json_format)

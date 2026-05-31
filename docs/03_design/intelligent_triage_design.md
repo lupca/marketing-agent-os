@@ -1,199 +1,88 @@
-# INTELLIGENT SUPERVISOR HUB — Thiết Kế 4-Layer Triage Architecture (v3.0)
+# INTELLIGENT SUPERVISOR HUB (v4.0) — Kiến Trúc "Thư Ký Riêng" (Knowledge-First)
 
-**Thay thế:** Vector-Only Semantic Router (v2.1)
-**Áp dụng từ:** Sprint 3 — Triage Upgrade
-**Chịu trách nhiệm:** Chief Architect
-
----
-
-## 1. Tổng Quan & Lý Do Nâng Cấp
-
-### Vấn đề của Vector-Only Router (v2.1)
-
-```
-messages[-1] → embed → cosine distance → if distance < 0.30 → intent
-```
-
-| Hạn chế | Ví dụ cụ thể |
-|---|---|
-| Mất ngữ cảnh hội thoại | User đang tạo chiến dịch dở, nhắn "sửa ngân sách 5 triệu" → router phân loại sai thành `chat` |
-| Không phát hiện follow-up | Câu nối tiếp bị xử lý như yêu cầu mới hoàn toàn |
-| Vector quyết định trực tiếp | pgvector chỉ đo khoảng cách, không hiểu ngữ nghĩa ngữ cảnh |
-| Không trích xuất entities | Các node phía sau phải tự parse lại từ câu nói người dùng |
-
-### Giải pháp: 4-Layer Intelligent Supervisor Hub
-
-pgvector chuyển vai trò từ "bộ não ra quyết định" → "bộ nhớ cung cấp gợi ý cho LLM". LLM mới là bộ não thực sự với khả năng Chain-of-Thought reasoning.
+**Thay thế:** Kiến trúc Triage-First (v3.0) — Khô khan và mù tri thức.
+**Áp dụng từ:** Sprint 4 — Hệ Điều Hành Marketing Tỉnh Táo.
+**Chịu trách nhiệm:** Chief Architect & CTO (Dựa trên chỉ đạo trực tiếp của CMO).
 
 ---
 
-## 2. Sơ Đồ Luồng 4-Layer
+## 1. Triết Lý Thiết Kế (The "Assistant-First" Philosophy)
+
+Trong kinh doanh, tri thức là sức mạnh. Một hệ điều hành AI không được phép điều hướng người dùng đi lòng vòng khi chính nó đang nắm giữ câu trả lời trong tay.
+
+*   **Sai lầm của v3.0:** Đưa con "Lính gác cổng" (Triage) ra trước. Thằng này chỉ biết luật, không biết dữ liệu, dẫn đến việc sếp hỏi về thương hiệu mà nó lại dẫn đi tính tiền quảng cáo (Analyst).
+*   **Kiến trúc v4.0:** Đưa con **"Thư ký riêng" (Chat Agent)** đứng trước. Con này được trang bị toàn bộ tri thức doanh nghiệp (RAG + Brand DNA). Nhiệm vụ của nó là **Hứng và Thấu hiểu** trước khi **Điều hướng**.
+
+---
+
+## 2. Sơ Đồ Luồng Kiến Trúc Mới
 
 ```mermaid
 flowchart TD
-    IN([User Message]) --> L1
-
-    subgraph L1["Layer 1: Context Aggregator"]
-        LA[Lấy 10 tin nhắn gần nhất]
-        LB[Đọc sop_stage hiện tại]
-        LC[Kiểm tra campaign_id có không]
-        LA --> LB --> LC
+    IN([User Message]) --> ChatNode[Chat Agent - Thư ký riêng]
+    
+    subgraph Knowledge[Tầng Tri Thức]
+        ChatNode --> RAG[Truy vấn RAG: Thương hiệu/Sản phẩm/Chính sách]
+        ChatNode --> State[Đọc Trạng thái Chiến dịch hiện tại]
     end
-
-    L1 --> L2
-
-    subgraph L2["Layer 2: Dynamic Few-Shot Retrieval (pgvector)"]
-        LD[Embed current_query → vector 1024-dim]
-        LE["Cosine search top 3 utterances\n từ intent_routing_knowledge"]
-        LF[Format thành few-shot examples string]
-        LD --> LE --> LF
+    
+    ChatNode --> Decision{Phân loại Ngữ cảnh}
+    
+    Decision -- "Hỏi đáp/Tra cứu/Tâm sự" --> Response[Trả lời trực tiếp cho Sếp]
+    Decision -- "Yêu cầu Hành động/Công việc cụ thể" --> TriageNode[Triage Hub - Trigger điều phối]
+    
+    subgraph Triage[Tầng Điều Phối Công Việc]
+        TriageNode --> Analyst[Phòng Kinh Doanh]
+        TriageNode --> Creative[Phòng Sáng Tạo]
+        TriageNode --> Researcher[Ban Nghiên Cứu]
     end
-
-    L2 --> L3
-
-    subgraph L3["Layer 3: LLM Router — Qwen2.5 14B"]
-        LG["System Prompt:\n Context + Few-Shot + Rules"]
-        LH["Chain-of-Thought Reasoning\n (thought_process bắt buộc)"]
-        LI["Structured JSON Output\n → Pydantic RoutingDecision"]
-        LG --> LH --> LI
-    end
-
-    L3 --> L4
-
-    subgraph L4["Layer 4: State Injector & Dispatcher"]
-        LJ[Validate Pydantic Schema]
-        LK[Cập nhật AgencyState]
-        LL[Log vào agent_decisions DB]
-        LM[route_after_triage dispatch]
-        LJ --> LK --> LL --> LM
-    end
-
-    LM --> N1[analyst]
-    LM --> N2[performance]
-    LM --> N3[researcher_agent]
-    LM --> N4[chat_agent]
+    
+    Response --> END([Kết thúc lượt chat])
+    Analyst --> END
+    Creative --> END
+    Researcher --> END
 ```
 
 ---
 
-## 3. Pydantic Schema — RoutingDecision
+## 3. Các Lớp Xử Lý Chi Tiết (Pipeline 4.0)
 
-File: [`graphs/routing_models.py`](file:///wsl.localhost/server/root/marketing-agent-os/graphs/routing_models.py)
+### Lớp 1: Hứng Dữ Liệu & Nạp DNA (Knowledge Injection)
+Thay vì chỉ nạp lịch sử chat, Chat Agent ngay khi nhận tin nhắn phải được tiêm (Inject) toàn bộ thông tin tĩnh và động của doanh nghiệp từ Database.
+- **DNA:** Brand Name, Slogan, USP, Voice & Tone.
+- **Context:** Chiến dịch nào đang chạy, kịch bản nào vừa bị chửi (Anti-patterns).
 
-```python
-class RoutingDecision(BaseModel):
-    thought_process: str      # Chain-of-Thought bắt buộc — chống hallucination
-    is_follow_up: bool        # True nếu câu này tiếp nối chủ đề trước
-    intent: Literal[
-        "chat",
-        "show_metrics",
-        "create_campaign",
-        "research"
-    ]
-    extracted_entities: Dict[str, Any]  # Entities sẵn cho node phía sau
-```
+### Lớp 2: Xử Lý Hỏi Đáp (Inquiry Handling)
+Nếu tin nhắn của sếp là câu hỏi (Inquiry), Chat Agent **BẮT BUỘC** phải trả lời ngay dựa trên tri thức hiện có. Tuyệt đối không đẩy sang các phòng ban chuyên môn nếu chưa có lệnh làm việc.
 
-### Ý nghĩa từng field:
+### Lớp 3: Kích Hoạt Trigger (Action Detection)
+Chỉ khi phát hiện các động từ mạnh hoặc yêu cầu quy trình (ví dụ: *"Lên bài đi", "Sửa kịch bản", "Chạy ads"*) $\rightarrow$ Chat Agent mới đóng vai trò là "Trigger" gọi con Triage ra để bắt đầu luồng LangGraph.
 
-| Field | Mục đích | Ví dụ |
-|---|---|---|
-| `thought_process` | Buộc LLM suy luận trước khi quyết định, tránh ảo giác | `"User đang ở sop_stage='creative_generation', câu 'sửa ngân sách' → rõ ràng là follow-up của create_campaign"` |
-| `is_follow_up` | Flag context-awareness — giúp analyst/strategist biết có nên kế thừa context không | `true` |
-| `intent` | Intent cuối cùng | `"create_campaign"` |
-| `extracted_entities` | Entities bóc tách sẵn — node phía sau không cần re-parse | `{"budget": 5000000, "product_name": "G-Agent Tech"}` |
+### Lớp 4: Điều Hướng Chính Xác (Precision Routing)
+Con Triage (vốn khô khan) lúc này chỉ tập trung vào việc:
+- Phân chia Task cho Analyst (Tính CPA).
+- Giao việc cho Creative (Viết Copy).
+- Nhờ Researcher (Cào data đối thủ).
 
 ---
 
-## 4. System Prompt Reference
+## 4. Thay Đổi Kỹ Thuật (Cho Team Dev)
 
-```
-## Quy tắc suy luận (trích):
-1. Nếu sop_stage KHÔNG phải "triage" hoặc "chat" VÀ user nhắn ngắn gọn bổ sung
-   → is_follow_up=true, giữ nguyên intent của luồng đó.
-2. Ưu tiên ngữ cảnh hội thoại gần nhất khi câu nói mơ hồ.
-3. Trích xuất entities nếu có.
-4. PHẢI viết thought_process step-by-step TRƯỚC khi kết luận intent.
-```
+| Thành phần | Thay đổi so với v3.0 |
+|---|---|
+| **Entry Point** | Đổi từ `triage_node` sang `chat_agent_node`. |
+| **Logic Router** | `chat_agent` sẽ trả về một `router_signal`. Nếu signal là `workflow` -> chuyển sang `triage`. |
+| **System Prompt** | Chat Agent được dạy: "Bạn là Thư ký riêng, nắm giữ DNA của VNB Sports. Hãy trả lời sếp trước, chỉ làm việc khi sếp ra lệnh". |
+| **RAG Usage** | Chat Agent sử dụng `retrieve_chunks_reranked` ngay từ bước 1. |
 
 ---
 
-## 5. Config Settings
+## 5. Quy Tắc Bảo Vệ Dữ Liệu (Dành cho CMO)
 
-File: [`config/settings.py`](file:///wsl.localhost/server/root/marketing-agent-os/config/settings.py)
-
-```python
-TRIAGE_CONTEXT_MESSAGES = 10    # Số tin nhắn Layer 1 thu thập
-TRIAGE_FEW_SHOT_COUNT = 3       # Số utterances Layer 2 trả về
-TRIAGE_FALLBACK_INTENT = "research"  # Fallback an toàn khi LLM lỗi
-```
+Để tránh "sai lệch bối cảnh" như sếp đã chửi:
+1.  **Cấm Fallback Tĩnh:** Tuyệt đối không dùng dữ liệu "G-Agent Tech" làm mẫu. Nếu không có dữ liệu thật trong DB, Agent phải báo cáo: *"Dạ em chưa thấy thông tin [X] trong hệ thống, sếp nạp thêm cho em nhé"*.
+2.  **Validation Thật:** Mọi con số CPA, Ngân sách phải query realtime từ PostgresSQL, không được tự bịa ra con số 1.050.000đ khi sếp chưa thiết lập.
 
 ---
 
-## 6. Routing Table
-
-File: [`graphs/triage.py`](file:///wsl.localhost/server/root/marketing-agent-os/graphs/triage.py) — `route_after_triage()`
-
-| Intent | Node tiếp theo | Kênh Chainlit |
-|---|---|---|
-| `create_campaign` | `analyst` | `#phong-kinh-doanh` |
-| `show_metrics` | `performance` | `#phong-kinh-doanh` |
-| `research` | `researcher_agent` | `#phong-sang-tao` |
-| `chat` | `chat_agent` | `#phong-sang-tao` |
-
----
-
-## 7. So Sánh Trước / Sau
-
-| Tiêu chí | v2.1 (Vector-Only) | v3.0 (Intelligent Supervisor Hub) |
-|---|---|---|
-| **Đầu vào** | `messages[-1]` (1 câu) | 10 tin nhắn gần nhất + `sop_stage` + `campaign_id` |
-| **Cơ chế quyết định** | cosine distance < 0.30 → intent | LLM Chain-of-Thought + few-shot guidance |
-| **Vai trò pgvector** | Bộ não ra quyết định | Bộ nhớ gợi ý few-shot cho LLM |
-| **Context-awareness** | ❌ Không | ✅ `is_follow_up` + conversation history |
-| **Entity extraction** | ❌ Không | ✅ `extracted_entities` |
-| **Observability** | Log basic | ✅ `thought_process` lưu vào DB |
-| **Follow-up handling** | ❌ Phân loại sai | ✅ Phát hiện và giữ nguyên luồng |
-| **Mở rộng intent** | Thêm utterances + threshold tuning | Thêm 1 dòng vào system prompt |
-| **Latency** | ~0.5s (vector only) | ~3-5s (LLM inference) |
-| **Accuracy (edge cases)** | Thấp với câu mơ hồ | Cao — LLM hiểu ngữ cảnh |
-
----
-
-## 8. Chat Agent (Mới thêm — v3.0)
-
-File: [`graphs/chat.py`](file:///wsl.localhost/server/root/marketing-agent-os/graphs/chat.py)
-
-Node mới `chat_agent` xử lý intent `chat` thay vì để hệ thống im lặng (behavior cũ: `chat → END`).
-
-**Tính năng:**
-- Trả lời hội thoại thông thường thân thiện.
-- Hướng dẫn người dùng các tính năng hệ thống khi được hỏi.
-- Fallback message an toàn khi LLM lỗi.
-
----
-
-## 9. AgencyState Extensions
-
-File: [`graphs/state.py`](file:///wsl.localhost/server/root/marketing-agent-os/graphs/state.py)
-
-3 field mới được thêm vào `AgencyState`:
-
-```python
-is_follow_up: bool                   # Context-aware routing flag
-extracted_entities: Dict[str, Any]   # Entities từ Triage (budget, product_name...)
-routing_thought_process: str         # CoT suy luận để truy vết & audit
-```
-
----
-
-## 10. Kế Hoạch Mở Rộng Tương Lai
-
-Khi cần thêm tính năng mới (ví dụ: `project_management`):
-
-1. ✅ Thêm node `project_management_node` trong `graphs/`
-2. ✅ Thêm 1 dòng vào system prompt: `"- 'project_management': Quản lý WBS, phân công..."`
-3. ✅ Thêm 1 entry vào `routing_table` trong `route_after_triage()`
-4. ✅ Thêm utterances mẫu vào `db/seed.py`
-5. ✅ Kết nối node trong `main_router.py`
-
-**Không cần thay đổi logic 4-Layer pipeline.**
+**Nhiệm vụ cho Team Dev:** Ngừng ngay luồng Triage-first. Tái cấu trúc lại `main_router.py` theo sơ đồ Knowledge-first ở trên. Đảm bảo tri thức doanh nghiệp phải dẫn dắt hành động, chứ không phải quy trình bóp chết tri thức.

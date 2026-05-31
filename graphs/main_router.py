@@ -2,16 +2,16 @@
 import logging
 import asyncio
 from langgraph.graph import StateGraph, START, END
-from graphs.state import AgencyState
-from graphs.business import analyst_node, performance_node
-from graphs.creative import strategist_node, copywriter_node, brand_guardian_node
-from graphs.researcher import researcher_node
-from graphs.creative_reporter import creative_report_node
-from graphs.triage import triage_node, route_after_triage
-from graphs.publisher import publisher_node, waiting_approval_barrier_node, route_after_guardian
-from graphs.chat import chat_node
-from graphs.negotiator import negotiator_node
-from graphs.commit import commit_node
+from graphs.supervisor.state import AgencyState
+from graphs.business.business import analyst_node, performance_node
+from graphs.creative.creative_subgraph import creative_graph
+from graphs.research.researcher import researcher_node
+from graphs.creative.creative_reporter import creative_report_node
+from graphs.supervisor.triage import triage_node, route_after_triage
+from graphs.creative.publisher import publisher_node, waiting_approval_barrier_node
+from graphs.supervisor.chat import chat_node
+from graphs.business.negotiator import negotiator_node
+from graphs.business.commit import commit_node
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -153,9 +153,7 @@ builder.add_node("performance", performance_node)
 builder.add_node("negotiator", negotiator_node)
 builder.add_node("waiting_draft_approval", waiting_draft_approval_node)
 builder.add_node("commit_node", commit_node)
-builder.add_node("strategist", strategist_node)
-builder.add_node("copywriter", copywriter_node)
-builder.add_node("guardian", brand_guardian_node)
+builder.add_node("creative_subgraph", creative_graph)
 builder.add_node("waiting_approval_barrier", waiting_approval_barrier_node)
 builder.add_node("publisher", publisher_node)
 builder.add_node("researcher_agent", researcher_node)
@@ -190,22 +188,11 @@ builder.add_conditional_edges(
     }
 )
 builder.add_edge("negotiator", "waiting_draft_approval")
-builder.add_edge("commit_node", "strategist")
-builder.add_edge("strategist", "copywriter")
-builder.add_edge("copywriter", "guardian")
+builder.add_edge("commit_node", "creative_subgraph")
+builder.add_edge("creative_subgraph", "waiting_approval_barrier")
 builder.add_edge("researcher_agent", END)
 builder.add_edge("chat_agent", END)
 builder.add_edge("creative_report_agent", END)
-
-# Guardian conditional check
-builder.add_conditional_edges(
-    "guardian",
-    route_after_guardian,
-    {
-        "waiting_approval_barrier": "waiting_approval_barrier",
-        "copywriter": "copywriter"
-    }
-)
 
 # Post barrier
 builder.add_edge("waiting_approval_barrier", "publisher")

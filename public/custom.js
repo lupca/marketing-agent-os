@@ -60,6 +60,30 @@
             color: #fff !important;
             transform: translateY(-1px);
         }
+        .custom-nav-new {
+            background: rgba(16, 185, 129, 0.12) !important;
+            border: 1px solid rgba(16, 185, 129, 0.3) !important;
+            color: #34d399 !important;
+            cursor: pointer;
+        }
+        .custom-nav-new:hover {
+            background: rgba(16, 185, 129, 0.22) !important;
+            border-color: #10b981 !important;
+            color: #6ee7b7 !important;
+            transform: translateY(-1px);
+        }
+        .custom-nav-hist {
+            background: rgba(245, 158, 11, 0.12) !important;
+            border: 1px solid rgba(245, 158, 11, 0.3) !important;
+            color: #fbbf24 !important;
+            cursor: pointer;
+        }
+        .custom-nav-hist:hover {
+            background: rgba(245, 158, 11, 0.22) !important;
+            border-color: #f59e0b !important;
+            color: #fcd34d !important;
+            transform: translateY(-1px);
+        }
     `;
     const style = document.createElement('style');
     style.appendChild(document.createTextNode(css));
@@ -94,6 +118,38 @@
         }
     };
 
+    window.createNewChat = function() {
+        console.log("Creating new campaign thread...");
+        document.cookie = "chat_thread_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "chat_page_reloaded=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        window.location.reload();
+    };
+
+    window.switchThread = function(threadId) {
+        if (!threadId) return;
+        console.log("Switching to campaign thread:", threadId);
+        document.cookie = "chat_thread_id=" + threadId + "; max-age=" + (3600*24*30) + "; path=/;";
+        document.cookie = "chat_page_reloaded=1; max-age=10; path=/;";
+        window.location.reload();
+    };
+
+    window.triggerHistoryCommand = function() {
+        // Find textarea and insert /history command
+        const textarea = document.querySelector('textarea');
+        if (textarea) {
+            textarea.value = "/history";
+            const event = new Event('input', { bubbles: true });
+            textarea.dispatchEvent(event);
+            
+            setTimeout(() => {
+                const sendButton = document.querySelector('button[type="submit"]') || document.querySelector('button[aria-label="Send message"]');
+                if (sendButton) {
+                    sendButton.click();
+                }
+            }, 100);
+        }
+    };
+
     // ============================================================
     // DYNAMIC HEADER NAV INJECTION (Dashboard & Knowledge Base links)
     // ============================================================
@@ -111,6 +167,16 @@
         nav.id = 'custom-header-nav';
         nav.className = 'custom-nav-wrapper';
 
+        const btnNew = document.createElement('a');
+        btnNew.className = 'custom-nav-link custom-nav-new';
+        btnNew.innerHTML = '➕ Tạo Chiến dịch Mới';
+        btnNew.onclick = window.createNewChat;
+
+        const btnHist = document.createElement('a');
+        btnHist.className = 'custom-nav-link custom-nav-hist';
+        btnHist.innerHTML = '🗂️ Lịch sử Chiến dịch';
+        btnHist.onclick = window.triggerHistoryCommand;
+
         const btnKB = document.createElement('a');
         btnKB.href = '/knowledge-base';
         btnKB.className = 'custom-nav-link custom-nav-kb';
@@ -121,6 +187,8 @@
         btnDash.className = 'custom-nav-link custom-nav-dash';
         btnDash.innerHTML = '📊 Dashboard';
 
+        nav.appendChild(btnNew);
+        nav.appendChild(btnHist);
         nav.appendChild(btnKB);
         nav.appendChild(btnDash);
 

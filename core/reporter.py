@@ -6,9 +6,9 @@ def generate_marketing_plan_markdown(state_values: dict) -> str:
     Synthesizes a highly polished, professional marketing plan report from the graph state.
     Returns a Markdown string formatted for premium look and readability.
     """
-    campaign_name = state_values.get("campaign_name") or "Chiến Dịch Quảng Cáo Tự Trị"
-    workspace_id = state_values.get("workspace_id") or "Chưa xác định"
-    product_id = state_values.get("product_id") or "Chưa xác định"
+    campaign_name = state_values.get("campaign_name") or ""
+    workspace_id = state_values.get("workspace_id") or ""
+    product_id = state_values.get("product_id") or ""
     
     target_cpa = state_values.get("target_cpa", 0.0)
     test_budget = state_values.get("test_budget", 0.0)
