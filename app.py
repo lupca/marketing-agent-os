@@ -967,6 +967,7 @@ async def run_vectorization_pipeline(element) -> str:
     Upload file lên MinIO + tạo RAG document record + kick Celery ingestion task.
     Xử lý hoàn toàn async — không block UI.
     """
+    from core.document_service import process_and_store_document, DuplicateDocumentError
     db: Session = SessionLocal()
     workspace_id = cl.user_session.get("workspace_id")
 
@@ -985,72 +986,32 @@ async def run_vectorization_pipeline(element) -> str:
         db.close()
         return f"❌ Không thể đọc file '{element.name}'. File rỗng hoặc lỗi upload."
 
-    # Write to temp file with UUID prefix to avoid collision on batch uploads
-    temp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "temp"))
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{element.name}")
-
-    with open(temp_file_path, "wb") as f:
-        f.write(file_bytes)
-
     try:
-        # Tính mã băm SHA-256 của toàn bộ file content
-        import hashlib
-        hasher = hashlib.sha256()
-        hasher.update(file_bytes)
-        file_hash = hasher.hexdigest()
-
-        # Kiểm tra trùng lặp tài liệu trong Workspace
-        duplicate = db.execute(
-            text("""
-                SELECT document_id FROM rag_documents 
-                WHERE workspace_id = CAST(:workspace_id AS uuid) 
-                  AND file_hash = :file_hash 
-                  AND is_deleted = FALSE 
-                LIMIT 1
-            """),
-            {"workspace_id": str(workspace_id), "file_hash": file_hash}
-        ).fetchone()
-
-        if duplicate:
-            db.close()
-            return "Tài liệu này đã tồn tại trong Knowledge Base. Bỏ qua quá trình xử lý để tiết kiệm tài nguyên."
-
-        file_size = len(file_bytes)
-
-        # 1. Upload to MinIO S3
-        object_key = f"rag/{workspace_id}/{uuid.uuid4()}{os.path.splitext(element.name)[-1]}"
-        upload_file(temp_file_path, object_key)
-
-        # 2. Tạo rag_documents record + Kick Celery ingest task (async)
-        doc = store_document(
+        doc_info = process_and_store_document(
             db=db,
-            workspace_id=workspace_id,
+            workspace_id=str(workspace_id),
+            file_bytes=file_bytes,
             file_name=element.name,
-            file_key=object_key,
-            access_tags=["marketing", "global"],
-            file_size_bytes=file_size,
-            file_hash=file_hash,
+            access_tags=["marketing", "global"]
         )
 
         success_msg = (
             f"### ✅ Tài liệu đã được nhận và đang xử lý!\n"
-            f"- **Tên file:** `{element.name}`\n"
-            f"- **Document ID:** `{doc.document_id}`\n"
+            f"- **Tên file:** `{doc_info['file_name']}`\n"
+            f"- **Document ID:** `{doc_info['document_id']}`\n"
             f"- **Tags:** `marketing, global`\n\n"
             f"⚙️ Hệ thống đang băm vector ngầm (Celery). "
             f"Truy cập **[Knowledge Base](/knowledge-base)** để theo dõi trạng thái và quản lý tags!"
         )
-        db.close()
         return success_msg
 
+    except DuplicateDocumentError as e:
+        return str(e)
     except Exception as e:
         logger.error(f"Error in run_vectorization_pipeline: {e}", exc_info=True)
-        db.close()
         return f"❌ Lỗi xử lý tài liệu '{element.name}': {str(e)}"
     finally:
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        db.close()
 
 @cl.on_message
 async def on_message(message: cl.Message):

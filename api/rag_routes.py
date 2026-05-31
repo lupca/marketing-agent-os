@@ -180,6 +180,8 @@ async def upload_document(
     access_tags: str = Form('["global"]'),   # JSON string
     db: Session = Depends(get_db)
 ):
+    from core.document_service import process_and_store_document, DuplicateDocumentError
+
     ws_id = _get_workspace_id_from_request(workspace_id, db)
 
     # Parse access_tags
@@ -204,77 +206,34 @@ async def upload_document(
     _validate_tags_exist(db, ws_id, tags)
 
     content = await file.read()
-    file_size = len(content)
 
-    # Tính mã băm SHA-256 chống trùng lặp tài liệu trong Workspace
-    import hashlib
-    hasher = hashlib.sha256()
-    hasher.update(content)
-    file_hash = hasher.hexdigest()
-
-    duplicate = db.execute(
-        text("""
-            SELECT document_id FROM rag_documents 
-            WHERE workspace_id = CAST(:workspace_id AS uuid) 
-              AND file_hash = :file_hash 
-              AND is_deleted = FALSE 
-            LIMIT 1
-        """),
-        {"workspace_id": str(ws_id), "file_hash": file_hash}
-    ).fetchone()
-
-    if duplicate:
+    try:
+        doc_info = process_and_store_document(
+            db=db,
+            workspace_id=str(ws_id),
+            file_bytes=content,
+            file_name=filename,
+            access_tags=tags
+        )
+        logger.info(f"[upload_document] Accepted document_id={doc_info['document_id']}, file={filename}")
+        return JSONResponse(
+            {
+                "message":     "File đã được nhận. Đang xử lý embedding ngầm.",
+                "document_id": doc_info["document_id"],
+                "file_name":   filename,
+                "access_tags": tags,
+                "status":      "processing",
+            },
+            status_code=202,
+        )
+    except DuplicateDocumentError as e:
         raise HTTPException(
             status_code=409,
-            detail="Tài liệu này đã tồn tại trong Knowledge Base. Bỏ qua quá trình xử lý để tiết kiệm tài nguyên."
-        )
-
-    # Save file tạm → upload MinIO
-    tmp_dir = tempfile.mkdtemp()
-    tmp_path = os.path.join(tmp_dir, filename)
-
-    with open(tmp_path, "wb") as f:
-        f.write(content)
-
-    # Upload lên MinIO
-    object_key = f"rag/{ws_id}/{uuid.uuid4()}{ext}"
-    try:
-        upload_file(tmp_path, object_key)
-    except Exception as e:
-        logger.error(f"[upload_document] MinIO upload failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Upload file thất bại: {str(e)}")
-    finally:
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
-
-    # Tạo DB record + kick Celery (trong store_document)
-    try:
-        doc = store_document(
-            db=db,
-            workspace_id=ws_id,
-            file_name=filename,
-            file_key=object_key,
-            access_tags=tags,
-            file_size_bytes=file_size,
-            file_hash=file_hash,
+            detail=str(e)
         )
     except Exception as e:
-        logger.error(f"[upload_document] store_document failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi tạo document record: {str(e)}")
-
-    logger.info(f"[upload_document] Accepted document_id={doc.document_id}, file={filename}")
-    return JSONResponse(
-        {
-            "message":     "File đã được nhận. Đang xử lý embedding ngầm.",
-            "document_id": str(doc.document_id),
-            "file_name":   filename,
-            "access_tags": tags,
-            "status":      "processing",
-        },
-        status_code=202,
-    )
+        logger.error(f"[upload_document] process_and_store_document failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý tài liệu: {str(e)}")
 
 
 # ============================================================
