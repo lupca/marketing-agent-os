@@ -54,6 +54,7 @@
         DOM.killedBoard = document.getElementById("killed-board");
         DOM.antiPatternsList = document.getElementById("anti-patterns-list");
         DOM.btnRefreshMetrics = document.getElementById("btn-refresh-metrics");
+        DOM.btnSyncMetrics = document.getElementById("btn-sync-metrics");
 
         DOM.simBudget = document.getElementById("sim-budget");
         DOM.simPrice = document.getElementById("sim-price");
@@ -769,6 +770,31 @@
         if (DOM.btnRefreshMetrics) {
             DOM.btnRefreshMetrics.removeAttribute("onclick");
             DOM.btnRefreshMetrics.addEventListener("click", fetchMetrics);
+        }
+
+        if (DOM.btnSyncMetrics) {
+            DOM.btnSyncMetrics.addEventListener("click", handleSyncMetrics);
+        }
+    }
+
+    /**
+     * Handlers for Sync Metrics
+     */
+    async function handleSyncMetrics() {
+        if (!DOM.btnSyncMetrics) return;
+        
+        const originalText = DOM.btnSyncMetrics.innerHTML;
+        DOM.btnSyncMetrics.innerHTML = "⏳ Đang đồng bộ...";
+        DOM.btnSyncMetrics.disabled = true;
+        
+        try {
+            const data = await apiRequest("/api/dashboard/sync-metrics", "POST");
+            if (data) {
+                alert(data.message || "Đã gửi yêu cầu đồng bộ thành công!");
+            }
+        } finally {
+            DOM.btnSyncMetrics.innerHTML = originalText;
+            DOM.btnSyncMetrics.disabled = false;
         }
     }
 

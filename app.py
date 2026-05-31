@@ -165,6 +165,18 @@ async def custom_dashboard_middleware(request: Request, call_next):
         finally:
             db.close()
             
+    elif path == "/api/dashboard/sync-metrics" and request.method == "POST":
+        try:
+            from core.celery_app import celery_app
+            celery_app.send_task(
+                "core.tasks.sync_own_media_metrics",
+                queue="social_publisher"
+            )
+            return JSONResponse(content={"status": "success", "message": "Đã đẩy lệnh đồng bộ metrics vào hàng đợi ngầm. Vui lòng F5 sau ít phút."})
+        except Exception as e:
+            logger.error(f"Error triggering metrics sync: {e}", exc_info=True)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
+
     elif path == "/api/dashboard/simulate" and request.method == "POST":
         db: Session = SessionLocal()
         try:

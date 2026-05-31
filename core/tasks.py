@@ -517,3 +517,128 @@ def publish_to_social(self, variant_id: str):
                 except Exception as cleanup_err:
                     logger.warning(f"[publish_to_social] Failed to delete temporary file {filepath}: {cleanup_err}")
 
+# ============================================================
+# TASK 5: Own Media Analytics Sync Job (CTO Design)
+# ============================================================
+@celery_app.task(
+    bind=True,
+    name="core.tasks.sync_own_media_metrics",
+    queue="social_publisher",
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+)
+def sync_own_media_metrics(self):
+    """
+    Background job to fetch post analytics for all organically published variants.
+    """
+    from db.connection import SessionLocal
+    from core.models import PlatformVariant, SocialInteraction
+    from core.document_service import process_and_store_document
+    from datetime import datetime, timedelta
+    import uuid
+    import requests
+    import os
+    import json
+    
+    db = SessionLocal()
+    try:
+        logger.info("[sync_own_media_metrics] STARTing sync job.")
+        api_key = os.getenv("UPLOAD_POST_API_KEY")
+        if not api_key:
+            api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Imx1cGNhLnRlY2hAZ21haWwuY29tIiwiZXhwIjo0OTMzNzc2NjMyLCJqdGkiOiI3MGY1ZjcxMy05YmVhLTRhNTYtODI0My00ZGNmOGFiYjFkMjgifQ.tcGgtYSvQ6Hs46BZ8V5Qz8VkHBu0DLx5fqL_RIllbkQ"
+        
+        headers = {"Authorization": f"Apikey {api_key}"}
+        
+        # 1. Tracking Job: Fetch published variants within last 7 days that have a platform_post_id
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        variants = db.query(PlatformVariant).filter(
+            PlatformVariant.publish_status == 'published',
+            PlatformVariant.platform_post_id.isnot(None),
+            PlatformVariant.published_at >= seven_days_ago
+        ).all()
+        
+        logger.info(f"[sync_own_media_metrics] Found {len(variants)} published variants to sync.")
+        
+        for variant in variants:
+            platform = variant.platform
+            post_id = variant.platform_post_id
+            user = "topvnsport"
+            
+            # GET /api/uploadposts/post-analytics
+            url = f"https://api.upload-post.com/api/uploadposts/post-analytics?platform_post_id={post_id}&platform={platform}&user={user}"
+            try:
+                res = requests.get(url, headers=headers, timeout=20)
+                if res.status_code == 200:
+                    data = res.json()
+                    metrics = data.get("platforms", {}).get(platform, {}).get("post_metrics", {})
+                    if metrics:
+                        variant.metric_views = metrics.get("views", variant.metric_views)
+                        variant.metric_likes = metrics.get("likes", variant.metric_likes)
+                        variant.metric_comments = metrics.get("comments", variant.metric_comments)
+                        variant.metric_shares = metrics.get("shares", variant.metric_shares)
+                        logger.info(f"[sync_own_media_metrics] Updated metrics for variant {variant.id}")
+            except Exception as e:
+                logger.warning(f"[sync_own_media_metrics] Failed to fetch analytics for variant {variant.id}: {e}")
+
+            # Listening Job (Instagram First): GET /api/uploadposts/comments
+            if platform == 'instagram':
+                comments_url = f"https://api.upload-post.com/api/uploadposts/comments?media_id={post_id}&user={user}"
+                try:
+                    c_res = requests.get(comments_url, headers=headers, timeout=20)
+                    if c_res.status_code == 200:
+                        c_data = c_res.json()
+                        comments = c_data.get("comments", [])
+                        
+                        # Process negative comments for Self-Feedback Loop
+                        negative_comments = []
+                        for c in comments:
+                            c_id = c.get("id")
+                            text = c.get("text", "")
+                            existing = db.query(SocialInteraction).filter_by(platform_user_id=c_id).first()
+                            if not existing:
+                                interaction = SocialInteraction(
+                                    workspace_id=variant.workspace_id,
+                                    variant_id=variant.id,
+                                    platform_user_id=c_id,
+                                    content=text,
+                                    sentiment="neutral"
+                                )
+                                db.add(interaction)
+                                # Simple keyword matching for MVP (usually LLM does this)
+                                lower_text = text.lower()
+                                if any(word in lower_text for word in ["mờ", "chán", "nhảm", "đắt", "tệ", "xấu", "lỗi", "chê"]):
+                                    interaction.sentiment = "negative"
+                                    negative_comments.append(text)
+                                    
+                        # Self-Learning (Self-Feedback Job): Push to RAG
+                        if negative_comments:
+                            feedback_text = f"Bài học rút ra (Anti-pattern) từ các bình luận tiêu cực cho chiến dịch '{variant.platform}':\n"
+                            for nc in negative_comments:
+                                feedback_text += f"- Khách hàng phản hồi: '{nc}'\n"
+                            feedback_text += "Hãy tránh lặp lại văn phong hoặc nội dung gây ra phản ứng này."
+                            
+                            try:
+                                process_and_store_document(
+                                    db=db,
+                                    workspace_id=str(variant.workspace_id),
+                                    file_bytes=feedback_text.encode('utf-8'),
+                                    file_name=f"self_feedback_{variant.id}.md",
+                                    access_tags=["self_feedback"]
+                                )
+                                logger.info(f"[sync_own_media_metrics] Added self-feedback to RAG for variant {variant.id}")
+                            except Exception as rag_err:
+                                logger.warning(f"[sync_own_media_metrics] RAG ingestion failed for self-feedback: {rag_err}")
+                except Exception as e:
+                    logger.warning(f"[sync_own_media_metrics] Failed to fetch comments for variant {variant.id}: {e}")
+                    
+        db.commit()
+        logger.info("[sync_own_media_metrics] FINISHED sync job.")
+        return {"status": "success", "synced_variants": len(variants)}
+    except Exception as exc:
+        logger.error(f"[sync_own_media_metrics] Failed: {exc}")
+        db.rollback()
+        raise self.retry(exc=exc)
+    finally:
+        db.close()
+
