@@ -378,5 +378,21 @@ class AIModel(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+# 24. Model: WorkspaceIntegration (Dynamic Third-Party Integrations Support)
+class WorkspaceIntegration(Base):
+    __tablename__ = "workspace_integrations"
+    
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    platform_name = Column(String(100), nullable=False)
+    config_key = Column(String(100), nullable=False)
+    config_value = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    meta_data = Column("metadata", JSON_TYPE, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+
 
 

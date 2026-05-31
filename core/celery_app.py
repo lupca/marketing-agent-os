@@ -36,6 +36,7 @@ celery_app.conf.update(
         "core.tasks.ingest_document":      {"queue": "rag_ingestion"},
         "core.tasks.cascade_update_tags":  {"queue": "rag_cascade"},
         "core.tasks.cascade_soft_delete":  {"queue": "rag_cascade"},
+        "core.tasks.publish_to_social":    {"queue": "social_publisher"},
     },
 
     # Retry policy mặc định cho tất cả tasks

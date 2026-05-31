@@ -375,3 +375,23 @@ CREATE TABLE IF NOT EXISTS agent_decisions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- 23. Table: workspace_integrations (Dynamic Third-Party Integrations Support - CTO Design)
+CREATE TABLE IF NOT EXISTS workspace_integrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    platform_name VARCHAR(100) NOT NULL, -- e.g. 'upload-post', 'serpapi'
+    config_key VARCHAR(100) NOT NULL,    -- e.g. 'api_key', 'user', 'default_page_id'
+    config_value TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT uq_workspace_platform_config UNIQUE (workspace_id, platform_name, config_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspace_integrations_lookup 
+ON workspace_integrations (workspace_id, platform_name);
+
+

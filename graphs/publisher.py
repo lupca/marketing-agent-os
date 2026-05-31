@@ -56,6 +56,7 @@ def publisher_node(state: AgencyState) -> dict:
         db.commit()
         
         # Save variants
+        pvs = []
         for v in variants:
             pv = PlatformVariant(
                 workspace_id=ws_id,
@@ -67,8 +68,31 @@ def publisher_node(state: AgencyState) -> dict:
                 meta_data=v
             )
             db.add(pv)
+            pvs.append(pv)
         db.commit()
         logger.info("Successfully persisted published campaign contents in database!")
+
+        # Trigger background publishing tasks (CTO Design - section 2.4)
+        from core.celery_app import celery_app
+        for pv in pvs:
+            try:
+                celery_app.send_task(
+                    "core.tasks.publish_to_social",
+                    args=[str(pv.id)],
+                    queue="social_publisher"
+                )
+                logger.info(f"Triggered background publishing job for variant_id: {pv.id}")
+            except Exception as broker_err:
+                logger.error(f"Failed to dispatch Celery task to broker for variant {pv.id}: {broker_err}")
+                try:
+                    # Update variant status to failed locally since task could not be sent
+                    pv.publish_status = 'failed'
+                    meta = dict(pv.meta_data) if pv.meta_data else {}
+                    meta["error_message"] = f"Failed to dispatch background job (Broker Connection Refused): {broker_err}"
+                    pv.meta_data = meta
+                    db.commit()
+                except Exception as db_err:
+                    logger.error(f"Failed to update variant status after broker error: {db_err}")
         
         # Log publisher decision
         log_decision(

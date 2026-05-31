@@ -87,3 +87,27 @@ def trim_and_log(
     state_update["messages"] = [AIMessage(content=message)]
     
     return state_update
+
+def get_integration_config(workspace_id: str, platform_name: str) -> dict:
+    """
+    Dynamically fetches active integration configurations for a platform in a workspace.
+    Returns a key-value dictionary, e.g. {"api_key": "...", "user": "..."}
+    """
+    from db.connection import SessionLocal
+    from core.models import WorkspaceIntegration
+    import uuid
+    
+    db = SessionLocal()
+    try:
+        ws_uuid = uuid.UUID(str(workspace_id))
+        records = db.query(WorkspaceIntegration).filter_by(
+            workspace_id=ws_uuid,
+            platform_name=platform_name,
+            is_active=True
+        ).all()
+        return {r.config_key: r.config_value for r in records}
+    except Exception as e:
+        logger.error(f"Error fetching integration config for platform {platform_name}: {e}")
+        return {}
+    finally:
+        db.close()
