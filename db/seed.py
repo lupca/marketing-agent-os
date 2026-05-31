@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 # Add project root to sys.path for direct execution
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from db.connection import SessionLocal, is_mock
+from db.connection import  is_mock
+from core.dependencies import get_session
 from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService, RAGDocument, RAGChunk, IntentRoutingKnowledge
 
 logging.basicConfig(level=logging.INFO)
@@ -299,8 +300,5 @@ def seed_semantic_router(db: Session):
     logger.info("Successfully seeded semantic router data!")
 
 if __name__ == "__main__":
-    db_session = SessionLocal()
-    try:
+    with get_session() as db_session:
         seed_database(db_session)
-    finally:
-        db_session.close()

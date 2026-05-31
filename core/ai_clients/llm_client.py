@@ -5,7 +5,7 @@ import logging
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from db.connection import SessionLocal
+from core.dependencies import get_session
 from core.models import Workspace
 
 load_dotenv()
@@ -28,81 +28,77 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
     Enforces that all configurations (URL, Model, Key) must be present in the database,
     adhering to single-source-of-truth principles.
     """
-    db = SessionLocal()
-    try:
-        ws_id = uuid.UUID(workspace_id_str)
-        ws = db.query(Workspace).filter_by(id=ws_id).first()
-        if not ws:
-            raise ValueError(f"Workspace not found for ID: {workspace_id_str}")
+    with get_session() as db:
+        try:
+            ws_id = uuid.UUID(workspace_id_str)
+            ws = db.query(Workspace).filter_by(id=ws_id).first()
+            if not ws:
+                raise ValueError(f"Workspace not found for ID: {workspace_id_str}")
             
-        ws_settings = ws.settings or {}
+            ws_settings = ws.settings or {}
         
-        api_url = ws_settings.get("ai_api_url")
-        api_key = ws_settings.get("siliconflow_api_key") or ""
-        model_name = ws_settings.get("ai_model")
-        temperature = float(ws_settings.get("temperature", 0.2))
-        enable_thinking = ws_settings.get("enable_thinking", False)
+            api_url = ws_settings.get("ai_api_url")
+            api_key = ws_settings.get("siliconflow_api_key") or ""
+            model_name = ws_settings.get("ai_model")
+            temperature = float(ws_settings.get("temperature", 0.2))
+            enable_thinking = ws_settings.get("enable_thinking", False)
         
-        if not api_url:
-            raise ValueError("Missing 'ai_api_url' configuration in workspace settings.")
+            if not api_url:
+                raise ValueError("Missing 'ai_api_url' configuration in workspace settings.")
             
-        # Normalize LLM Base URL to ensure OpenAI-compatible compatibility (e.g. append /v1 if missing)
-        api_url = api_url.strip()
-        if not api_url.endswith("/v1") and not api_url.endswith("/v1/"):
-            api_url = api_url.rstrip("/") + "/v1"
+            # Normalize LLM Base URL to ensure OpenAI-compatible compatibility (e.g. append /v1 if missing)
+            api_url = api_url.strip()
+            if not api_url.endswith("/v1") and not api_url.endswith("/v1/"):
+                api_url = api_url.rstrip("/") + "/v1"
             
-        if not model_name:
-            raise ValueError("Missing 'ai_model' configuration in workspace settings.")
+            if not model_name:
+                raise ValueError("Missing 'ai_model' configuration in workspace settings.")
             
-        # Determine if we are routing locally to Ollama based on the Base URL
-        is_local = "localhost" in api_url or "127.0.0.1" in api_url or "172." in api_url or "192.168." in api_url or "10." in api_url or "ollama" in api_url
+            # Determine if we are routing locally to Ollama based on the Base URL
+            is_local = "localhost" in api_url or "127.0.0.1" in api_url or "172." in api_url or "192.168." in api_url or "10." in api_url or "ollama" in api_url
         
-        logger.info(f"[get_dynamic_llm_client] Routing evaluation - URL: {api_url}, Model: {model_name}, is_local: {is_local}")
+            logger.info(f"[get_dynamic_llm_client] Routing evaluation - URL: {api_url}, Model: {model_name}, is_local: {is_local}")
         
-        # Route locally if local URL is configured
-        if is_local:
-            logger.info(f"Routing LLM requests LOCALLY to Ollama at {api_url} for model: {model_name}")
-            model_kwargs = {}
+            # Route locally if local URL is configured
+            if is_local:
+                logger.info(f"Routing LLM requests LOCALLY to Ollama at {api_url} for model: {model_name}")
+                model_kwargs = {}
+                if json_format:
+                    model_kwargs["response_format"] = {"type": "json_object"}
+                
+                return ChatOpenAI(
+                    base_url=api_url,
+                    api_key=api_key or "ollama", # placeholder for local Ollama
+                    model=model_name,
+                    temperature=temperature,
+                    max_retries=3,
+                    model_kwargs=model_kwargs
+                )
+            
+            # Otherwise, route to Cloud
+            if not api_key:
+                raise ValueError("Missing API key configuration in workspace settings for cloud LLM.")
+            
+            logger.info(f"Routing LLM requests to Cloud at {api_url} for model: {model_name}")
+            model_kwargs = {
+                "extra_body": {
+                    "enable_thinking": enable_thinking  # Explicitly disables reasoning/thinking
+                }
+            }
             if json_format:
                 model_kwargs["response_format"] = {"type": "json_object"}
-                
+            
             return ChatOpenAI(
                 base_url=api_url,
-                api_key=api_key or "ollama", # placeholder for local Ollama
+                api_key=api_key,
                 model=model_name,
                 temperature=temperature,
                 max_retries=3,
                 model_kwargs=model_kwargs
             )
-            
-        # Otherwise, route to Cloud
-        if not api_key:
-            raise ValueError("Missing API key configuration in workspace settings for cloud LLM.")
-            
-        logger.info(f"Routing LLM requests to Cloud at {api_url} for model: {model_name}")
-        model_kwargs = {
-            "extra_body": {
-                "enable_thinking": enable_thinking  # Explicitly disables reasoning/thinking
-            }
-        }
-        if json_format:
-            model_kwargs["response_format"] = {"type": "json_object"}
-            
-        return ChatOpenAI(
-            base_url=api_url,
-            api_key=api_key,
-            model=model_name,
-            temperature=temperature,
-            max_retries=3,
-            model_kwargs=model_kwargs
-        )
-    except Exception as e:
-        logger.error(f"Error loading dynamic LLM client: {e}")
-        raise
-    finally:
-        db.close()
-
-
+        except Exception as e:
+            logger.error(f"Error loading dynamic LLM client: {e}")
+            raise
 def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False, workspace_id: str = "00000000-0000-0000-0000-000000000002") -> str:
     """Generate text using SiliconFlow ChatOpenAI model dynamically configured by workspace settings."""
     try:

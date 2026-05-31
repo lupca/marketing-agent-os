@@ -18,6 +18,8 @@ class DuplicateDocumentError(Exception):
     """Exception raised when a document already exists in the workspace."""
     pass
 
+from core.models import RAGDocument
+
 def process_and_store_document(
     db: Session,
     workspace_id: str,
@@ -39,19 +41,16 @@ def process_and_store_document(
     hasher.update(file_bytes)
     file_hash = hasher.hexdigest()
 
-    # Check for duplicate
-    duplicate = db.execute(
-        text("""
-            SELECT document_id FROM rag_documents 
-            WHERE workspace_id = CAST(:workspace_id AS uuid) 
-              AND file_hash = :file_hash 
-              AND is_deleted = FALSE 
-            LIMIT 1
-        """),
-        {"workspace_id": str(workspace_id), "file_hash": file_hash}
-    ).fetchone()
+    # Check for duplicate using ORM
+    logger.info(f"[process_and_store_document] Checking duplicate for workspace_id={workspace_id}, file_hash={file_hash}")
+    duplicate = db.query(RAGDocument).filter(
+        RAGDocument.workspace_id == uuid.UUID(str(workspace_id)),
+        RAGDocument.file_hash == file_hash,
+        RAGDocument.is_deleted == False
+    ).first()
 
     if duplicate:
+        logger.info(f"[process_and_store_document] Duplicate found: {duplicate.document_id}")
         raise DuplicateDocumentError("Tài liệu này đã tồn tại trong Knowledge Base. Bỏ qua quá trình xử lý để tiết kiệm tài nguyên.")
 
     # Determine extension

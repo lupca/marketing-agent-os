@@ -12,7 +12,7 @@ Thay thế: Vector-Only Router (cosine distance trực tiếp → routing) từ 
 """
 import logging
 from langchain_core.messages import HumanMessage, AIMessage
-from db.connection import SessionLocal
+from core.dependencies import get_session
 from core.models import IntentRoutingKnowledge
 from core.ollama_client import get_embedding, generate_text
 from core.utils import parse_llm_json
@@ -114,41 +114,37 @@ def _retrieve_few_shot_examples(query: str, top_k: int = TRIAGE_FEW_SHOT_COUNT) 
     Dùng vector similarity để tìm top_k mẫu câu tương tự nhất làm gợi ý cho LLM.
     Không ra quyết định trực tiếp — chỉ cung cấp examples để LLM tự suy luận.
     """
-    db = SessionLocal()
-    try:
-        query_vector = get_embedding(query)
-        distance_expr = IntentRoutingKnowledge.embedding.cosine_distance(query_vector)
+    with get_session() as db:
+        try:
+            query_vector = get_embedding(query)
+            distance_expr = IntentRoutingKnowledge.embedding.cosine_distance(query_vector)
 
-        results = (
-            db.query(IntentRoutingKnowledge, distance_expr)
-            .filter(IntentRoutingKnowledge.is_active == True)
-            .order_by(distance_expr)
-            .limit(top_k)
-            .all()
-        )
-
-        if not results:
-            logger.warning("Layer 2: Không tìm thấy mẫu few-shot nào trong DB.")
-            return "(Không có mẫu tham khảo trong cơ sở tri thức)"
-
-        examples = []
-        for record, distance in results:
-            similarity_pct = round((1 - distance) * 100, 1)
-            examples.append(
-                f'  • Câu: "{record.utterance}"\n'
-                f'    → Intent: "{record.intent_category}" (tương đồng: {similarity_pct}%)'
+            results = (
+                db.query(IntentRoutingKnowledge, distance_expr)
+                .filter(IntentRoutingKnowledge.is_active == True)
+                .order_by(distance_expr)
+                .limit(top_k)
+                .all()
             )
 
-        logger.info(f"Layer 2: Tìm thấy {len(examples)} few-shot examples cho query: '{query[:60]}...'")
-        return "\n".join(examples)
+            if not results:
+                logger.warning("Layer 2: Không tìm thấy mẫu few-shot nào trong DB.")
+                return "(Không có mẫu tham khảo trong cơ sở tri thức)"
 
-    except Exception as e:
-        logger.error(f"Layer 2 Few-Shot Retrieval Error: {e}")
-        return "(Lỗi truy vấn cơ sở tri thức — bỏ qua few-shot)"
-    finally:
-        db.close()
+            examples = []
+            for record, distance in results:
+                similarity_pct = round((1 - distance) * 100, 1)
+                examples.append(
+                    f'  • Câu: "{record.utterance}"\n'
+                    f'    → Intent: "{record.intent_category}" (tương đồng: {similarity_pct}%)'
+                )
 
+            logger.info(f"Layer 2: Tìm thấy {len(examples)} few-shot examples cho query: '{query[:60]}...'")
+            return "\n".join(examples)
 
+        except Exception as e:
+            logger.error(f"Layer 2 Few-Shot Retrieval Error: {e}")
+            return "(Lỗi truy vấn cơ sở tri thức — bỏ qua few-shot)"
 # ---------------------------------------------------------------------------
 # LAYER 3: LLM Router (Chain-of-Thought + Structured JSON)
 # ---------------------------------------------------------------------------

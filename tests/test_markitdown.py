@@ -81,7 +81,7 @@ class TestMarkitdownAndDeduplication(unittest.TestCase):
 
     @patch("app.cl.user_session")
     @patch("core.rag.ingest_document_task")  # Mock Celery delay để tránh chạy worker thật khi test
-    @patch("app.upload_file")  # Mock upload file MinIO
+    @patch("core.document_service.upload_file")  # Mock upload file MinIO (refactored path)
     def test_rag_deduplication_logic(self, mock_upload, mock_celery, mock_session):
         """Kiểm thử cơ chế chặn tải lên trùng lặp SHA-256."""
         # Mock session Chainlit

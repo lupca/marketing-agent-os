@@ -3,7 +3,7 @@ import uuid
 import logging
 from transformers import AutoTokenizer
 from langchain_core.messages import trim_messages
-from db.connection import SessionLocal
+from core.dependencies import get_session
 from core.models import Workspace
 
 logger = logging.getLogger("context_manager")
@@ -31,12 +31,12 @@ def get_trimmed_context(messages: list, max_tokens: int = 14000, workspace_id: s
     # Dynamically read max_tokens from workspace settings if available
     if workspace_id:
         try:
-            db = SessionLocal()
-            ws = db.query(Workspace).filter_by(id=uuid.UUID(str(workspace_id))).first()
-            if ws and ws.settings and ws.settings.get("max_tokens"):
-                max_tokens = int(ws.settings["max_tokens"])
-                logger.info(f"Using dynamic max_tokens={max_tokens} from workspace settings.")
-            db.close()
+            with get_session() as db:
+                ws = db.query(Workspace).filter_by(id=uuid.UUID(str(workspace_id))).first()
+                if ws and ws.settings and ws.settings.get("max_tokens"):
+                    max_tokens = int(ws.settings["max_tokens"])
+                    logger.info(f"Using dynamic max_tokens={max_tokens} from workspace settings.")
+                db.close()
         except Exception as e:
             logger.warning(f"Could not read max_tokens from workspace settings: {e}")
         

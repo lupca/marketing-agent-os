@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, "/root/marketing-agent-os")
 
 from app import fastapi_app
-from db.connection import SessionLocal
+from core.dependencies import get_session
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mkt_reorganize")
@@ -73,38 +73,38 @@ def main():
     # Upload via TestClient
     client = TestClient(fastapi_app)
     
-    db = SessionLocal()
-    ws = db.execute(text("SELECT id FROM workspaces ORDER BY created_at LIMIT 1")).fetchone()
-    ws_id = str(ws.id) if ws else None
-    db.close()
+    with get_session() as db:
+        ws = db.execute(text("SELECT id FROM workspaces ORDER BY created_at LIMIT 1")).fetchone()
+        ws_id = str(ws.id) if ws else None
+        db.close()
     
-    if not ws_id:
-        logger.error("No workspace found. Aborting upload.")
-        return
+        if not ws_id:
+            logger.error("No workspace found. Aborting upload.")
+            return
 
-    logger.info(f"Bắt đầu upload {len(files_to_upload)} tài liệu lên RAG với các tags chuẩn...")
+        logger.info(f"Bắt đầu upload {len(files_to_upload)} tài liệu lên RAG với các tags chuẩn...")
     
-    for path, tag in files_to_upload:
-        try:
-            with open(path, "rb") as f:
-                response = client.post(
-                    "/api/rag/upload",
-                    data={
-                        "workspace_id": ws_id,
-                        # Attach the specific tag + global so it's accessible globally if needed,
-                        # but typically we just attach the specific tag and marketing.
-                        "access_tags": json.dumps([tag, "marketing"])
-                    },
-                    files={"file": (os.path.basename(path), f)}
-                )
-                if response.status_code == 202:
-                    logger.info(f"✅ Uploaded {os.path.basename(path)} (Tag: {tag})")
-                elif response.status_code == 409:
-                    logger.warning(f"⚠️ Duplicate file ignored: {os.path.basename(path)}")
-                else:
-                    logger.error(f"❌ Failed to upload {os.path.basename(path)}: {response.status_code} - {response.text}")
-        except Exception as e:
-            logger.error(f"Exception uploading {path}: {e}")
+        for path, tag in files_to_upload:
+            try:
+                with open(path, "rb") as f:
+                    response = client.post(
+                        "/api/rag/upload",
+                        data={
+                            "workspace_id": ws_id,
+                            # Attach the specific tag + global so it's accessible globally if needed,
+                            # but typically we just attach the specific tag and marketing.
+                            "access_tags": json.dumps([tag, "marketing"])
+                        },
+                        files={"file": (os.path.basename(path), f)}
+                    )
+                    if response.status_code == 202:
+                        logger.info(f"✅ Uploaded {os.path.basename(path)} (Tag: {tag})")
+                    elif response.status_code == 409:
+                        logger.warning(f"⚠️ Duplicate file ignored: {os.path.basename(path)}")
+                    else:
+                        logger.error(f"❌ Failed to upload {os.path.basename(path)}: {response.status_code} - {response.text}")
+            except Exception as e:
+                logger.error(f"Exception uploading {path}: {e}")
 
 if __name__ == "__main__":
     main()

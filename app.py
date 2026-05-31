@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 # Import backend modules
-from db.connection import SessionLocal, is_mock
+from db.connection import  is_mock
+from core.dependencies import get_session
 from core.models import Workspace, ProductService
 from core.parser import extract_text_from_file, semantic_chunk_text
 from core.storage import upload_file
@@ -27,9 +28,16 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi import Request
 from core.dashboard import get_dashboard_analytics, simulate_scenario
 
-# Mount RAG API Routes
+# Mount Specialized API Routes
 from api.rag_routes import rag_router
+from api.vault_routes import vault_router
+from api.dashboard_routes import dashboard_router
+from api.workspace_routes import workspace_router
+
 fastapi_app.include_router(rag_router)
+fastapi_app.include_router(vault_router)
+fastapi_app.include_router(dashboard_router)
+fastapi_app.include_router(workspace_router)
 
 # Prevent Chainlit's catch-all route (/{full_path:path}) from intercepting RAG API routes
 # by moving it to the very end of the route list.
@@ -118,611 +126,6 @@ async def custom_dashboard_middleware(request: Request, call_next):
             content = f.read()
         return HTMLResponse(content=content)
 
-    elif path == "/api/vault/contents" and request.method == "GET":
-        db: Session = SessionLocal()
-        try:
-            from core.models import MasterContent, PlatformVariant, MarketingCampaign
-            approved_contents = db.query(MasterContent).filter(
-                MasterContent.approval_status == 'approved'
-            ).order_by(MasterContent.created_at.desc()).all()
-            
-            data = []
-            for mc in approved_contents:
-                camp = db.query(MarketingCampaign).filter_by(id=mc.campaign_id).first()
-                pvs = db.query(PlatformVariant).filter_by(master_content_id=mc.id).all()
-                
-                variants_list = []
-                for pv in pvs:
-                    variants_list.append({
-                        "platform": pv.platform,
-                        "adapted_copy": pv.adapted_copy,
-                        "publish_status": pv.publish_status,
-                        "created_at": pv.created_at.strftime('%Y-%m-%d %H:%M:%S') if pv.created_at else None
-                    })
-                
-                data.append({
-                    "id": str(mc.id),
-                    "campaign_name": camp.name if camp else "Chiến dịch tự trị",
-                    "core_message": mc.core_message,
-                    "created_at": mc.created_at.strftime('%d/%m/%Y %H:%M') if mc.created_at else None,
-                    "variants": variants_list
-                })
-            return JSONResponse(content={"status": "success", "data": data})
-        except Exception as e:
-            logger.error(f"Error fetching vault contents: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-        
-    elif path == "/api/dashboard/metrics" and request.method == "GET":
-        db: Session = SessionLocal()
-        try:
-            data = get_dashboard_analytics(db)
-            return JSONResponse(content=data)
-        except Exception as e:
-            logger.error(f"Error fetching dashboard metrics: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-            
-    elif path == "/api/dashboard/sync-metrics" and request.method == "POST":
-        try:
-            from core.celery_app import celery_app
-            celery_app.send_task(
-                "core.tasks.sync_own_media_metrics",
-                queue="social_publisher"
-            )
-            return JSONResponse(content={"status": "success", "message": "Đã đẩy lệnh đồng bộ metrics vào hàng đợi ngầm. Vui lòng F5 sau ít phút."})
-        except Exception as e:
-            logger.error(f"Error triggering metrics sync: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-
-    elif path == "/api/dashboard/simulate" and request.method == "POST":
-        db: Session = SessionLocal()
-        try:
-            body = await request.json()
-            test_budget = float(body.get("test_budget", 0))
-            price = float(body.get("price", 0))
-            cost = float(body.get("cost", 0))
-            res = simulate_scenario(test_budget, price, cost, db)
-            return JSONResponse(content=res)
-        except Exception as e:
-            logger.error(f"Error simulating scenario: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-
-    elif path == "/api/workspace/settings" and request.method == "GET":
-        db: Session = SessionLocal()
-        try:
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            ws = db.query(Workspace).filter_by(id=ws_id).first()
-            return JSONResponse(content=ws.settings if (ws and ws.settings) else {})
-        except Exception as e:
-            logger.error(f"Error fetching workspace settings: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-
-    elif path == "/api/workspace/settings" and request.method == "POST":
-        ALLOWED_SETTINGS = {"ai_model", "temperature", "max_tokens", "recursion_limit",
-                           "reranker_mode", "siliconflow_api_key", "enable_thinking", "ai_api_url"}
-        db: Session = SessionLocal()
-        try:
-            body = await request.json()
-            # Whitelist validation: only allow known setting keys
-            filtered = {k: v for k, v in body.items() if k in ALLOWED_SETTINGS}
-            if not filtered:
-                return JSONResponse(content={"status": "error", "message": "No valid settings provided"}, status_code=400)
-            # Type coercion & validation
-            if "temperature" in filtered:
-                filtered["temperature"] = max(0.0, min(1.0, float(filtered["temperature"])))
-            if "max_tokens" in filtered:
-                filtered["max_tokens"] = max(4000, min(20000, int(filtered["max_tokens"])))
-            if "recursion_limit" in filtered:
-                filtered["recursion_limit"] = max(2, min(15, int(filtered["recursion_limit"])))
-            if "enable_thinking" in filtered:
-                filtered["enable_thinking"] = bool(filtered["enable_thinking"])
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            ws = db.query(Workspace).filter_by(id=ws_id).first()
-            if ws:
-                current_settings = dict(ws.settings) if ws.settings else {}
-                current_settings.update(filtered)
-                ws.settings = current_settings
-                db.commit()
-                return JSONResponse(content={"status": "success"})
-            return JSONResponse(content={"status": "error", "message": "Workspace not found"}, status_code=404)
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error saving workspace settings: {e}", exc_info=True)
-            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
-        finally:
-            db.close()
-            
-    elif path == "/api/workspace/integrations" and request.method == "GET":
-        from core.models import WorkspaceIntegration
-        db: Session = SessionLocal()
-        try:
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            integrations = db.query(WorkspaceIntegration).filter_by(workspace_id=ws_id).order_by(WorkspaceIntegration.platform_name, WorkspaceIntegration.config_key).all()
-            data = [{
-                "id": str(i.id),
-                "platform_name": i.platform_name,
-                "config_key": i.config_key,
-                "config_value": i.config_value,
-                "is_active": i.is_active,
-                "created_at": i.created_at.strftime('%Y-%m-%d %H:%M:%S') if i.created_at else None
-            } for i in integrations]
-            return JSONResponse(content={"status": "success", "data": data})
-        except Exception as e:
-            logger.error(f"Error fetching workspace integrations: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-
-    elif path == "/api/workspace/integrations" and request.method == "POST":
-        from core.models import WorkspaceIntegration
-        from sqlalchemy.sql import func
-        db: Session = SessionLocal()
-        try:
-            body = await request.json()
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            
-            record_id = body.get("id")
-            platform_name = body.get("platform_name")
-            config_key = body.get("config_key")
-            config_value = body.get("config_value")
-            is_active = body.get("is_active", True)
-            
-            if not platform_name or not config_key or config_value is None:
-                return JSONResponse(content={"error": "Missing required fields"}, status_code=400)
-                
-            existing = None
-            if record_id:
-                try:
-                    existing = db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(record_id)).first()
-                except Exception:
-                    pass
-            
-            # Fallback to checking by platform and key if no record found by ID
-            if not existing:
-                existing = db.query(WorkspaceIntegration).filter_by(
-                    workspace_id=ws_id,
-                    platform_name=platform_name,
-                    config_key=config_key
-                ).first()
-            
-            if existing:
-                existing.platform_name = platform_name
-                existing.config_key = config_key
-                existing.config_value = str(config_value)
-                existing.is_active = bool(is_active)
-                existing.updated_at = func.now()
-                db.commit()
-                return JSONResponse(content={"status": "success", "message": "Updated successfully"})
-            else:
-                new_integration = WorkspaceIntegration(
-                    workspace_id=ws_id,
-                    platform_name=platform_name,
-                    config_key=config_key,
-                    config_value=str(config_value),
-                    is_active=bool(is_active)
-                )
-                db.add(new_integration)
-                db.commit()
-                return JSONResponse(content={"status": "success", "message": "Created successfully"})
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error saving workspace integration: {e}", exc_info=True)
-            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
-        finally:
-            db.close()
-
-    elif path == "/api/workspace/integrations/delete" and request.method == "POST":
-        from core.models import WorkspaceIntegration
-        db: Session = SessionLocal()
-        try:
-            body = await request.json()
-            integration_id = body.get("id")
-            if not integration_id:
-                return JSONResponse(content={"error": "Missing integration id"}, status_code=400)
-                
-            db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(integration_id)).delete()
-            db.commit()
-            return JSONResponse(content={"status": "success", "message": "Deleted successfully"})
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error deleting workspace integration: {e}", exc_info=True)
-            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
-        finally:
-            db.close()
-            
-    elif path == "/api/workspace/models" and request.method == "GET":
-        from core.models import AIModel
-        db: Session = SessionLocal()
-        try:
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
-            if not models:
-                # Seed the table with default models
-                logger.info("No AI models found in PostgreSQL for workspace Team Alpha. Seeding default models...")
-                DEFAULT_MODELS = [
-                    {
-                        "model_id": "deepseek-ai/DeepSeek-V4-Pro",
-                        "name": "DeepSeek-V4-Pro",
-                        "provider": "deepseek-ai",
-                        "description": "DeepSeek-V4-Pro is DeepSeek's flagship open-source MoE model with 1.6T total parameters and 49B activated, purpose-built for frontier-level reasoning, coding, and mathematical tasks.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "862B", "1M"],
-                        "series": "DeepSeek",
-                        "context_window": ">= 128K",
-                        "model_size": "Over 100B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "deepseek-ai/DeepSeek-V4-Flash",
-                        "name": "DeepSeek-V4-Flash",
-                        "provider": "deepseek-ai",
-                        "description": "DeepSeek-V4-Flash is DeepSeek's latest open-source MoE model featuring 284B total parameters with only 13B activated during inference, delivering high-speed generation and excellent general capabilities.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "158B", "1M"],
-                        "series": "DeepSeek",
-                        "context_window": ">= 128K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "moonshotai/Kimi-K2.6",
-                        "name": "Kimi-K2.6",
-                        "provider": "moonshotai",
-                        "description": "Kimi K2.6 is an open-source, native multimodal agentic model by Moonshot AI, achieving open-source state-of-the-art on benchmarks including HLE with tools, SWE-Bench Pro, and long-context reasoning.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Prefix", "Tools", "VLM", "1T", "256K", "MoE", "Reasoning"],
-                        "series": "Kimi",
-                        "context_window": ">= 128K",
-                        "model_size": "Over 100B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New"
-                    },
-                    {
-                        "model_id": "tencent/Hy3-preview",
-                        "name": "Hy3-preview",
-                        "provider": "tencent",
-                        "description": "Hy3 preview is a 295B-parameter Mixture-of-Experts (MoE) language model from Tencent Hunyuan, built for production-grade agent workloads. With only 21B parameters activated per token.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Prefix", "Tools", "Reasoning", "MoE", "300B", "131K"],
-                        "series": "Tencent",
-                        "context_window": ">= 128K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "zai-org/GLM-5.1",
-                        "name": "GLM-5.1",
-                        "provider": "zai-org",
-                        "description": "GLM-5.1 is Z.ai's next-generation flagship model built for agentic engineering. It is designed to run continuously for hours or even longer, refining its strategy as it works towards a complex goal.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "MoE", "Reasoning", "744B"],
-                        "series": "GLM",
-                        "context_window": ">= 128K",
-                        "model_size": "Over 100B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New"
-                    },
-                    {
-                        "model_id": "Qwen/Qwen3.5-35B-A3B",
-                        "name": "Qwen3.5-35B-A3B",
-                        "provider": "qwen",
-                        "description": "Qwen3.5-A3B is a large language model from Alibaba's Qwen3.5 series, featuring a Mixture-of-Experts (MoE) architecture with 35 billion total parameters and approximately 3 billion active parameters.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "VLM", "35B", "262K", "MoE", "Reasoning"],
-                        "series": "Qwen",
-                        "context_window": ">= 128K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New"
-                    },
-                    {
-                        "model_id": "Qwen/Qwen3.5-27B",
-                        "name": "Qwen3.5-27B",
-                        "provider": "qwen",
-                        "description": "Qwen3.5-27B is the first open-weight small-to-mid-sized dense model in the Qwen3.5 series, with targeted improvements for code generation, agent workflows, and real-world tools usage.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "VLM", "27B", "262K", "Reasoning"],
-                        "series": "Qwen",
-                        "context_window": ">= 128K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New 限时优惠"
-                    },
-                    {
-                        "model_id": "zai-org/GLM-5V-Turbo",
-                        "name": "GLM-5V-Turbo",
-                        "provider": "zai-org",
-                        "description": "GLM-5V-Turbo is Zhipu's latest flagship multimodal foundation model, optimized for multimodal coding and agent capabilities. It supports up to 200K tokens of image, video, and audio input.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "VLM", "MoE", "Reasoning"],
-                        "series": "GLM",
-                        "context_window": ">= 128K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New"
-                    },
-                    {
-                        "model_id": "Qwen/Qwen3.5-397B-A17B",
-                        "name": "Qwen3.5-397B-A17B",
-                        "provider": "qwen",
-                        "description": "Qwen3.5-397B-A17B is the latest vision-language model in the Qwen series, featuring a Mixture-of-Experts (MoE) architecture with 397B total parameters and 17B activated.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "VLM", "397B", "262K", "Reasoning"],
-                        "series": "Qwen",
-                        "context_window": ">= 128K",
-                        "model_size": "Over 100B",
-                        "is_custom": False,
-                        "is_new": True,
-                        "special_badge": "New"
-                    },
-                    {
-                        "model_id": "Qwen/Qwen3.5-122B-A10B",
-                        "name": "Qwen3.5-122B-A10B",
-                        "provider": "qwen",
-                        "description": "Qwen3.5-122B-A10B is a native multimodal large language model from the Qwen team, with 122B total parameters and only 10B activated. It features an efficient hybrid architecture.",
-                        "category": "Chat",
-                        "tags": ["Chat", "Tools", "VLM", "MoE", "Reasoning"],
-                        "series": "Qwen",
-                        "context_window": ">= 128K",
-                        "model_size": "Over 100B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "black-forest-labs/FLUX.1-schnell",
-                        "name": "FLUX.1-schnell",
-                        "provider": "FLUX",
-                        "description": "FLUX.1-schnell is Black Forest Labs' fastest state-of-the-art open-weights 12B parameter image generation model, optimized for local running or rapid cloud generation.",
-                        "category": "Image",
-                        "tags": ["Image", "Tools", "FIM", "Math"],
-                        "series": "FLUX",
-                        "context_window": ">= 8K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "luma/ray-1.6",
-                        "name": "Ray-1.6 Video",
-                        "provider": "Luma AI",
-                        "description": "Ray-1.6 is a state-of-the-art video generation model by Luma AI, designed for cinematographic realism, dynamic actions, and highly artistic composition.",
-                        "category": "Video",
-                        "tags": ["Video", "Tools", "MoE"],
-                        "series": "Wan",
-                        "context_window": ">= 16K",
-                        "model_size": "10 ~ 50B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "openai/whisper-large-v3",
-                        "name": "Whisper-Large-V3",
-                        "provider": "openai",
-                        "description": "Whisper Large V3 is OpenAI's state-of-the-art automatic speech recognition (ASR) and translation model, supporting multilingual audio transcribing.",
-                        "category": "Speech",
-                        "tags": ["Speech", "Tools"],
-                        "series": "Meta Llama",
-                        "context_window": ">= 32K",
-                        "model_size": "Under 10B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "BAAI/bge-m3",
-                        "name": "BGE-M3 Embeddings",
-                        "provider": "BAAI",
-                        "description": "BAAI's flagship local sentence embedding model natively outputting 1024-dimensional vectors. Exceptionally strong in Vietnamese and multilingual semantic tasks.",
-                        "category": "Embedding",
-                        "tags": ["Embedding", "Math"],
-                        "series": "Qwen",
-                        "context_window": ">= 8K",
-                        "model_size": "Under 10B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    },
-                    {
-                        "model_id": "BAAI/bge-reranker-large",
-                        "name": "BGE-Reranker-Large",
-                        "provider": "BAAI",
-                        "description": "BAAI's large cross-encoder document reranker, optimizing RAG pipeline semantic precision offline at 10ms speed on RTX 4060 Ti GPU VRAM (CUDA).",
-                        "category": "Reranker",
-                        "tags": ["Reranker", "Coder"],
-                        "series": "Qwen",
-                        "context_window": ">= 8K",
-                        "model_size": "Under 10B",
-                        "is_custom": False,
-                        "is_new": False,
-                        "special_badge": None
-                    }
-                ]
-                for m_data in DEFAULT_MODELS:
-                    # Determine a logical default api_url seed
-                    seed_api_url = "https://api.siliconflow.com/v1"
-                    if m_data["category"] in ["Embedding", "Reranker"]:
-                        seed_api_url = "http://localhost:11434/v1"
-                    
-                    db_model = AIModel(
-                        workspace_id=ws_id,
-                        model_id=m_data["model_id"],
-                        name=m_data["name"],
-                        provider=m_data["provider"],
-                        description=m_data["description"],
-                        category=m_data["category"],
-                        tags=m_data["tags"],
-                        series=m_data["series"],
-                        context_window=m_data["context_window"],
-                        model_size=m_data["model_size"],
-                        is_custom=m_data["is_custom"],
-                        is_new=m_data["is_new"],
-                        special_badge=m_data["special_badge"],
-                        api_url=seed_api_url,
-                        api_key=None
-                    )
-                    db.add(db_model)
-                db.commit()
-                # Re-query
-                models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
-            
-            # Serialize
-            data = []
-            for m in models:
-                data.append({
-                    "id": str(m.id),
-                    "model_id": m.model_id,
-                    "name": m.name,
-                    "provider": m.provider,
-                    "description": m.description,
-                    "category": m.category,
-                    "tags": m.tags or [],
-                    "series": m.series,
-                    "context_window": m.context_window,
-                    "model_size": m.model_size,
-                    "is_custom": m.is_custom,
-                    "is_new": m.is_new,
-                    "special_badge": m.special_badge,
-                    "api_url": m.api_url,
-                    "api_key": m.api_key,
-                    "created_at": m.created_at.strftime('%Y-%m-%d %H:%M:%S') if m.created_at else None
-                })
-            return JSONResponse(content={"status": "success", "data": data})
-        except Exception as e:
-            logger.error(f"Error fetching workspace AI models: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
- 
-    elif path == "/api/workspace/models" and request.method == "POST":
-        from core.models import AIModel
-        db: Session = SessionLocal()
-        try:
-            body = await request.json()
-            ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-            
-            # Validate required fields
-            model_id = body.get("model_id")
-            name = body.get("name")
-            provider = body.get("provider")
-            category = body.get("category")
-            if not model_id or not name or not provider or not category:
-                return JSONResponse(content={"error": "Missing required fields (model_id, name, provider, category)"}, status_code=400)
-                
-            db_model = AIModel(
-                workspace_id=ws_id,
-                model_id=model_id,
-                name=name,
-                provider=provider,
-                description=body.get("description", ""),
-                category=category,
-                tags=body.get("tags", []),
-                series=body.get("series", provider),
-                context_window=body.get("context_window", ">= 8K"),
-                model_size=body.get("model_size", "Under 10B"),
-                is_custom=True,
-                is_new=body.get("is_new", False),
-                special_badge=body.get("special_badge", None),
-                api_url=body.get("api_url", None),
-                api_key=body.get("api_key", None)
-            )
-            db.add(db_model)
-            db.commit()
-            
-            return JSONResponse(content={
-                "status": "success", 
-                "data": {
-                    "id": str(db_model.id),
-                    "model_id": db_model.model_id,
-                    "name": db_model.name
-                }
-            })
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error creating workspace AI model: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
- 
-    elif path.startswith("/api/workspace/models/") and request.method == "PUT":
-        from core.models import AIModel
-        db: Session = SessionLocal()
-        try:
-            # Extract id from path "/api/workspace/models/{id}"
-            model_uuid_str = path.split("/")[-1]
-            model_uuid = uuid.UUID(model_uuid_str)
-            body = await request.json()
-            
-            db_model = db.query(AIModel).filter_by(id=model_uuid).first()
-            if not db_model:
-                return JSONResponse(content={"error": "Model not found"}, status_code=404)
-                
-            # Update fields if provided
-            if "model_id" in body: db_model.model_id = body["model_id"]
-            if "name" in body: db_model.name = body["name"]
-            if "provider" in body: db_model.provider = body["provider"]
-            if "description" in body: db_model.description = body["description"]
-            if "category" in body: db_model.category = body["category"]
-            if "tags" in body: db_model.tags = body["tags"]
-            if "series" in body: db_model.series = body["series"]
-            if "context_window" in body: db_model.context_window = body["context_window"]
-            if "model_size" in body: db_model.model_size = body["model_size"]
-            if "is_new" in body: db_model.is_new = bool(body["is_new"])
-            if "special_badge" in body: db_model.special_badge = body["special_badge"]
-            if "api_url" in body: db_model.api_url = body["api_url"]
-            if "api_key" in body: db_model.api_key = body["api_key"]
-            
-            db.commit()
-            return JSONResponse(content={"status": "success"})
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error updating workspace AI model: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-
-    elif path.startswith("/api/workspace/models/") and request.method == "DELETE":
-        from core.models import AIModel
-        db: Session = SessionLocal()
-        try:
-            # Extract id from path "/api/workspace/models/{id}"
-            model_uuid_str = path.split("/")[-1]
-            model_uuid = uuid.UUID(model_uuid_str)
-            
-            db_model = db.query(AIModel).filter_by(id=model_uuid).first()
-            if not db_model:
-                return JSONResponse(content={"error": "Model not found"}, status_code=404)
-                
-            db.delete(db_model)
-            db.commit()
-            return JSONResponse(content={"status": "success"})
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error deleting workspace AI model: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
-        finally:
-            db.close()
-
     return await call_next(request)
 
 logger = logging.getLogger("chainlit_app")
@@ -737,27 +140,24 @@ def get_workspace_config(thread_id, workspace_id, product_id):
     Returns a unified LangGraph config dictionary, dynamically reading
     recursion_limit from the database workspace settings or falling back to 5.
     """
-    db = SessionLocal()
-    rec_limit = 5
-    try:
-        ws_id = uuid.UUID(str(workspace_id))
-        ws = db.query(Workspace).filter_by(id=ws_id).first()
-        if ws and ws.settings:
-            # Enforce 5 loops maximum as requested by CTO, but allow dashboard setting
-            rec_limit = int(ws.settings.get("recursion_limit") or ws.settings.get("max_loops") or 5)
-    except Exception as e:
-        logger.error(f"Error loading recursion limit from settings: {e}")
-    finally:
-        db.close()
-        
-    return {
-        "configurable": {
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "product_id": product_id
-        },
-        "recursion_limit": rec_limit
-    }
+    with get_session() as db:
+        rec_limit = 5
+        try:
+            ws_id = uuid.UUID(str(workspace_id))
+            ws = db.query(Workspace).filter_by(id=ws_id).first()
+            if ws and ws.settings:
+                # Enforce 5 loops maximum as requested by CTO, but allow dashboard setting
+                rec_limit = int(ws.settings.get("recursion_limit") or ws.settings.get("max_loops") or 5)
+        except Exception as e:
+            logger.error(f"Error loading recursion limit from settings: {e}")
+        return {
+            "configurable": {
+                "thread_id": thread_id,
+                "workspace_id": workspace_id,
+                "product_id": product_id
+            },
+            "recursion_limit": rec_limit
+        }
 
 
 # ----------------- v3.2 Track Messages & Render Draft Card -----------------
@@ -878,101 +278,98 @@ async def render_draft_card(config, state_values):
 @cl.on_chat_start
 async def on_chat_start():
     """Initialize session data and database context, recovering previous chat thread if exists."""
-    db = SessionLocal()
-    thread_id = None
+    with get_session() as db:
+        thread_id = None
     
-    # Read cookies from WebSocket client headers
-    client_headers = cl.context.session.client_headers if hasattr(cl.context.session, "client_headers") else {}
-    cookie_str = client_headers.get("cookie", "")
+        # Read cookies from WebSocket client headers
+        client_headers = cl.context.session.client_headers if hasattr(cl.context.session, "client_headers") else {}
+        cookie_str = client_headers.get("cookie", "")
     
-    cookies = {}
-    if cookie_str:
-        for item in cookie_str.split(";"):
-            if "=" in item:
-                k, v = item.strip().split("=", 1)
-                cookies[k] = v
+        cookies = {}
+        if cookie_str:
+            for item in cookie_str.split(";"):
+                if "=" in item:
+                    k, v = item.strip().split("=", 1)
+                    cookies[k] = v
                 
-    cookie_thread_id = cookies.get("chat_thread_id")
-    page_reloaded = cookies.get("chat_page_reloaded") == "1"
+        cookie_thread_id = cookies.get("chat_thread_id")
+        page_reloaded = cookies.get("chat_page_reloaded") == "1"
     
-    try:
-        # ONLY recover thread on F5 reload (page_reloaded is True)
-        if page_reloaded and cookie_thread_id:
-            checkpoint_exists = db.execute(text("SELECT 1 FROM checkpoints WHERE thread_id = :tid LIMIT 1"), {"tid": cookie_thread_id}).fetchone()
-            if checkpoint_exists:
-                thread_id = cookie_thread_id
-                logger.info(f"F5 Refresh detected. Recovered active thread_id from cookie: {thread_id}")
+        try:
+            # ONLY recover thread on F5 reload (page_reloaded is True)
+            if page_reloaded and cookie_thread_id:
+                checkpoint_exists = db.execute(text("SELECT 1 FROM checkpoints WHERE thread_id = :tid LIMIT 1"), {"tid": cookie_thread_id}).fetchone()
+                if checkpoint_exists:
+                    thread_id = cookie_thread_id
+                    logger.info(f"F5 Refresh detected. Recovered active thread_id from cookie: {thread_id}")
                 
+            if not thread_id:
+                # Fallback if first load or not refreshed
+                result = db.execute(text("SELECT thread_id FROM checkpoints ORDER BY checkpoint_id DESC LIMIT 1")).fetchone()
+                if result:
+                    thread_id = result[0]
+                    logger.info(f"Recovered existing thread_id from database: {thread_id}")
+        except Exception as e:
+            logger.error(f"Error recovering thread_id from database checkpoints: {e}")
         if not thread_id:
-            # Fallback if first load or not refreshed
-            result = db.execute(text("SELECT thread_id FROM checkpoints ORDER BY checkpoint_id DESC LIMIT 1")).fetchone()
-            if result:
-                thread_id = result[0]
-                logger.info(f"Recovered existing thread_id from database: {thread_id}")
-    except Exception as e:
-        logger.error(f"Error recovering thread_id from database checkpoints: {e}")
-    finally:
-        db.close()
+            thread_id = str(uuid.uuid4())
+            logger.info(f"Generated new thread_id: {thread_id}")
 
-    if not thread_id:
-        thread_id = str(uuid.uuid4())
-        logger.info(f"Generated new thread_id: {thread_id}")
-
-    cl.user_session.set("thread_id", thread_id)
-    cl.user_session.set("workspace_id", SEED_WORKSPACE_ID)
-    cl.user_session.set("product_id", SEED_PRODUCT_ID)
-    # Establish connection status greeting
-    profile = cl.user_session.get("chat_profile", "#phong-kinh-doanh")
-    db_mode = "MOCK SQLite (Offline)" if is_mock() else "PostgreSQL (Online)"
+        cl.user_session.set("thread_id", thread_id)
+        cl.user_session.set("workspace_id", SEED_WORKSPACE_ID)
+        cl.user_session.set("product_id", SEED_PRODUCT_ID)
+        # Establish connection status greeting
+        profile = cl.user_session.get("chat_profile", "#phong-kinh-doanh")
+        db_mode = "MOCK SQLite (Offline)" if is_mock() else "PostgreSQL (Online)"
     
-    welcome_msg = (
-        f"### 🖥️ Hệ Điều Hành Marketing Agent OS v3.0 Khởi Động!\n"
-        f"- **Môi trường CSDL:** `{db_mode}`\n"
-        f"- **Thread ID:** `{thread_id}`\n\n"
-        f"**Sếp cần giao việc gì hôm nay?**\n"
-        f"- Để tạo chiến dịch mới, nhập ví dụ: *\"Lên camp mới cho sản phẩm G-Agent Tech\"*\n"
-        f"- Để xem báo cáo hiệu suất, nhập ví dụ: *\"Xem báo cáo CPA tuần qua\"*\n"
-        f"- Gõ **`vault`** (không cần dấu gạch chéo `/`) để xem ngay kho bài viết quảng cáo chất lượng cao đã phê duyệt!\n"
-        f"- Hoặc kéo thả file tài liệu PDF/TXT vào đây để RAG tự động học tri thức!"
-    )
-    await cl.Message(content=welcome_msg).send()
+        welcome_msg = (
+            f"### 🖥️ Hệ Điều Hành Marketing Agent OS v3.0 Khởi Động!\n"
+            f"- **Môi trường CSDL:** `{db_mode}`\n"
+            f"- **Thread ID:** `{thread_id}`\n\n"
+            f"**Sếp cần giao việc gì hôm nay?**\n"
+            f"- Để tạo chiến dịch mới, nhập ví dụ: *\"Lên camp mới cho sản phẩm G-Agent Tech\"*\n"
+            f"- Để xem báo cáo hiệu suất, nhập ví dụ: *\"Xem báo cáo CPA tuần qua\"*\n"
+            f"- Gõ **`vault`** (không cần dấu gạch chéo `/`) để xem ngay kho bài viết quảng cáo chất lượng cao đã phê duyệt!\n"
+            f"- Hoặc kéo thả file tài liệu PDF/TXT vào đây để RAG tự động học tri thức!"
+        )
+        await cl.Message(content=welcome_msg).send()
 
-    # Load and restore past conversation messages onto the UI so history is persistent
-    config = get_workspace_config(thread_id, SEED_WORKSPACE_ID, SEED_PRODUCT_ID)
-    try:
-        state = await graph.aget_state(config)
-        if state and state.values and "messages" in state.values:
-            past_messages = state.values["messages"]
-            logger.info(f"Restoring {len(past_messages)} past messages onto Chainlit UI for thread {thread_id}")
-            for msg in past_messages:
-                author_name = "Sep (User)" if isinstance(msg, HumanMessage) or (hasattr(msg, "type") and msg.type == "human") else "Marketing OS Agent"
-                await cl.Message(content=msg.content, author=author_name).send()
+        # Load and restore past conversation messages onto the UI so history is persistent
+        config = get_workspace_config(thread_id, SEED_WORKSPACE_ID, SEED_PRODUCT_ID)
+        try:
+            state = await graph.aget_state(config)
+            if state and state.values and "messages" in state.values:
+                past_messages = state.values["messages"]
+                logger.info(f"Restoring {len(past_messages)} past messages onto Chainlit UI for thread {thread_id}")
+                for msg in past_messages:
+                    author_name = "Sep (User)" if isinstance(msg, HumanMessage) or (hasattr(msg, "type") and msg.type == "human") else "Marketing OS Agent"
+                    await cl.Message(content=msg.content, author=author_name).send()
                 
-            # NEW: Restore active approval actions if the recovered thread is waiting for human approval
-            if state.next and state.next[0] == "waiting_approval_barrier":
-                logger.info("Restoring active approval cards onto UI for thread...")
-                var = state.values.get("variants", [{}])[0]
-                cpa = state.values.get("target_cpa", 0.0)
+                # NEW: Restore active approval actions if the recovered thread is waiting for human approval
+                if state.next and state.next[0] == "waiting_approval_barrier":
+                    logger.info("Restoring active approval cards onto UI for thread...")
+                    var = state.values.get("variants", [{}])[0]
+                    cpa = state.values.get("target_cpa", 0.0)
                 
-                approval_card = (
-                    f"### 📥 KỊCH BẢN CHỜ PHÊ DUYỆT (HỒI PHỤC SAU F5)\n"
-                    f"- **Kênh đề xuất:** `Facebook Ads`\n"
-                    f"- **Ngưỡng target CPA tối đa:** `{cpa:,.0f} VNĐ` / đơn.\n\n"
-                    f"**Kịch bản đề xuất:**\n"
-                    f"```text\n{var.get('adapted_copy')}\n```\n"
-                    f"Sếp xem và duyệt chiến dịch vĩ mô này:"
-                )
-                actions = [
-                    cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
-                    cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
-                ]
-                await cl.Message(content=approval_card, actions=actions).send()
+                    approval_card = (
+                        f"### 📥 KỊCH BẢN CHỜ PHÊ DUYỆT (HỒI PHỤC SAU F5)\n"
+                        f"- **Kênh đề xuất:** `Facebook Ads`\n"
+                        f"- **Ngưỡng target CPA tối đa:** `{cpa:,.0f} VNĐ` / đơn.\n\n"
+                        f"**Kịch bản đề xuất:**\n"
+                        f"```text\n{var.get('adapted_copy')}\n```\n"
+                        f"Sếp xem và duyệt chiến dịch vĩ mô này:"
+                    )
+                    actions = [
+                        cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                        cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa ✍️")
+                    ]
+                    await cl.Message(content=approval_card, actions=actions).send()
                 
-            elif state.next and state.next[0] == "waiting_draft_approval":
-                logger.info("Restoring active draft card onto UI for thread...")
-                await render_draft_card(config, state.values)
-    except Exception as e:
-        logger.error(f"Error restoring past conversation onto UI: {e}")
+                elif state.next and state.next[0] == "waiting_draft_approval":
+                    logger.info("Restoring active draft card onto UI for thread...")
+                    await render_draft_card(config, state.values)
+        except Exception as e:
+            logger.error(f"Error restoring past conversation onto UI: {e}")
 
 async def run_vectorization_pipeline(element) -> str:
     """
@@ -980,51 +377,48 @@ async def run_vectorization_pipeline(element) -> str:
     Xử lý hoàn toàn async — không block UI.
     """
     from core.document_service import process_and_store_document, DuplicateDocumentError
-    db: Session = SessionLocal()
-    workspace_id = cl.user_session.get("workspace_id")
+    with get_session() as db:
+        workspace_id = cl.user_session.get("workspace_id")
 
-    # Read file bytes from element.path (Chainlit stores spontaneous uploads on disk)
-    # Fallback to element.content for backwards compatibility
-    file_bytes = None
-    if hasattr(element, 'path') and element.path:
+        # Read file bytes from element.path (Chainlit stores spontaneous uploads on disk)
+        # Fallback to element.content for backwards compatibility
+        file_bytes = None
+        if hasattr(element, 'path') and element.path:
+            try:
+                with open(element.path, "rb") as src:
+                    file_bytes = src.read()
+            except Exception as read_err:
+                logger.error(f"Failed to read from element.path '{element.path}': {read_err}")
+        if file_bytes is None and hasattr(element, 'content') and element.content:
+            file_bytes = element.content
+        if file_bytes is None:
+            db.close()
+            return f"❌ Không thể đọc file '{element.name}'. File rỗng hoặc lỗi upload."
+
         try:
-            with open(element.path, "rb") as src:
-                file_bytes = src.read()
-        except Exception as read_err:
-            logger.error(f"Failed to read from element.path '{element.path}': {read_err}")
-    if file_bytes is None and hasattr(element, 'content') and element.content:
-        file_bytes = element.content
-    if file_bytes is None:
-        db.close()
-        return f"❌ Không thể đọc file '{element.name}'. File rỗng hoặc lỗi upload."
+            doc_info = process_and_store_document(
+                db=db,
+                workspace_id=str(workspace_id),
+                file_bytes=file_bytes,
+                file_name=element.name,
+                access_tags=["marketing", "global"]
+            )
 
-    try:
-        doc_info = process_and_store_document(
-            db=db,
-            workspace_id=str(workspace_id),
-            file_bytes=file_bytes,
-            file_name=element.name,
-            access_tags=["marketing", "global"]
-        )
+            success_msg = (
+                f"### ✅ Tài liệu đã được nhận và đang xử lý!\n"
+                f"- **Tên file:** `{doc_info['file_name']}`\n"
+                f"- **Document ID:** `{doc_info['document_id']}`\n"
+                f"- **Tags:** `marketing, global`\n\n"
+                f"⚙️ Hệ thống đang băm vector ngầm (Celery). "
+                f"Truy cập **[Knowledge Base](/knowledge-base)** để theo dõi trạng thái và quản lý tags!"
+            )
+            return success_msg
 
-        success_msg = (
-            f"### ✅ Tài liệu đã được nhận và đang xử lý!\n"
-            f"- **Tên file:** `{doc_info['file_name']}`\n"
-            f"- **Document ID:** `{doc_info['document_id']}`\n"
-            f"- **Tags:** `marketing, global`\n\n"
-            f"⚙️ Hệ thống đang băm vector ngầm (Celery). "
-            f"Truy cập **[Knowledge Base](/knowledge-base)** để theo dõi trạng thái và quản lý tags!"
-        )
-        return success_msg
-
-    except DuplicateDocumentError as e:
-        return str(e)
-    except Exception as e:
-        logger.error(f"Error in run_vectorization_pipeline: {e}", exc_info=True)
-        return f"❌ Lỗi xử lý tài liệu '{element.name}': {str(e)}"
-    finally:
-        db.close()
-
+        except DuplicateDocumentError as e:
+            return str(e)
+        except Exception as e:
+            logger.error(f"Error in run_vectorization_pipeline: {e}", exc_info=True)
+            return f"❌ Lỗi xử lý tài liệu '{element.name}': {str(e)}"
 @cl.on_message
 async def on_message(message: cl.Message):
     """Handle chat messages, file imports, and orchestrate LangGraph."""
@@ -1046,42 +440,40 @@ async def on_message(message: cl.Message):
     # 2. Intercept /vault command (handling both /vault and vault cleanly to avoid React router redirect)
     cmd = message.content.strip().lower()
     if cmd in ["/vault", "vault", "/vault", "vault"]:
-        db = SessionLocal()
-        try:
-            from core.models import MasterContent, PlatformVariant, MarketingCampaign
-            approved_contents = db.query(MasterContent).filter(
-                MasterContent.approval_status == 'approved'
-            ).order_by(MasterContent.created_at.desc()).all()
+        with get_session() as db:
+            try:
+                from core.models import MasterContent, PlatformVariant, MarketingCampaign
+                approved_contents = db.query(MasterContent).filter(
+                    MasterContent.approval_status == 'approved'
+                ).order_by(MasterContent.created_at.desc()).all()
             
-            if not approved_contents:
-                await cl.Message(content="### 🏛️ KHO TÀI SẢN PHÊ DUYỆT (APPROVED ASSET VAULT)\nHiện chưa có kịch bản quảng cáo nào được duyệt. Hãy bắt đầu lên chiến dịch mới và phê duyệt bản nháp để đưa vào kho tài sản nhé!").send()
-                return
+                if not approved_contents:
+                    await cl.Message(content="### 🏛️ KHO TÀI SẢN PHÊ DUYỆT (APPROVED ASSET VAULT)\nHiện chưa có kịch bản quảng cáo nào được duyệt. Hãy bắt đầu lên chiến dịch mới và phê duyệt bản nháp để đưa vào kho tài sản nhé!").send()
+                    return
                 
-            vault_msg = "## 🏛️ KHO TÀI SẢN PHÊ DUYỆT (APPROVED ASSET VAULT)\nHiển thị danh sách các bài viết quảng cáo chất lượng cao đã qua kiểm duyệt kỹ lưỡng và sẵn sàng mang đi sản xuất:\n\n"
+                vault_msg = "## 🏛️ KHO TÀI SẢN PHÊ DUYỆT (APPROVED ASSET VAULT)\nHiển thị danh sách các bài viết quảng cáo chất lượng cao đã qua kiểm duyệt kỹ lưỡng và sẵn sàng mang đi sản xuất:\n\n"
             
-            for idx, mc in enumerate(approved_contents):
-                camp = db.query(MarketingCampaign).filter_by(id=mc.campaign_id).first()
-                camp_name = camp.name if camp else "Chiến dịch tự trị"
-                pvs = db.query(PlatformVariant).filter_by(master_content_id=mc.id).all()
+                for idx, mc in enumerate(approved_contents):
+                    camp = db.query(MarketingCampaign).filter_by(id=mc.campaign_id).first()
+                    camp_name = camp.name if camp else "Chiến dịch tự trị"
+                    pvs = db.query(PlatformVariant).filter_by(master_content_id=mc.id).all()
                 
-                vault_msg += f"### 📦 TÀI SẢN {idx+1}: {camp_name}\n"
-                vault_msg += f"- **Thông điệp cốt lõi (Core Message):** *\"{mc.core_message}\"* \n"
-                vault_msg += f"- **Thời gian duyệt:** `{mc.created_at.strftime('%d/%m/%Y %H:%M')}` \n"
+                    vault_msg += f"### 📦 TÀI SẢN {idx+1}: {camp_name}\n"
+                    vault_msg += f"- **Thông điệp cốt lõi (Core Message):** *\"{mc.core_message}\"* \n"
+                    vault_msg += f"- **Thời gian duyệt:** `{mc.created_at.strftime('%d/%m/%Y %H:%M')}` \n"
                 
-                if pvs:
-                    vault_msg += "**Kịch bản thích ứng phân phối:**\n"
-                    for pv in pvs:
-                        vault_msg += f"  *   **Kênh {pv.platform.upper()}:**\n"
-                        vault_msg += f"```text\n{pv.adapted_copy}\n```\n"
-                vault_msg += "---\n\n"
+                    if pvs:
+                        vault_msg += "**Kịch bản thích ứng phân phối:**\n"
+                        for pv in pvs:
+                            vault_msg += f"  *   **Kênh {pv.platform.upper()}:**\n"
+                            vault_msg += f"```text\n{pv.adapted_copy}\n```\n"
+                    vault_msg += "---\n\n"
                 
-            await cl.Message(content=vault_msg).send()
-        except Exception as e:
-            logger.error(f"Error querying Approved Vault: {e}", exc_info=True)
-            await cl.Message(content=f"❌ Không thể truy vấn Kho tài sản: {str(e)}").send()
-        finally:
-            db.close()
-        return
+                await cl.Message(content=vault_msg).send()
+            except Exception as e:
+                logger.error(f"Error querying Approved Vault: {e}", exc_info=True)
+                await cl.Message(content=f"❌ Không thể truy vấn Kho tài sản: {str(e)}").send()
+            return
 
     # 3. Process text command via LangGraph
     thread_id = cl.user_session.get("thread_id")
@@ -1142,79 +534,76 @@ async def on_message(message: cl.Message):
             f"Yêu cầu: Không được phép sử dụng lại các từ ngữ, cách tiếp cận, hoặc văn phong này!"
         )
         
-        db = SessionLocal()
-        try:
-            # Lưu feedback vào RAG dưới dạng document anti-pattern
-            import tempfile, json as _json
-            tmp_fb = tempfile.mktemp(suffix=".txt")
-            with open(tmp_fb, "w", encoding="utf-8") as _f:
-                _f.write(feedback_content)
-            fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
-            upload_file(tmp_fb, fb_key)
-            store_document(
-                db=db,
+        with get_session() as db:
+            try:
+                # Lưu feedback vào RAG dưới dạng document anti-pattern
+                import tempfile, json as _json
+                tmp_fb = tempfile.mktemp(suffix=".txt")
+                with open(tmp_fb, "w", encoding="utf-8") as _f:
+                    _f.write(feedback_content)
+                fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
+                upload_file(tmp_fb, fb_key)
+                store_document(
+                    db=db,
+                    workspace_id=workspace_id,
+                    file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
+                    file_key=fb_key,
+                    access_tags=["manager_feedback", "anti_patterns"],
+                    file_size_bytes=len(feedback_content.encode()),
+                )
+            except Exception as ve:
+                logger.error(f"Failed to vectorize feedback: {ve}")
+            # Log reject decision
+            log_decision(
                 workspace_id=workspace_id,
-                file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
-                file_key=fb_key,
-                access_tags=["manager_feedback", "anti_patterns"],
-                file_size_bytes=len(feedback_content.encode()),
+                campaign_id=campaign_id,
+                agent_name="CMO / CEO",
+                action="Reject Script via Chat",
+                decision_status="rejected",
+                reason=f"CMO đã gõ phản hồi từ chối bản thảo kịch bản nháp. Yêu cầu sửa đổi: \"{feedback_text}\"",
+                metadata={"feedback": feedback_text}
             )
-        except Exception as ve:
-            logger.error(f"Failed to vectorize feedback: {ve}")
-        finally:
-            db.close()
-            
-        # Log reject decision
-        log_decision(
-            workspace_id=workspace_id,
-            campaign_id=campaign_id,
-            agent_name="CMO / CEO",
-            action="Reject Script via Chat",
-            decision_status="rejected",
-            reason=f"CMO đã gõ phản hồi từ chối bản thảo kịch bản nháp. Yêu cầu sửa đổi: \"{feedback_text}\"",
-            metadata={"feedback": feedback_text}
-        )
         
-        # Resume the graph by injecting human feedback and routing back to copywriter
-        state_update = {
-            "messages": [HumanMessage(content=f"CEO Feedback: {feedback_text}")],
-            "sop_stage": "creative_generation"
-        }
-        await graph.aupdate_state(config, state_update)
+            # Resume the graph by injecting human feedback and routing back to copywriter
+            state_update = {
+                "messages": [HumanMessage(content=f"CEO Feedback: {feedback_text}")],
+                "sop_stage": "creative_generation"
+            }
+            await graph.aupdate_state(config, state_update)
         
-        cb = cl.LangchainCallbackHandler()
-        async for event in graph.astream(None, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                if node_name == "copywriter":
-                    var = node_update.get("variants", [])[0]
-                    copy_msg = (
-                        f"✍️ **[Bản Thảo Viết Lại của Copywriter]**\n"
-                        f"```text\n{var.get('adapted_copy')}\n```"
-                    )
-                    sent = await cl.Message(content=copy_msg).send()
-                    track_msg_id(sent.id)
-                elif node_name == "guardian":
-                    logs = node_update.get("feedback_log", [])
-                    sent = await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
-                    track_msg_id(sent.id)
+            cb = cl.LangchainCallbackHandler()
+            async for event in graph.astream(None, config=config, stream_mode="updates"):
+                for node_name, node_update in event.items():
+                    if node_name == "copywriter":
+                        var = node_update.get("variants", [])[0]
+                        copy_msg = (
+                            f"✍️ **[Bản Thảo Viết Lại của Copywriter]**\n"
+                            f"```text\n{var.get('adapted_copy')}\n```"
+                        )
+                        sent = await cl.Message(content=copy_msg).send()
+                        track_msg_id(sent.id)
+                    elif node_name == "guardian":
+                        logs = node_update.get("feedback_log", [])
+                        sent = await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
+                        track_msg_id(sent.id)
                     
-        await associate_messages_with_current_checkpoint(config)
-        # Check if paused again
-        current_state = await graph.aget_state(config)
-        if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
-            var = current_state.values.get("variants", [{}])[0]
-            approval_card = (
-                f"### 📥 BẢN THẢO VIẾT LẠI CHỜ DUYỆT\n"
-                f"```text\n{var.get('adapted_copy')}\n```"
-            )
-            new_actions = [
-                cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
-                cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
-            ]
-            sent = await cl.Message(content=approval_card, actions=new_actions).send()
-            track_msg_id(sent.id)
             await associate_messages_with_current_checkpoint(config)
-        return
+            # Check if paused again
+            current_state = await graph.aget_state(config)
+            if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
+                var = current_state.values.get("variants", [{}])[0]
+                approval_card = (
+                    f"### 📥 BẢN THẢO VIẾT LẠI CHỜ DUYỆT\n"
+                    f"```text\n{var.get('adapted_copy')}\n```"
+                )
+                new_actions = [
+                    cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                    cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
+                ]
+                sent = await cl.Message(content=approval_card, actions=new_actions).send()
+                track_msg_id(sent.id)
+                await associate_messages_with_current_checkpoint(config)
+            return
 
     initial_state = {
         "messages": [HumanMessage(content=message.content)],
@@ -1490,75 +879,72 @@ async def on_reject(action: cl.Action):
             f"Yêu cầu: Không được phép sử dụng lại các từ ngữ, cách tiếp cận, hoặc văn phong này!"
         )
         
-        db = SessionLocal()
-        try:
-            import tempfile
-            tmp_fb = tempfile.mktemp(suffix=".txt")
-            with open(tmp_fb, "w", encoding="utf-8") as _f:
-                _f.write(feedback_content)
-            fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
-            upload_file(tmp_fb, fb_key)
-            store_document(
-                db=db,
+        with get_session() as db:
+            try:
+                import tempfile
+                tmp_fb = tempfile.mktemp(suffix=".txt")
+                with open(tmp_fb, "w", encoding="utf-8") as _f:
+                    _f.write(feedback_content)
+                fb_key = f"rag/{workspace_id}/feedback_{uuid.uuid4().hex[:8]}.txt"
+                upload_file(tmp_fb, fb_key)
+                store_document(
+                    db=db,
+                    workspace_id=workspace_id,
+                    file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
+                    file_key=fb_key,
+                    access_tags=["manager_feedback", "anti_patterns"],
+                    file_size_bytes=len(feedback_content.encode()),
+                )
+                logger.info("Successfully queued CMO feedback vectorization via Celery!")
+            except Exception as ve:
+                logger.error(f"Failed to vectorize CMO feedback: {ve}", exc_info=True)
+            # 3. Log CMO reject decision in agent_decisions table
+            log_decision(
                 workspace_id=workspace_id,
-                file_name=f"cmo_feedback_{uuid.uuid4().hex[:6]}.txt",
-                file_key=fb_key,
-                access_tags=["manager_feedback", "anti_patterns"],
-                file_size_bytes=len(feedback_content.encode()),
+                campaign_id=campaign_id,
+                agent_name="CMO / CEO",
+                action="Reject Script",
+                decision_status="rejected",
+                reason=f"CMO đã xem bản thảo kịch bản nháp và từ chối. Yêu cầu sửa đổi: \"{feedback_text}\"",
+                metadata={"feedback": feedback_text, "old_script": old_copy}
             )
-            logger.info("Successfully queued CMO feedback vectorization via Celery!")
-        except Exception as ve:
-            logger.error(f"Failed to vectorize CMO feedback: {ve}", exc_info=True)
-        finally:
-            db.close()
-            
-        # 3. Log CMO reject decision in agent_decisions table
-        log_decision(
-            workspace_id=workspace_id,
-            campaign_id=campaign_id,
-            agent_name="CMO / CEO",
-            action="Reject Script",
-            decision_status="rejected",
-            reason=f"CMO đã xem bản thảo kịch bản nháp và từ chối. Yêu cầu sửa đổi: \"{feedback_text}\"",
-            metadata={"feedback": feedback_text, "old_script": old_copy}
-        )
         
-        # Resume the graph by injecting human feedback and routing back to copywriter
-        # We update the state first with human feedback in state values
-        state_update = {
-            "messages": [HumanMessage(content=f"CEO Feedback: {feedback_text}")],
-            "sop_stage": "creative_generation"
-        }
-        await graph.aupdate_state(config, state_update)
+            # Resume the graph by injecting human feedback and routing back to copywriter
+            # We update the state first with human feedback in state values
+            state_update = {
+                "messages": [HumanMessage(content=f"CEO Feedback: {feedback_text}")],
+                "sop_stage": "creative_generation"
+            }
+            await graph.aupdate_state(config, state_update)
         
-        # Resume graph stream
-        cb = cl.LangchainCallbackHandler()
-        async for event in graph.astream(None, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                if node_name == "copywriter":
-                    var = node_update.get("variants", [])[0]
-                    copy_msg = (
-                        f"✍️ **[Bản Thảo Viết Lại của Copywriter]**\n"
-                        f"```text\n{var.get('adapted_copy')}\n```"
-                    )
-                    await cl.Message(content=copy_msg).send()
-                elif node_name == "guardian":
-                    logs = node_update.get("feedback_log", [])
-                    await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
+            # Resume graph stream
+            cb = cl.LangchainCallbackHandler()
+            async for event in graph.astream(None, config=config, stream_mode="updates"):
+                for node_name, node_update in event.items():
+                    if node_name == "copywriter":
+                        var = node_update.get("variants", [])[0]
+                        copy_msg = (
+                            f"✍️ **[Bản Thảo Viết Lại của Copywriter]**\n"
+                            f"```text\n{var.get('adapted_copy')}\n```"
+                        )
+                        await cl.Message(content=copy_msg).send()
+                    elif node_name == "guardian":
+                        logs = node_update.get("feedback_log", [])
+                        await cl.Message(content=f"🛡️ **[Phòng Sáng Tạo - Brand Guardian]**\n- Kết quả chấm lại: `{logs[-1]}`").send()
                     
-        # Check if paused again
-        current_state = await graph.aget_state(config)
-        if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
-            var = current_state.values.get("variants", [{}])[0]
-            approval_card = (
-                f"### 📥 BẢN THẢO VIẾT LẠI CHỜ DUYỆT\n"
-                f"```text\n{var.get('adapted_copy')}\n```"
-            )
-            new_actions = [
-                cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
-                cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
-            ]
-            await cl.Message(content=approval_card, actions=new_actions).send()
+            # Check if paused again
+            current_state = await graph.aget_state(config)
+            if current_state and current_state.next and current_state.next[0] == "waiting_approval_barrier":
+                var = current_state.values.get("variants", [{}])[0]
+                approval_card = (
+                    f"### 📥 BẢN THẢO VIẾT LẠI CHỜ DUYỆT\n"
+                    f"```text\n{var.get('adapted_copy')}\n```"
+                )
+                new_actions = [
+                    cl.Action(name="cmo_approve", payload={"value": "approved"}, label="Duyệt và Đăng 🚀"),
+                    cl.Action(name="cmo_reject", payload={"value": "rejected"}, label="Yêu cầu sửa tiếp ✍️")
+                ]
+                await cl.Message(content=approval_card, actions=new_actions).send()
 
     await action.remove()
 

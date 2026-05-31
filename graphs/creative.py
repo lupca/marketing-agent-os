@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 from sqlalchemy.orm import Session
-from db.connection import SessionLocal
+from core.dependencies import get_session
 from core.models import ProductService
 from core.ollama_client import generate_text
 from graphs.researcher import run_research
@@ -41,17 +41,25 @@ def build_strategist_prompt(
     product_name: str, 
     product_usp: str, 
     anti_patterns_report: str, 
-    insights_str: str
+    insights_str: str,
+    brand_data: dict = None
 ) -> str:
-    """Build the prompt for Strategist Agent incorporating RAG findings."""
+    """Build the prompt for Strategist Agent incorporating RAG findings and dynamic brand identity."""
+    if not brand_data:
+        brand_data = {
+            "brand_name": "G-Agent Tech",
+            "voice_and_tone": "Chuyên nghiệp, sắc bén, số liệu thực tế",
+            "keywords": "AI Agent, LangGraph, Tối ưu CPA"
+        }
+    
     base_prompt = ANGLE_STRATEGIST_PROMPT.format(
         num_angles=1,
         funnel_stage="Consideration",
-        campaign_name="Chiến dịch tăng doanh số",
+        campaign_name=state.get("campaign_name", "Chiến dịch tăng doanh số"),
         campaign_goal="Tối ưu chi phí chuyển đổi ads",
-        brand_name="G-Agent Tech",
-        brand_voice="Chuyên nghiệp, sắc bén, số liệu thực tế",
-        brand_keywords="AI Agent, LangGraph, Tối ưu CPA",
+        brand_name=brand_data.get("brand_name", "G-Agent Tech"),
+        brand_voice=brand_data.get("voice_and_tone", "Chuyên nghiệp, sắc bén, số liệu thực tế"),
+        brand_keywords=", ".join(brand_data.get("keywords", [])) if isinstance(brand_data.get("keywords"), list) else brand_data.get("keywords", ""),
         product_name=product_name,
         product_usp=product_usp,
         product_features="Analyst Node, Copywriter Node, Auto scale/kill ads",
@@ -193,25 +201,28 @@ def strategist_node(state: AgencyState) -> dict:
     and creates a structured content marketing angle strategy.
     """
     logger.info("Executing Strategist Node (Marketing Angle Formulation)...")
-    db: Session = SessionLocal()
-    
+    from core.db_services import get_brand_context
     workspace_id = state.get("workspace_id")
     product_id = state.get("product_id")
-    
-    # 1. Fetch Product details
-    product = None
-    if product_id:
-        try:
-            product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
-        except Exception:
-            pass
-    if not product:
-        product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
+
+    with get_session() as db:
+        # 1. Fetch Product details
+        product = None
+        if product_id:
+            try:
+                product = db.query(ProductService).filter_by(id=uuid.UUID(str(product_id))).first()
+            except Exception:
+                pass
+        if not product:
+            product = db.query(ProductService).filter_by(name="Marketing Agent OS Software").first()
         
-    product_name = product.name if product else "Sản phẩm AI"
-    product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
+        product_name = product.name if product else "Sản phẩm AI"
+        product_usp = product.usp if product else "Công nghệ AI Agent tự động hóa tối ưu"
     
-    # 2. Get customer insights from Researcher (dùng access_tags phân quyền đúng)
+        # 2. Fetch Brand details dynamically
+        brand_data = get_brand_context(workspace_id)
+
+    # 3. Get customer insights from Researcher (dùng access_tags phân quyền đúng)
     logger.info("Calling Researcher Agent for customer insights...")
     try:
         # Insights tâm lý/chiến lược: truy cập cả marketing, psychology, economics
@@ -228,21 +239,18 @@ def strategist_node(state: AgencyState) -> dict:
         )
     except Exception as e:
         logger.error(f"Lỗi phối hợp phòng ban: Strategist không nhận được báo cáo từ Researcher: {e}")
-        db.close()
         raise RuntimeError(f"Lỗi phối hợp phòng ban: Strategist không thể nhận báo cáo từ Researcher: {e}") from e
-    finally:
-        db.close()
-        
-    # 3. Build Prompt & Generate
-    final_prompt = build_strategist_prompt(state, product_name, product_usp, anti_patterns_report, insights_str)
+    
+    # 4. Build Prompt & Generate
+    final_prompt = build_strategist_prompt(state, product_name, product_usp, anti_patterns_report, insights_str, brand_data=brand_data)
     
     logger.info("Generating marketing angle strategy from Ollama...")
     system_prompt = "You are a professional marketing strategist. You MUST format output in valid JSON."
     res_str = generate_text(final_prompt, system_prompt=system_prompt, json_format=True, workspace_id=workspace_id)
     angle_data = parse_llm_json(res_str, fallback_data=STRATEGIST_FALLBACK)
-    
+
     logger.info(f"Strategist Node finished. Selected Angle: {angle_data.get('angle_name')}")
-    
+
     strat_msg = (
         f"🧠 **[Phòng Sáng Tạo - Strategist]**\n"
         f"- Đã nghiên cứu RAG và tự động dán RAG bài học thất bại.\n"
@@ -250,7 +258,7 @@ def strategist_node(state: AgencyState) -> dict:
         f"- **Nỗi đau đánh trúng:** \"{angle_data.get('pain_point_focus')}\"\n"
         f"- **Tập trung:** {angle_data.get('psychological_angle')}"
     )
-    
+
     return trim_and_log(
         state=state,
         new_state_data={

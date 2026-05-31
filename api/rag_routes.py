@@ -29,26 +29,13 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from db.connection import SessionLocal
-from core.rag import store_document, retrieve_chunks_reranked
+from core.dependencies import get_db
+from core.rag import retrieve_chunks_reranked
 from core.tasks import cascade_update_tags, cascade_soft_delete
-from core.storage import upload_file
-from core.models import RAGAccessTag, RAGDocument
 
 logger = logging.getLogger("api_rag_routes")
 
 rag_router = APIRouter()
-
-
-# ============================================================
-# Dependency: DB Session
-# ============================================================
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # ============================================================

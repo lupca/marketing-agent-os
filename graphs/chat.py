@@ -46,7 +46,7 @@ def chat_node(state: AgencyState) -> dict:
         f"- Thân thiện, chuyên nghiệp, ngắn gọn.\n"
         f"- Luôn sẵn sàng giúp đỡ và hướng dẫn người dùng.\n\n"
         f"## Khi người dùng hỏi về Thương hiệu hiện tại hoặc Sản phẩm hiện tại:\n"
-        f"- Hãy trả lời chính xác dựa trên thông tin Ngữ cảnh Doanh nghiệp được cung cấp ở trên (ví dụ: thương hiệu hiện tại là 'G-Agent Tech', sản phẩm là 'Marketing Agent OS Software'). Tuyệt đối không bịa đặt hoặc trả lời mơ hồ, không dùng các placeholder như [tên thương hiệu].\n\n"
+        f"- Hãy trả lời chính xác dựa trên thông tin Ngữ cảnh Doanh nghiệp được cung cấp ở trên. Tuyệt đối không bịa đặt hoặc trả lời mơ hồ, không dùng các placeholder như [tên thương hiệu].\n\n"
         f"## Khi người dùng chào hỏi hoặc hỏi tổng quát:\n"
         f"- Chào lại và giới thiệu ngắn gọn bạn có thể làm gì.\n\n"
         f"## Các tính năng bạn có thể hướng dẫn:\n"

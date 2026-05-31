@@ -30,11 +30,12 @@ class UniversalParser:
             logger.error(f"[parser] Lỗi khi parse file bằng MarkItDown: {e}")
             raise e
 
-    def chunk_markdown(self, markdown_text: str) -> List[any]:
+    def chunk_markdown(self, markdown_text: str, chunk_size: int = None, chunk_overlap: int = None) -> List[str]:
         """
         Chiến lược Chunking 2 Bước (2-Step Pipeline):
         Bước 1: Chặt theo Header để giữ ngữ cảnh cấu trúc tài liệu.
         Bước 2: Cắt nhỏ các chunk quá dài bằng Recursive Character Splitter.
+        Returns: List[str] (Raw text chunks).
         """
         if not markdown_text or not markdown_text.strip():
             return []
@@ -51,14 +52,15 @@ class UniversalParser:
         )
         md_header_splits = markdown_splitter.split_text(markdown_text)
         
-        # Import cấu hình mặc định (CTO v3)
-        try:
-            from config.settings import RAG_CHUNK_SIZE, RAG_CHUNK_OVERLAP
-            chunk_size = RAG_CHUNK_SIZE
-            chunk_overlap = RAG_CHUNK_OVERLAP
-        except ImportError:
-            chunk_size = 1000
-            chunk_overlap = 200
+        # Cấu hình mặc định (CTO v3)
+        if chunk_size is None or chunk_overlap is None:
+            try:
+                from config.settings import RAG_CHUNK_SIZE, RAG_CHUNK_OVERLAP
+                chunk_size = chunk_size or RAG_CHUNK_SIZE
+                chunk_overlap = chunk_overlap or RAG_CHUNK_OVERLAP
+            except ImportError:
+                chunk_size = chunk_size or 1000
+                chunk_overlap = chunk_overlap or 200
 
         # Bước 2: Recursive Character Splitting (Safety Net)
         text_splitter = RecursiveCharacterTextSplitter(
@@ -67,13 +69,17 @@ class UniversalParser:
         )
         final_splits = text_splitter.split_documents(md_header_splits)
         
-        logger.info(f"[parser] Chunking hoàn tất: {len(markdown_text)} ký tự -> {len(final_splits)} chunks")
-        return final_splits
+        # Trích xuất chuỗi thô từ page_content của Langchain Document
+        chunks = [doc.page_content.strip() for doc in final_splits if doc and doc.page_content.strip()]
+        # Lọc bỏ chunks quá ngắn (< 10 ký tự)
+        chunks = [c for c in chunks if len(c) >= 10]
+        
+        logger.info(f"[parser] Chunking hoàn tất: {len(markdown_text)} ký tự -> {len(chunks)} chunks")
+        return chunks
 
 
 # ============================================================
 # BACKWARD COMPATIBILITY WRAPPERS
-# Giúp các thành phần cũ (app.py, core/tasks.py) hoạt động ổn định
 # ============================================================
 def extract_text_from_file(file_path: str) -> str:
     """Wrapper tương thích ngược: Trích xuất nội dung sử dụng UniversalParser."""
@@ -87,38 +93,5 @@ def semantic_chunk_text(
     separators: list = None,
 ) -> List[str]:
     """Wrapper tương thích ngược: Chia nhỏ văn bản theo cấu trúc Markdown."""
-    if not text or not text.strip():
-        return []
-    
     parser = UniversalParser()
-    # Nếu chunk_size hoặc chunk_overlap được truyền động, chúng ta tự cấu hình Recursive splitter
-    # Ngược lại dùng hàm mặc định của UniversalParser
-    if chunk_size is not None or chunk_overlap is not None:
-        # Chạy thủ công pipeline 2 bước với kích thước tùy biến
-        headers_to_split_on = [
-            ("#", "Header 1"),
-            ("##", "Header 2"),
-            ("###", "Header 3"),
-        ]
-        markdown_splitter = MarkdownHeaderTextSplitter(
-            headers_to_split_on=headers_to_split_on,
-            strip_headers=False
-        )
-        md_header_splits = markdown_splitter.split_text(text)
-        
-        c_size = chunk_size if chunk_size is not None else 1000
-        c_overlap = chunk_overlap if chunk_overlap is not None else 200
-        
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=c_size, 
-            chunk_overlap=c_overlap
-        )
-        final_splits = text_splitter.split_documents(md_header_splits)
-    else:
-        final_splits = parser.chunk_markdown(text)
-    
-    # Trích xuất chuỗi thô từ page_content của Langchain Document
-    chunks = [doc.page_content.strip() for doc in final_splits if doc and doc.page_content.strip()]
-    # Lọc bỏ chunks quá ngắn (< 10 ký tự) như thiết kế cũ
-    chunks = [c for c in chunks if len(c) >= 10]
-    return chunks
+    return parser.chunk_markdown(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)

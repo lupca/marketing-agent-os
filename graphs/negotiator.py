@@ -3,7 +3,7 @@ import logging
 import json
 import uuid
 from sqlalchemy.orm import Session
-from db.connection import SessionLocal
+from core.dependencies import get_session
 from core.ollama_client import generate_text
 from core.rag import retrieve_chunks_reranked
 from core.db_services import get_product_context
@@ -70,131 +70,131 @@ def negotiator_node(state: AgencyState) -> dict:
     Uses RAG retrieval for past performance metrics and case studies.
     """
     logger.info("Executing Proactive Negotiator Node...")
-    db: Session = SessionLocal()
+    with get_session() as db:
     
-    workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
-    product_id = state.get("product_id") or "00000000-0000-0000-0000-000000000005"
-    campaign_id = state.get("campaign_id")
+        workspace_id = state.get("workspace_id") or "00000000-0000-0000-0000-000000000002"
+        product_id = state.get("product_id") or "00000000-0000-0000-0000-000000000005"
+        campaign_id = state.get("campaign_id")
     
-    # 1. Fetch Product details
-    product_name = "Sản phẩm AI"
-    product_price = 0.0
-    product_cost = 0.0
-    product_margin = 0.0
-    try:
-        product = get_product_context(uuid.UUID(str(product_id)))
-        product_name = product.get("name", "Sản phẩm AI")
-        product_price = product.get("price", 0.0)
-        product_cost = product.get("cost", 0.0)
-        product_margin = product.get("margin", 0.0)
-    except Exception as e:
-        logger.error(f"Error fetching product name: {e}")
+        # 1. Fetch Product details
+        product_name = "Sản phẩm AI"
+        product_price = 0.0
+        product_cost = 0.0
+        product_margin = 0.0
+        try:
+            product = get_product_context(uuid.UUID(str(product_id)))
+            product_name = product.get("name", "Sản phẩm AI")
+            product_price = product.get("price", 0.0)
+            product_cost = product.get("cost", 0.0)
+            product_margin = product.get("margin", 0.0)
+        except Exception as e:
+            logger.error(f"Error fetching product name: {e}")
         
-    calculated_anchor_cpa = product_margin * 0.3
+        calculated_anchor_cpa = product_margin * 0.3
         
-    # 2. Retrieve relevant Case Studies (RAG)
-    query = f"chỉ số hiệu suất CPA ngân sách và kết quả chiến dịch cũ của {product_name}"
-    logger.info(f"Negotiator retrieving RAG context for: {query}")
-    rag_results = retrieve_chunks_reranked(
-        db, 
-        uuid.UUID(str(workspace_id)), 
-        query, 
-        access_tags=["economics", "anti_patterns", "user_upload"], 
-        limit=3
-    )
-    
-    case_studies_str = ""
-    if rag_results:
-        for idx, item in enumerate(rag_results):
-            case_studies_str += f"Case Study {idx+1}: {item.get('content')}\n"
-    else:
-        case_studies_str = "(Không tìm thấy case study cũ trong cơ sở dữ liệu. Vui lòng tự đề xuất chỉ số hợp lý)"
-        
-    # 3. Read current DraftPlan
-    draft = state.get("draft_plan") or {}
-    current_budget = draft.get("test_budget") or state.get("test_budget") or 2000000.0
-    current_cpa = draft.get("target_cpa") or state.get("target_cpa") or 150000.0
-    current_notes = draft.get("notes_for_creative") or ""
-    
-    # 4. Form conversation history
-    messages = state.get("messages", [])
-    recent_messages = messages[-6:]
-    history_lines = []
-    for msg in recent_messages:
-        role = "Sếp" if isinstance(msg, HumanMessage) or getattr(msg, "type", "") == "human" else "Negotiator"
-        history_lines.append(f"{role}: {msg.content}")
-    history_str = "\n".join(history_lines)
-    
-    # 5. Build prompt and invoke LLM
-    prompt = NEGOTIATOR_SYSTEM_PROMPT.format(
-        product_name=product_name,
-        product_price=product_price,
-        product_cost=product_cost,
-        product_margin=product_margin,
-        calculated_anchor_cpa=calculated_anchor_cpa,
-        case_studies=case_studies_str,
-        current_budget=current_budget,
-        current_cpa=current_cpa,
-        current_notes=current_notes,
-        conversation_history=history_str
-    )
-    
-    query_text = messages[-1].content if messages else "Đàm phán bản thảo"
-    system_prompt = "You are a master business negotiator. Output JSON only."
-    
-    try:
-        response_str = generate_text(query_text, system_prompt=prompt, json_format=True, workspace_id=workspace_id)
-        result = parse_llm_json(response_str, fallback_data={
-            "thought_process": "Lỗi phân tích JSON từ LLM. Giữ nguyên chỉ số.",
-            "updated_draft_plan": {
-                "test_budget": current_budget,
-                "target_cpa": current_cpa,
-                "notes_for_creative": current_notes
-            },
-            "agent_message": "Dạ em đã ghi nhận ý kiến của Sếp. Em xin gửi lại bản phác thảo ngân sách và CPA để Sếp duyệt."
-        })
-    except Exception as e:
-        logger.error(f"Error calling LLM for negotiation: {e}")
-        result = {
-            "thought_process": f"Lỗi gọi LLM: {str(e)}",
-            "updated_draft_plan": {
-                "test_budget": current_budget,
-                "target_cpa": current_cpa,
-                "notes_for_creative": current_notes
-            },
-            "agent_message": "Dạ, hệ thống đang gặp gián đoạn kết nối. Em xin giữ nguyên đề xuất ngân sách chạy thử là 2,000,000đ và CPA mục tiêu là 150,000đ."
-        }
-        
-    updated_plan = result.get("updated_draft_plan", {})
-    
-    # Tool invocation log (SOP discipline)
-    budget_changed = abs(updated_plan.get("test_budget", 0) - current_budget) > 0.01
-    cpa_changed = abs(updated_plan.get("target_cpa", 0) - current_cpa) > 0.01
-    notes_changed = updated_plan.get("notes_for_creative", "") != current_notes
-    
-    if budget_changed or cpa_changed or notes_changed:
-        logger.info("Draft plan modified! Invoking UpdateDraftPlanTool logger.")
-        log_decision(
-            workspace_id=workspace_id,
-            campaign_id=campaign_id,
-            agent_name="Negotiator Agent",
-            action="UpdateDraftPlanTool",
-            decision_status="success",
-            reason=f"Cập nhật Bản thảo đàm phán: Ngân sách={updated_plan.get('test_budget'):,.0f}đ (trước: {current_budget:,.0f}đ), CPA Target={updated_plan.get('target_cpa'):,.0f}đ (trước: {current_cpa:,.0f}đ), Notes: '{updated_plan.get('notes_for_creative')}'",
-            metadata={
-                "old_budget": current_budget,
-                "new_budget": updated_plan.get("test_budget"),
-                "old_cpa": current_cpa,
-                "new_cpa": updated_plan.get("target_cpa"),
-                "notes": updated_plan.get("notes_for_creative")
-            }
+        # 2. Retrieve relevant Case Studies (RAG)
+        query = f"chỉ số hiệu suất CPA ngân sách và kết quả chiến dịch cũ của {product_name}"
+        logger.info(f"Negotiator retrieving RAG context for: {query}")
+        rag_results = retrieve_chunks_reranked(
+            db, 
+            uuid.UUID(str(workspace_id)), 
+            query, 
+            access_tags=["economics", "anti_patterns", "user_upload"], 
+            limit=3
         )
-        
-    db.close()
     
-    # Return updated state
-    return {
-        "draft_plan": updated_plan,
-        "sop_stage": "waiting_draft_approval",
-        "messages": [AIMessage(content=result.get("agent_message", ""))]
-    }
+        case_studies_str = ""
+        if rag_results:
+            for idx, item in enumerate(rag_results):
+                case_studies_str += f"Case Study {idx+1}: {item.get('content')}\n"
+        else:
+            case_studies_str = "(Không tìm thấy case study cũ trong cơ sở dữ liệu. Vui lòng tự đề xuất chỉ số hợp lý)"
+        
+        # 3. Read current DraftPlan
+        draft = state.get("draft_plan") or {}
+        current_budget = draft.get("test_budget") or state.get("test_budget") or 2000000.0
+        current_cpa = draft.get("target_cpa") or state.get("target_cpa") or 150000.0
+        current_notes = draft.get("notes_for_creative") or ""
+    
+        # 4. Form conversation history
+        messages = state.get("messages", [])
+        recent_messages = messages[-6:]
+        history_lines = []
+        for msg in recent_messages:
+            role = "Sếp" if isinstance(msg, HumanMessage) or getattr(msg, "type", "") == "human" else "Negotiator"
+            history_lines.append(f"{role}: {msg.content}")
+        history_str = "\n".join(history_lines)
+    
+        # 5. Build prompt and invoke LLM
+        prompt = NEGOTIATOR_SYSTEM_PROMPT.format(
+            product_name=product_name,
+            product_price=product_price,
+            product_cost=product_cost,
+            product_margin=product_margin,
+            calculated_anchor_cpa=calculated_anchor_cpa,
+            case_studies=case_studies_str,
+            current_budget=current_budget,
+            current_cpa=current_cpa,
+            current_notes=current_notes,
+            conversation_history=history_str
+        )
+    
+        query_text = messages[-1].content if messages else "Đàm phán bản thảo"
+        system_prompt = "You are a master business negotiator. Output JSON only."
+    
+        try:
+            response_str = generate_text(query_text, system_prompt=prompt, json_format=True, workspace_id=workspace_id)
+            result = parse_llm_json(response_str, fallback_data={
+                "thought_process": "Lỗi phân tích JSON từ LLM. Giữ nguyên chỉ số.",
+                "updated_draft_plan": {
+                    "test_budget": current_budget,
+                    "target_cpa": current_cpa,
+                    "notes_for_creative": current_notes
+                },
+                "agent_message": "Dạ em đã ghi nhận ý kiến của Sếp. Em xin gửi lại bản phác thảo ngân sách và CPA để Sếp duyệt."
+            })
+        except Exception as e:
+            logger.error(f"Error calling LLM for negotiation: {e}")
+            result = {
+                "thought_process": f"Lỗi gọi LLM: {str(e)}",
+                "updated_draft_plan": {
+                    "test_budget": current_budget,
+                    "target_cpa": current_cpa,
+                    "notes_for_creative": current_notes
+                },
+                "agent_message": "Dạ, hệ thống đang gặp gián đoạn kết nối. Em xin giữ nguyên đề xuất ngân sách chạy thử là 2,000,000đ và CPA mục tiêu là 150,000đ."
+            }
+        
+        updated_plan = result.get("updated_draft_plan", {})
+    
+        # Tool invocation log (SOP discipline)
+        budget_changed = abs(updated_plan.get("test_budget", 0) - current_budget) > 0.01
+        cpa_changed = abs(updated_plan.get("target_cpa", 0) - current_cpa) > 0.01
+        notes_changed = updated_plan.get("notes_for_creative", "") != current_notes
+    
+        if budget_changed or cpa_changed or notes_changed:
+            logger.info("Draft plan modified! Invoking UpdateDraftPlanTool logger.")
+            log_decision(
+                workspace_id=workspace_id,
+                campaign_id=campaign_id,
+                agent_name="Negotiator Agent",
+                action="UpdateDraftPlanTool",
+                decision_status="success",
+                reason=f"Cập nhật Bản thảo đàm phán: Ngân sách={updated_plan.get('test_budget'):,.0f}đ (trước: {current_budget:,.0f}đ), CPA Target={updated_plan.get('target_cpa'):,.0f}đ (trước: {current_cpa:,.0f}đ), Notes: '{updated_plan.get('notes_for_creative')}'",
+                metadata={
+                    "old_budget": current_budget,
+                    "new_budget": updated_plan.get("test_budget"),
+                    "old_cpa": current_cpa,
+                    "new_cpa": updated_plan.get("target_cpa"),
+                    "notes": updated_plan.get("notes_for_creative")
+                }
+            )
+        
+        db.close()
+    
+        # Return updated state
+        return {
+            "draft_plan": updated_plan,
+            "sop_stage": "waiting_draft_approval",
+            "messages": [AIMessage(content=result.get("agent_message", ""))]
+        }
