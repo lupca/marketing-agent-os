@@ -33,6 +33,7 @@ def store_document(
     access_tags: list,
     file_size_bytes: int = 0,
     file_hash: str = None,
+    metadata: dict = None
 ) -> RAGDocument:
     """
     Tạo record rag_documents (upload_status='processing') và
@@ -51,6 +52,7 @@ def store_document(
         sync_status="synced",
         file_size_bytes=file_size_bytes,
         file_hash=file_hash,
+        meta_data=metadata or {}
     )
     db.add(doc)
     db.commit()

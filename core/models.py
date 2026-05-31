@@ -314,6 +314,7 @@ class RAGDocument(Base):
     file_size_bytes = Column("file_size_bytes", Integer, nullable=False, default=0)
     file_hash       = Column(String(64), nullable=True)
     is_deleted      = Column(Boolean, nullable=False, default=False)
+    meta_data       = Column("metadata", JSON_TYPE, nullable=True, default=dict)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -329,6 +330,7 @@ class RAGChunk(Base):
     # Phi chuẩn hóa từ rag_documents (Zero-JOIN)
     access_tags  = Column(JSON_TYPE, nullable=False, default=lambda: ["global"])
     is_deleted   = Column(Boolean, nullable=False, default=False)
+    meta_data    = Column("metadata", JSON_TYPE, nullable=True, default=dict)
 
 # 21. Model: IntentRoutingKnowledge
 class IntentRoutingKnowledge(Base):

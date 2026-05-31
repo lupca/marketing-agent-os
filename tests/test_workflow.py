@@ -14,9 +14,25 @@ from core.models import PlatformVariant, MasterContent
 from graphs.main_router import graph
 from tests.mock_ollama import LocalOllamaTestCase
 
-# Default IDs matching seeds
-SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
-SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
+# Query seeded Workspace & Product IDs dynamically from DB to avoid hardcoding
+def _get_test_seeded_ids():
+    from core.models import Workspace, ProductService
+    with SessionLocal() as db:
+        ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+        if not ws:
+            ws = db.query(Workspace).first()
+        ws_id = str(ws.id) if ws else "00000000-0000-0000-0000-000000000002"
+        
+        prod = None
+        if ws:
+            prod = db.query(ProductService).filter_by(workspace_id=ws.id).first()
+        if not prod:
+            prod = db.query(ProductService).first()
+        prod_id = str(prod.id) if prod else "00000000-0000-0000-0000-000000000005"
+        
+        return ws_id, prod_id
+
+SEED_WORKSPACE_ID, SEED_PRODUCT_ID = _get_test_seeded_ids()
 
 class TestMultiAgentWorkflow(LocalOllamaTestCase):
     
@@ -77,16 +93,10 @@ class TestMultiAgentWorkflow(LocalOllamaTestCase):
         for event in graph.stream(None, config=config, stream_mode="updates"):
             for node_name, node_update in event.items():
                 print(f" -> Completed Node: '{node_name}'")
-                if node_name == "strategist":
-                    self.assertIn("current_angle", node_update)
-                    print(f"    [CHECK] Strategist selected Angle: {node_update['current_angle'].get('angle_name')}")
-                elif node_name == "copywriter":
+                if node_name == "creative_subgraph":
                     self.assertIn("master_content", node_update)
                     self.assertIn("variants", node_update)
-                    print(f"    [CHECK] Copywriter drafted Core message: \"{node_update['master_content'].get('core_message')}\"")
-                elif node_name == "guardian":
-                    self.assertIn("feedback_log", node_update)
-                    print(f"    [CHECK] Brand Guardian logs: {node_update['feedback_log'][-1]}")
+                    print(f"    [CHECK] Creative Sub-graph generated Core message and variants successfully!")
                     
         # 2. Verify graph paused at copy approval barrier (waiting_approval_barrier)
         current_state = graph.get_state(config)

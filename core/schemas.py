@@ -43,6 +43,7 @@ class WorkspaceIntegrationSchema(BaseModel):
     created_at: Optional[str] = None
 
 class AIModelSchema(BaseModel):
+    id: UUID
     model_id: str
     name: str
     provider: str
@@ -55,3 +56,8 @@ class AIModelSchema(BaseModel):
     is_custom: bool
     is_new: bool
     special_badge: Optional[str] = None
+    api_url: Optional[str] = None
+    api_key: Optional[str] = None
+
+    class Config:
+        from_attributes = True

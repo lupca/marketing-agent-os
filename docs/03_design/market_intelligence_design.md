@@ -79,11 +79,131 @@ Tuyệt đối KHÔNG tạo bảng mới để giữ DB sạch gọn.
 
    * Chuẩn Hóa API: 100% sử dụng hệ sinh thái của SerpApi.
        * Sử dụng endpoint youtube để lấy thứ hạng và comment.
-       * Sử dụng endpoint youtube_video_transcript để lấy kịch bản thoại (Không dùng tool scrape bên ngoài như Tech
-         Lead ban đầu đề xuất).
+       * Sử dụng endpoint youtube_video_transcript để lấy kịch bản thoại
    * Database Schema: Giữ nguyên bảng rag_chunks hiện tại, không tạo bảng mới. Các siêu dữ liệu (Metadata) như loại
      Hook, điểm Sentiment sẽ được nhét dưới dạng JSONB. Bắt buộc gắn tag access_tags = ["market_intel"].
    * Tái Cấu Trúc Service Layer (RAG Ingestion): Tách toàn bộ logic xử lý nhúng vector (MinIO → DB → Celery) từ API
      Route upload_document ra thành một hàm Service dùng chung (process_and_store_document). Việc này giúp
      Intelligence Agent có thể tự động nạp dữ liệu cào được vào RAG bằng chính luồng chuẩn mà người dùng đang sử
      dụng.
+
+
+The API endpoint is https://serpapi.com/search?engine=youtube
+
+Đây là hướng dẫn nhanh cách sử dụng [YouTube Video Transcript API](https://serpapi.com/youtube-video-transcript) dành cho developer:
+
+### 1. Endpoint & Method
+
+* **GET** `https://serpapi.com/search.json`
+
+### 2. Các tham số bắt buộc (Required)
+
+* `engine`: Luôn đặt là `youtube_video_transcript`
+* `v`: ID của video YouTube (Ví dụ: `Gk8gB5VACZw` từ URL `youtube.com/watch?v=Gk8gB5VACZw`)
+* `api_key`: Mã API key cá nhân của bạn trên SerpApi.
+
+### 3. Tham số tùy chọn (Optional)
+
+* `language_code`: Mã ngôn ngữ của bản dịch (Mặc định là `en`).
+* `type`: Đặt là `asr` nếu muốn lấy phụ đề tự động (Auto-generated).
+
+---
+
+### 4. Code mẫu nhanh (cURL & Python)
+
+**cURL:**
+
+```bash
+curl -X GET "https://serpapi.com/search.json?engine=youtube_video_transcript&v=Gk8gB5VACZw&api_key=YOUR_API_KEY"
+
+```
+
+**Python:**
+
+```python
+from serpapi import GoogleSearch
+
+search = GoogleSearch({
+    "engine": "youtube_video_transcript",
+    "v": "Gk8gB5VACZw",
+    "api_key": "YOUR_API_KEY"
+})
+
+results = search.get_dict()
+transcript = results.get("transcript", [])
+
+```
+
+### 5. Dữ liệu trả về (JSON Response)
+
+Kết quả sẽ trả về một Object chứa mảng `transcript` với đầy đủ mốc thời gian (`start_ms`, `end_ms`) và nội dung chữ (`snippet`):
+
+```json
+{
+  "transcript": [
+    {
+      "start_ms": 240,
+      "end_ms": 7040,
+      "snippet": "hello everyone and welcome...",
+      "start_time_text": "0:00"
+    }
+  ],
+  "chapters": [ ... ] // Nếu video có chia chương
+}
+
+```
+
+Dưới đây là phiên bản siêu gọn (Cheat Sheet) để bạn copy-paste và chạy ngay:
+
+### 1. HTTP Request
+
+* **Method:** `GET`
+* **URL:** `https://serpapi.com/search.json`
+* **Query Params:**
+* `engine=youtube_video_transcript`
+* `v=ID_VIDEO` (Ví dụ: `Gk8gB5VACZw`)
+* `api_key=MÃ_API_CỦA_BẠN`
+
+
+
+---
+
+### 2. Mẫu Code 1 Dòng
+
+**cURL:**
+
+```bash
+curl "https://serpapi.com/search.json?engine=youtube_video_transcript&v=Gk8gB5VACZw&api_key=YOUR_API_KEY"
+
+```
+
+**Python (Sử dụng `requests` gốc, không cần cài thư viện ngoài):**
+
+```python
+import requests
+
+res = requests.get("https://serpapi.com/search.json", params={
+    "engine": "youtube_video_transcript", "v": "Gk8gB5VACZw", "api_key": "YOUR_API_KEY"
+}).json()
+
+print(res.get("transcript"))
+
+```
+
+---
+
+### 3. Cấu trúc Response rút gọn
+
+```json
+{
+  "transcript": [
+    {
+      "start_ms": 240,
+      "end_ms": 7040,
+      "snippet": "Nội dung chữ hiển thị ở đây...",
+      "start_time_text": "0:00"
+    }
+  ]
+}
+
+```

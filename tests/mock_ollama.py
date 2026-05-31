@@ -27,7 +27,9 @@ class LocalOllamaTestCase(unittest.TestCase):
         )
         
         # Apply patch to replace get_dynamic_llm_client with our mock local client
-        self.llm_patcher = patch("core.ollama_client.get_dynamic_llm_client")
+        # MUST patch the original source in 'core.ai_clients.llm_client' to intercept 
+        # internal calls from generate_text() and other modules.
+        self.llm_patcher = patch("core.ai_clients.llm_client.get_dynamic_llm_client")
         self.mock_get_client = self.llm_patcher.start()
         self.mock_get_client.return_value = self.mock_client
         

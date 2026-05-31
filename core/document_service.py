@@ -25,7 +25,8 @@ def process_and_store_document(
     workspace_id: str,
     file_bytes: bytes,
     file_name: str,
-    access_tags: List[str] = None
+    access_tags: List[str] = None,
+    metadata: dict = None
 ) -> dict:
     """
     Service Layer: Handle file upload, deduplication, MinIO upload, and RAG ingestion triggering.
@@ -78,6 +79,7 @@ def process_and_store_document(
             access_tags=access_tags,
             file_size_bytes=file_size,
             file_hash=file_hash,
+            metadata=metadata
         )
 
         return {

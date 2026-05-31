@@ -13,8 +13,25 @@ from db.seed import seed_database
 from graphs.main_router import graph
 from tests.mock_ollama import LocalOllamaTestCase
 
-SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000002"
-SEED_PRODUCT_ID = "00000000-0000-0000-0000-000000000005"
+# Query seeded Workspace & Product IDs dynamically from DB to avoid hardcoding
+def _get_test_seeded_ids():
+    from core.models import Workspace, ProductService
+    with SessionLocal() as db:
+        ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+        if not ws:
+            ws = db.query(Workspace).first()
+        ws_id = str(ws.id) if ws else "00000000-0000-0000-0000-000000000002"
+        
+        prod = None
+        if ws:
+            prod = db.query(ProductService).filter_by(workspace_id=ws.id).first()
+        if not prod:
+            prod = db.query(ProductService).first()
+        prod_id = str(prod.id) if prod else "00000000-0000-0000-0000-000000000005"
+        
+        return ws_id, prod_id
+
+SEED_WORKSPACE_ID, SEED_PRODUCT_ID = _get_test_seeded_ids()
 
 class TestTimeTravelAndTransformation(LocalOllamaTestCase):
     

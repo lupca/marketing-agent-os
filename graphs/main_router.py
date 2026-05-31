@@ -142,6 +142,71 @@ def route_after_draft_barrier(state: AgencyState) -> str:
         return "commit_node"
     return "negotiator"
 
+def intelligence_node(state: AgencyState) -> dict:
+    """
+    Intelligence Node (Market Intelligence Agent).
+    Checks CPA and product constraints, fetches competitor kịch bản & comments from SerpApi,
+    pre-processes them with LLM to extract hook/sentiment/pain-points, cold-stores raw files,
+    and vectorizes findings in pgvector RAG for the Strategist Agent.
+    """
+    logger.info("Executing Intelligence Node (SerpApi YouTube Competitor Research)...")
+    from core.market_intelligence import fetch_and_process_market_data
+    from core.dependencies import get_session
+    from langchain_core.messages import AIMessage
+    from core.decision_logger import log_decision
+    
+    workspace_id = state.get("workspace_id")
+    business_context = state.get("business_context") or {}
+    product_name = business_context.get("product", {}).get("name") or "Marketing OS Software"
+
+    with get_session() as db:
+        try:
+            logger.info(f"Running SerpApi competitor research for query: '{product_name}'...")
+            processed_videos = fetch_and_process_market_data(db, str(workspace_id), product_name, limit=3)
+            
+            if processed_videos:
+                report_content = (
+                    f"🔍 **[Market Intelligence]** Đã hoàn tất phân tích `{len(processed_videos)} kịch bản đối thủ`!\n"
+                    f"- Raw JSON được lưu giữ vĩnh viễn trong bucket `market-intel-raw` (Cold Storage).\n"
+                    f"- Tài liệu phân tích tinh hoa đã được tự động băm vector vào Knowledge Base (Hot Storage) với nhãn `market_intel`.\n"
+                    f"- **Danh sách video đối thủ đã xử lý:**\n"
+                )
+                for idx, pv in enumerate(processed_videos):
+                    meta = pv["analysis"]
+                    report_content += (
+                        f"  {idx+1}. **{pv['title']}** (Kênh: *{pv['channel']}*)\n"
+                        f"     - Hook bóc tách: *\"{meta.get('hook', 'N/A')}\"* (Loại: {meta.get('hook_type', 'N/A')})\n"
+                        f"     - Sentiment bình luận: Tích cực {meta.get('sentiment', {}).get('positive_pct', 0)}%, Tiêu cực {meta.get('sentiment', {}).get('negative_pct', 0)}%\n"
+                        f"     - Pain Points tìm thấy: {', '.join(meta.get('pain_points', []))}\n"
+                    )
+            else:
+                report_content = (
+                    f"🔍 **[Market Intelligence]** Không tìm thấy kịch bản đối thủ mới liên quan đến sản phẩm `{product_name}`. "
+                    f"Hệ thống sẽ sử dụng tri thức sẵn có từ Knowledge Base."
+                )
+
+            log_decision(
+                workspace_id=workspace_id,
+                campaign_id=state.get("campaign_id"),
+                agent_name="Market Intelligence Agent",
+                action="Fetch Competitor Intel",
+                decision_status="success",
+                reason=f"Đã cào và xử lý thành công {len(processed_videos)} kịch bản đối thủ từ YouTube qua SerpApi.",
+                metadata={"processed_videos_count": len(processed_videos)}
+            )
+            
+            return {
+                "sop_stage": "creative_generation",
+                "messages": [AIMessage(content=report_content)]
+            }
+        except Exception as e:
+            logger.error(f"Intelligence Node failed: {e}", exc_info=True)
+            fallback_msg = f"🔍 **[Market Intelligence]** [Cảnh báo] Lỗi kết nối SerpApi. Bỏ qua tìm kiếm trực tiếp và sử dụng dữ liệu RAG sẵn có."
+            return {
+                "sop_stage": "creative_generation",
+                "messages": [AIMessage(content=fallback_msg)]
+            }
+
 # ----------------- Build LangGraph StateGraph -----------------
 
 builder = StateGraph(AgencyState)
@@ -153,6 +218,7 @@ builder.add_node("performance", performance_node)
 builder.add_node("negotiator", negotiator_node)
 builder.add_node("waiting_draft_approval", waiting_draft_approval_node)
 builder.add_node("commit_node", commit_node)
+builder.add_node("intelligence_node", intelligence_node)
 builder.add_node("creative_subgraph", creative_graph)
 builder.add_node("waiting_approval_barrier", waiting_approval_barrier_node)
 builder.add_node("publisher", publisher_node)
@@ -188,7 +254,8 @@ builder.add_conditional_edges(
     }
 )
 builder.add_edge("negotiator", "waiting_draft_approval")
-builder.add_edge("commit_node", "creative_subgraph")
+builder.add_edge("commit_node", "intelligence_node")
+builder.add_edge("intelligence_node", "creative_subgraph")
 builder.add_edge("creative_subgraph", "waiting_approval_barrier")
 builder.add_edge("researcher_agent", END)
 builder.add_edge("chat_agent", END)

@@ -266,11 +266,11 @@ def strategist_node(state: CreativeState) -> dict:
     # Get customer insights from Researcher (dùng access_tags phân quyền đúng)
     logger.info("Calling Researcher Agent for customer insights...")
     try:
-        # Insights tâm lý/chiến lược: truy cập cả marketing, psychology, economics
+        # Insights tâm lý/chiến lược: truy cập cả marketing, psychology, economics, market_intel
         insights_str = run_research(
             workspace_id,
             f"chiến lược marketing khách hàng nỗi đau cho {product_name}",
-            access_tags=["marketing", "psychology", "economics", "global"],
+            access_tags=["marketing", "psychology", "economics", "global", "market_intel"],
         )
         # Anti-patterns: chỉ truy cập anti_patterns + manager_feedback
         anti_patterns_report = run_research(

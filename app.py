@@ -349,6 +349,21 @@ async def on_chat_start():
         # Establish connection status greeting
         profile = cl.user_session.get("chat_profile", "#phong-kinh-doanh")
         db_mode = "MOCK SQLite (Offline)" if is_mock() else "PostgreSQL (Online)"
+
+        # Check for active radar alerts from database
+        alert_msg_section = ""
+        try:
+            alerts = db.execute(text(
+                "SELECT reason FROM agent_decisions "
+                "WHERE agent_name = 'Market Radar Agent' AND decision_status = 'alert' "
+                "ORDER BY created_at DESC LIMIT 3"
+            )).fetchall()
+            if alerts:
+                alert_msg_section = "\n\n⚠️ **[CẢNH BÁO RADAR THỊ TRƯỜNG]**\n"
+                for alt in alerts:
+                    alert_msg_section += f"- {alt.reason}\n"
+        except Exception as e:
+            logger.error(f"Error querying active radar alerts: {e}")
     
         welcome_msg = (
             f"### 🖥️ Hệ Điều Hành Marketing Agent OS v3.0 Khởi Động!\n"
@@ -358,7 +373,7 @@ async def on_chat_start():
             f"- Để tạo chiến dịch mới, nhập ví dụ: *\"Lên camp mới cho sản phẩm G-Agent Tech\"*\n"
             f"- Để xem báo cáo hiệu suất, nhập ví dụ: *\"Xem báo cáo CPA tuần qua\"*\n"
             f"- Gõ **`vault`** (không cần dấu gạch chéo `/`) để xem ngay kho bài viết quảng cáo chất lượng cao đã phê duyệt!\n"
-            f"- Hoặc kéo thả file tài liệu PDF/TXT vào đây để RAG tự động học tri thức!"
+            f"- Hoặc kéo thả file tài liệu PDF/TXT vào đây để RAG tự động học tri thức!{alert_msg_section}"
         )
         await cl.Message(content=welcome_msg).send()
 

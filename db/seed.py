@@ -38,20 +38,64 @@ def seed_database(db: Session):
 
     # 2. Seed Default Workspace
     default_ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+    
+    # Safe settings for testing to prevent cloud token burning
+    safe_settings = {
+        "currency": "VND", 
+        "timezone": "Asia/Ho_Chi_Minh",
+        "ai_api_url": "http://localhost:11434/v1",
+        "ai_model": "Qwen/Qwen2.5-7B-Instruct",
+        "siliconflow_api_key": "dummy_key_for_testing_do_not_use_cloud"
+    }
+
     if not default_ws:
         default_ws = Workspace(
             id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
             name="Team Alpha Workspace",
             owner_id=admin_user.id,
             members=[str(admin_user.id)],
-            settings={"currency": "VND", "timezone": "Asia/Ho_Chi_Minh"}
+            settings=safe_settings
         )
         db.add(default_ws)
         db.commit()
         db.refresh(default_ws)
         logger.info(f"Seeded Workspace: {default_ws.name}")
     else:
-        logger.info("Workspace already exists.")
+        # Enforce safe settings even if workspace exists to avoid leaking real keys from prev environments
+        default_ws.settings = safe_settings
+        db.commit()
+        logger.info("Workspace already exists. Enforced safe test settings (Local Ollama).")
+
+    # 2b. Seed RAG Access Tags (including market_intel for dashboard UI visibility)
+    from sqlalchemy import text
+    default_tags = [
+        {"tag_name": "global", "description": "Tài liệu công khai cho tất cả Agent trong workspace", "color": "#22c55e"},
+        {"tag_name": "marketing", "description": "Tài liệu chiến lược marketing, brief, insights", "color": "#3b82f6"},
+        {"tag_name": "economics", "description": "Kinh tế học hành vi, tài liệu nghiên cứu thị trường", "color": "#f59e0b"},
+        {"tag_name": "psychology", "description": "Tâm lý học quảng cáo, trigger hành vi người dùng", "color": "#8b5cf6"},
+        {"tag_name": "anti_patterns", "description": "Mẫu quảng cáo thất bại, bài học kinh nghiệm", "color": "#ef4444"},
+        {"tag_name": "policies", "description": "Chính sách quảng cáo Facebook, TikTok, quy định nền tảng", "color": "#06b6d4"},
+        {"tag_name": "manager_feedback", "description": "Feedback từ CMO/Manager về nội dung đã duyệt/từ chối", "color": "#f97316"},
+        {"tag_name": "market_intel", "description": "Tình báo đối thủ, kịch bản, hooks & pain-points từ SerpApi", "color": "#10b981"}
+    ]
+    for tag in default_tags:
+        existing = db.execute(
+            text("SELECT tag_id FROM rag_access_tags WHERE workspace_id = :ws AND tag_name = :name"),
+            {"ws": default_ws.id, "name": tag["tag_name"]}
+        ).fetchone()
+        if not existing:
+            db.execute(
+                text("INSERT INTO rag_access_tags (tag_id, workspace_id, tag_name, description, color) VALUES (:id, :ws, :name, :desc, :color)"),
+                {
+                    "id": uuid.uuid4(),
+                    "ws": default_ws.id,
+                    "name": tag["tag_name"],
+                    "desc": tag["description"],
+                    "color": tag["color"]
+                }
+            )
+    db.commit()
+    logger.info("Successfully seeded RAG access tags (including market_intel).")
 
     # 3. Seed Default Brand Identity
     default_brand = db.query(BrandIdentity).filter_by(brand_name="G-Agent Tech").first()

@@ -156,7 +156,12 @@ async def get_models(db: Session = Depends(get_db)):
         if not models:
              # Just return empty list or handle seeding if absolutely necessary
              return {"status": "success", "data": []}
-        return {"status": "success", "data": [AIModelSchema.model_validate(m).model_dump() for m in models]}
+
+        # Use mode="json" to automatically convert UUIDs and other objects to strings for JS
+        data = [AIModelSchema.model_validate(m).model_dump(mode="json") for m in models]
+            
+        return {"status": "success", "data": data}
+
     except Exception as e:
         logger.error(f"Error fetching workspace models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,6 +183,9 @@ async def add_model(request: Request, db: Session = Depends(get_db)):
             series=body.get("series"),
             context_window=body.get("context_window"),
             model_size=body.get("model_size"),
+            special_badge=body.get("special_badge"),
+            api_url=body.get("api_url"),
+            api_key=body.get("api_key"),
             is_custom=True,
             is_new=True
         )
@@ -187,4 +195,48 @@ async def add_model(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error adding custom model: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.put("/models/{model_uuid}")
+async def update_model(model_uuid: str, request: Request, db: Session = Depends(get_db)):
+    try:
+        body = await request.json()
+        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid)).first()
+        if not model:
+            raise HTTPException(status_code=404, detail="Model not found")
+        
+        # Update fields
+        model.name = body.get("name", model.name)
+        model.model_id = body.get("model_id", model.model_id)
+        model.provider = body.get("provider", model.provider)
+        model.description = body.get("description", model.description)
+        model.category = body.get("category", model.category)
+        model.tags = body.get("tags", model.tags)
+        model.series = body.get("series", model.series)
+        model.context_window = body.get("context_window", model.context_window)
+        model.model_size = body.get("model_size", model.model_size)
+        model.special_badge = body.get("special_badge", model.special_badge)
+        model.api_url = body.get("api_url", model.api_url)
+        model.api_key = body.get("api_key", model.api_key)
+        
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating model: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.delete("/models/{model_uuid}")
+async def delete_model(model_uuid: str, db: Session = Depends(get_db)):
+    try:
+        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid)).first()
+        if not model:
+            raise HTTPException(status_code=404, detail="Model not found")
+        
+        db.delete(model)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting model: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

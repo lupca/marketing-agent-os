@@ -61,7 +61,16 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
         
             # Route locally if local URL is configured
             if is_local:
-                logger.info(f"Routing LLM requests LOCALLY to Ollama at {api_url} for model: {model_name}")
+                # Normalize model name for local Ollama compatibility
+                local_model = model_name
+                if "Qwen/Qwen2.5-7B-Instruct" in model_name:
+                    local_model = "qwen2.5:7b-instruct"
+                elif "Qwen/Qwen2.5-14B-Instruct" in model_name:
+                    local_model = "qwen2.5:14b-instruct"
+                elif "Qwen/Qwen2.5-7B" in model_name:
+                    local_model = "qwen2.5:7b"
+                
+                logger.info(f"Routing LLM requests LOCALLY to Ollama at {api_url} for model: {local_model} (original: {model_name})")
                 model_kwargs = {}
                 if json_format:
                     model_kwargs["response_format"] = {"type": "json_object"}
@@ -69,7 +78,7 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
                 return ChatOpenAI(
                     base_url=api_url,
                     api_key=api_key or "ollama", # placeholder for local Ollama
-                    model=model_name,
+                    model=local_model,
                     temperature=temperature,
                     max_retries=3,
                     model_kwargs=model_kwargs

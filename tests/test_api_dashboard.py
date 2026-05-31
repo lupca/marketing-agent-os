@@ -22,6 +22,8 @@ class TestDashboardAPI(unittest.TestCase):
         # Ensure database is pre-seeded with dashboard mock metrics
         db = SessionLocal()
         try:
+            from db.seed import seed_database
+            seed_database(db)
             auto_seed_dashboard_data(db)
         finally:
             db.close()

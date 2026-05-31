@@ -1,0 +1,1123 @@
+{
+  "search_metadata": {
+    "id": "6a1c5c71d10c6a2243b22a7b",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/yIWr6U72nLXsdd5GeeCTjA/6a1c5c71d10c6a2243b22a7b.json",
+    "created_at": "2026-05-31 16:06:09 UTC",
+    "processed_at": "2026-05-31 16:06:09 UTC",
+    "youtube_url": "https://www.youtube.com/results?search_query=G-Agent+Tech&gl=vn&hl=vi",
+    "raw_html_file": "https://serpapi.com/searches/yIWr6U72nLXsdd5GeeCTjA/6a1c5c71d10c6a2243b22a7b.html",
+    "total_time_taken": 2.04
+  },
+  "search_parameters": {
+    "engine": "youtube",
+    "search_query": "G-Agent Tech",
+    "gl": "vn",
+    "hl": "vi"
+  },
+  "search_information": {
+    "total_results": 6140745,
+    "video_results_state": "Results for exact spelling"
+  },
+  "video_results": [
+    {
+      "position_on_page": 1,
+      "title": "From IDEs to AI Agents with Steve Yegge",
+      "link": "https://www.youtube.com/watch?v=aFsAOu2bgFk",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=aFsAOu2bgFk",
+      "video_id": "aFsAOu2bgFk",
+      "channel": {
+        "name": "The Pragmatic Engineer",
+        "link": "https://www.youtube.com/@pragmaticengineer",
+        "thumbnail": "https://yt3.ggpht.com/qG5_w-Lf6SyIgYXz3vm3ZgpGe-swbizzXsCM5oaOdlTL8AQzV48UMt3Wga-g5sfB7Mj7qH5qow=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tháng trước",
+      "views": 248403,
+      "length": "1:32:00",
+      "description": "Steve Yegge has spent decades writing software and thinking about how the craft evolves. From his early years at Amazon and ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/aFsAOu2bgFk/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAH8DID8pvQk-FvSqfAoSuEg62WOA",
+        "rich": "https://i.ytimg.com/an_webp/aFsAOu2bgFk/mqdefault_6s.webp?du=3000&sqp=CIKx8dAG&rs=AOn4CLDMExQNkXMeNYrt6TRbtoZu2tnpnQ"
+      }
+    },
+    {
+      "position_on_page": 2,
+      "title": "G-Agents AI #IDO launch on 🚀 #BullPerks!",
+      "link": "https://www.youtube.com/watch?v=Ns9IetqQE_A",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=Ns9IetqQE_A",
+      "video_id": "Ns9IetqQE_A",
+      "channel": {
+        "name": "BullPerks",
+        "link": "https://www.youtube.com/@BullPerks",
+        "thumbnail": "https://yt3.ggpht.com/XYrPpVC_qKLjGJQax36fIKoY4BA2S6yWrfqEC7z3os-15n9CYBhp_M504LVc4UC015PCn0_N-A=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 35,
+      "length": "1:08",
+      "description": "G-Agents is redefining Web3 with AI-powered products and intelligent automation, making blockchain more engaging, efficient, ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/Ns9IetqQE_A/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBL4n6ArHAfI9zcke9ExpUCnkBbgA",
+        "rich": "https://i.ytimg.com/an_webp/Ns9IetqQE_A/mqdefault_6s.webp?du=3000&sqp=COCg8dAG&rs=AOn4CLBkt28PJyeN2RKL-fMQ8e-38IASlA"
+      }
+    },
+    {
+      "position_on_page": 3,
+      "title": "Intro to AI agents",
+      "link": "https://www.youtube.com/watch?v=ZZ2QUCePgYw",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=ZZ2QUCePgYw",
+      "video_id": "ZZ2QUCePgYw",
+      "channel": {
+        "name": "Google Cloud Tech",
+        "link": "https://www.youtube.com/@googlecloudtech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_XJ_FbhTDiTg7Zhr328vkGrw99p8-uQ3Y1nW2KZozueF_nkixmIhAbF2hUMFB9lUqMwSBo4etlY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 219289,
+      "length": "6:10",
+      "description": "Vertex AI Agent Builder quickstart → https://goo.gle/3UPJ7dN GenAI powered App with Genkit → https://goo.gle/4fCSTrK ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/ZZ2QUCePgYw/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDbEn3U4NLbyfL_pkdDhplE-LMhag",
+        "rich": "https://i.ytimg.com/an_webp/ZZ2QUCePgYw/mqdefault_6s.webp?du=3000&sqp=CPyz8dAG&rs=AOn4CLAfJivXVUFZLEBS7iO1aNAvVNFejA"
+      }
+    },
+    {
+      "position_on_page": 4,
+      "title": "Meet G Agent by Ghaia.ai–Revolutionizing Business Automation with AI Agents",
+      "link": "https://www.youtube.com/watch?v=zw-rCABZl0w",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=zw-rCABZl0w",
+      "video_id": "zw-rCABZl0w",
+      "channel": {
+        "name": "ghaia ai",
+        "link": "https://www.youtube.com/@ghaia.aisolutions",
+        "thumbnail": "https://yt3.ggpht.com/PLQdYPnyHM3grQq0BdXEkXAXL06Uq4cvtQkptPmWsicj6xCF0aVfshPBfYXAhX8R93QmKbwSdA=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "9 tháng trước",
+      "views": 93,
+      "length": "1:39",
+      "description": "Learn how G Agent, Ghaia.ai's game-changing multi-agent AI system, is transforming workflows in every industry — from oil & gas ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/zw-rCABZl0w/hq720.jpg?sqp=-oaymwE2COgCEMoBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB_gmAAtAFigIMCAAQARhMIC0ofzAP&rs=AOn4CLD34s11pWZ28bqLRGS0egMG92EawQ",
+        "rich": "https://i.ytimg.com/an_webp/zw-rCABZl0w/mqdefault_6s.webp?du=3000&sqp=COS08dAG&rs=AOn4CLCXDY5485mzf3Edr3o3FWgdveEMEA"
+      }
+    },
+    {
+      "position_on_page": 5,
+      "title": "Prerak Garg, Copilots to Agents | Tech & AI LIVE: Gen AI 2024",
+      "link": "https://www.youtube.com/watch?v=BqXf82LKt-g",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=BqXf82LKt-g",
+      "video_id": "BqXf82LKt-g",
+      "channel": {
+        "name": "Technology Magazine",
+        "link": "https://www.youtube.com/@TechnologyMagazine",
+        "thumbnail": "https://yt3.ggpht.com/UJR42fHanGVz6hdISORocrNz25HqFLJ_p4CHdKJkuKDQOiairy9tV4_CxYw9zI_4KmOm3TfLzQ=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 202,
+      "length": "9:24",
+      "description": "This presentation covers the AI progress so far and peeks into the future with AI scaling laws. It covers the transition from AI tools ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/BqXf82LKt-g/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBCQ7b4Ao1T2h7cwtqfUkhnk5-BcQ",
+        "rich": "https://i.ytimg.com/an_webp/BqXf82LKt-g/mqdefault_6s.webp?du=3000&sqp=CPD78NAG&rs=AOn4CLBGqp2pkkynw2E-VKhrRdnarBEAPw"
+      }
+    },
+    {
+      "position_on_page": 7,
+      "title": "Why 40% of AI Agents Fail & Meta Goes Headless | GTMN 24",
+      "link": "https://www.youtube.com/watch?v=Q4IgJNF_V5w",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=Q4IgJNF_V5w",
+      "video_id": "Q4IgJNF_V5w",
+      "channel": {
+        "name": "GTMN",
+        "link": "https://www.youtube.com/@GTMNfm",
+        "thumbnail": "https://yt3.ggpht.com/csknnM-oW1mfhllYaHr5_fH0FQ5w_JviO30rgUc8Qr53SHZocgAjsHS75qQp6CWPIGRnxORSBw=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tuần trước",
+      "views": 45,
+      "length": "35:28",
+      "description": "Gartner estimates that out of thousands of vendors claiming agent tech solutions, only around 130 offer real agent tech features.",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/Q4IgJNF_V5w/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCg-3EyJI9reiI9jn2yvmsu4aTXPA",
+        "rich": "https://i.ytimg.com/an_webp/Q4IgJNF_V5w/mqdefault_6s.webp?du=3000&sqp=CIyU8dAG&rs=AOn4CLArJQJ66c1jLuKFPVTtHZk8Tt2NGA"
+      }
+    },
+    {
+      "position_on_page": 8,
+      "title": "AI Agents, Clearly Explained",
+      "link": "https://www.youtube.com/watch?v=FwOTs4UxQS4",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=FwOTs4UxQS4",
+      "video_id": "FwOTs4UxQS4",
+      "channel": {
+        "name": "Jeff Su",
+        "link": "https://www.youtube.com/@JeffSu",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/fHDMaIjQYS0XTz17AL-iIxdfyrGJfLliAJTQmJE931P1OareLsLIvFeJDcDtI3QpkD9HLnvI7Gw=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 4388038,
+      "length": "10:09",
+      "description": "My AI Toolkit: https://academy.jeffsu.org/ai-toolkit?utm_source=youtube&utm_medium=video&utm_campaign=177 Understanding ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/FwOTs4UxQS4/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCEid7Vq3BJaKXOGCqBjEw44c9zrw",
+        "rich": "https://i.ytimg.com/an_webp/FwOTs4UxQS4/mqdefault_6s.webp?du=3000&sqp=CMCi8dAG&rs=AOn4CLAMUwTOPLNISKZf8DrngYx_mrj8rA"
+      }
+    },
+    {
+      "position_on_page": 9,
+      "title": "The ABCs of agent building",
+      "link": "https://www.youtube.com/watch?v=rjoMZyxncUI",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=rjoMZyxncUI",
+      "video_id": "rjoMZyxncUI",
+      "channel": {
+        "name": "Google Cloud Tech",
+        "link": "https://www.youtube.com/@googlecloudtech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_XJ_FbhTDiTg7Zhr328vkGrw99p8-uQ3Y1nW2KZozueF_nkixmIhAbF2hUMFB9lUqMwSBo4etlY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "8 ngày trước",
+      "views": 13243,
+      "length": "13:54",
+      "description": "Explore each framework and protocol in the AI agent stack and learn how they fit together within the Google ecosystem. Whether ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/rjoMZyxncUI/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCFhGU2PdsMgTw9K4WGrrMVmDQRGg",
+        "rich": "https://i.ytimg.com/an_webp/rjoMZyxncUI/mqdefault_6s.webp?du=3000&sqp=CNiB8dAG&rs=AOn4CLBz7RfhcaDIh-6kUWMSJV9e3uhkzw"
+      }
+    },
+    {
+      "position_on_page": 12,
+      "title": "Your AI Agent is Leaking Company Data — Here's the Proof",
+      "link": "https://www.youtube.com/watch?v=5M9oirBfx-g",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=5M9oirBfx-g",
+      "video_id": "5M9oirBfx-g",
+      "channel": {
+        "name": "Gateco",
+        "link": "https://www.youtube.com/@GatecoAi",
+        "thumbnail": "https://yt3.ggpht.com/i04ZnkUCJSLAImzWPyWwUdtQXxcoSzPGSzrliGqImimmBJhl8gH2EC2tndH_nzpevZ3D2jgZQQ=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tuần trước",
+      "views": 12,
+      "length": "7:32",
+      "description": "Are you shipping agentic AI without considering the RAG Authorization Gap? Agentic AI is the most discussed topic in technology ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/5M9oirBfx-g/hq720.jpg?sqp=-oaymwE2COgCEMoBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB_gmAAtAFigIMCAAQARgPIGUoUjAP&rs=AOn4CLAXDkobYS5YYqVpiaf0TSfJOEkx8A"
+      }
+    },
+    {
+      "position_on_page": 13,
+      "title": "7 Game-Changing ChatGPT Agents That 99% of People Don't Know About",
+      "link": "https://www.youtube.com/watch?v=USRfRv34HmQ",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=USRfRv34HmQ",
+      "video_id": "USRfRv34HmQ",
+      "channel": {
+        "name": "AI Master",
+        "link": "https://www.youtube.com/@iamAImaster",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/3zyScxdcSY9pGwv4juhJgpl4UNCa5V-dt9Ge3fAXhl3FlKEEIo3nar6E7hpY1yGPnkoMiHNa=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "7 tháng trước",
+      "views": 331373,
+      "length": "14:13",
+      "description": "sponsored Instantly Reply Agent - Automate your cold outreach responses 24/7: ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/USRfRv34HmQ/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDCAFSAQctZZZJzeJfIuNK5Bm38FA",
+        "rich": "https://i.ytimg.com/an_webp/USRfRv34HmQ/mqdefault_6s.webp?du=3000&sqp=CJyN8dAG&rs=AOn4CLCQK_UHGKAns6VGZKc67tfYTCYojQ"
+      }
+    },
+    {
+      "position_on_page": 15,
+      "title": "NEW ChatGPT Agent Builder: From Zero to Automation Hero (2026 Guide)",
+      "link": "https://www.youtube.com/watch?v=YlqXKDP1c5k",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=YlqXKDP1c5k",
+      "video_id": "YlqXKDP1c5k",
+      "channel": {
+        "name": "AI Master",
+        "link": "https://www.youtube.com/@iamAImaster",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/3zyScxdcSY9pGwv4juhJgpl4UNCa5V-dt9Ge3fAXhl3FlKEEIo3nar6E7hpY1yGPnkoMiHNa=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "7 tháng trước",
+      "views": 171909,
+      "length": "15:42",
+      "description": "sponsored Sign up for Consensus today! https://consensus.app/ Stop doing repetitive work manually. Join 10000+ AI builders ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/YlqXKDP1c5k/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDZMaFrPBw8p1wwBVbzkPmfJRImRg",
+        "rich": "https://i.ytimg.com/an_webp/YlqXKDP1c5k/mqdefault_6s.webp?du=3000&sqp=COmG8dAG&rs=AOn4CLA6Owuqeby6cYAETWw9YgmPc2AF0A"
+      }
+    },
+    {
+      "position_on_page": 16,
+      "title": "G-Agents AI Promo video - New Era of web3 AI Agents",
+      "link": "https://www.youtube.com/watch?v=YKCyTJ9xm0g",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=YKCyTJ9xm0g",
+      "video_id": "YKCyTJ9xm0g",
+      "channel": {
+        "name": "G-Agent AI",
+        "link": "https://www.youtube.com/@G-agentAI",
+        "thumbnail": "https://yt3.ggpht.com/i4B3JccTvwldB4xOw99LlgSg3heKrQ5SjWN3N1aUzjcOZoURbmQPE6irPNkmFDefWNJOaRQOdQ=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 74,
+      "length": "0:47",
+      "description": "Use your own web3 AI Agents with G-Agents AI. Script: The new era of AI Agents has arrived! G-Agents - AI powered web3 Agents ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/YKCyTJ9xm0g/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLClhv4lezeGpoI660Ld-ODH8Lu4eg",
+        "rich": "https://i.ytimg.com/an_webp/YKCyTJ9xm0g/mqdefault_6s.webp?du=3000&sqp=CPC08dAG&rs=AOn4CLC1lWFEnSVGNCd2PGrTKv2Tn3ddjA"
+      }
+    },
+    {
+      "position_on_page": 18,
+      "title": "AI Engineers - Agents at Work - NYC Summit",
+      "link": "https://www.youtube.com/watch?v=l6eg1K2w7t0",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=l6eg1K2w7t0",
+      "video_id": "l6eg1K2w7t0",
+      "channel": {
+        "name": "Greg Baugues",
+        "link": "https://www.youtube.com/@gregcode",
+        "thumbnail": "https://yt3.ggpht.com/2yCIXSJYPSlpYkHOH6jQhlpKkypQ-aMvT6_65zoKA_KEHc8j6US46XsL4CJTdspJSotZF8wvux4=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 1850,
+      "length": "11:00",
+      "description": "800 AI engineers got together in NYC to talk about AI Agents. The theme was \"Agents At Work.\" It was a three day, single track ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/l6eg1K2w7t0/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD6WBVm0bYqJuEvSYrRdB1nyqQ3xA",
+        "rich": "https://i.ytimg.com/an_webp/l6eg1K2w7t0/mqdefault_6s.webp?du=3000&sqp=CISi8dAG&rs=AOn4CLC7cQWtPDJpklwtRmix1uiXMrWZmg"
+      }
+    },
+    {
+      "position_on_page": 19,
+      "title": "Tackling the hardest questions in agent development with Philipp | The Agent Factory Podcast",
+      "link": "https://www.youtube.com/watch?v=kPVZQ3ae7-8",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=kPVZQ3ae7-8",
+      "video_id": "kPVZQ3ae7-8",
+      "channel": {
+        "name": "Google Cloud Tech",
+        "link": "https://www.youtube.com/@googlecloudtech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_XJ_FbhTDiTg7Zhr328vkGrw99p8-uQ3Y1nW2KZozueF_nkixmIhAbF2hUMFB9lUqMwSBo4etlY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "9 tháng trước",
+      "views": 7955,
+      "length": "1:09:12",
+      "description": "Ready to listen about how to use Gemini for building applications like Deepmind Deep Research agent? In this special episode, ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/kPVZQ3ae7-8/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCj53GhdODMC9AXbwIDnW0NC7Riig",
+        "rich": "https://i.ytimg.com/an_webp/kPVZQ3ae7-8/mqdefault_6s.webp?du=3000&sqp=CKKo8dAG&rs=AOn4CLCtveRMZyzvVGJtfMwuIZ7CPnoJYQ"
+      }
+    },
+    {
+      "position_on_page": 22,
+      "title": "AI-Powered Oil and Gas Transformation | AI Agents & G Agent Demo by Ghaia.ai",
+      "link": "https://www.youtube.com/watch?v=A8VyZzt38t4",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=A8VyZzt38t4",
+      "video_id": "A8VyZzt38t4",
+      "channel": {
+        "name": "ghaia ai",
+        "link": "https://www.youtube.com/@ghaia.aisolutions",
+        "thumbnail": "https://yt3.ggpht.com/PLQdYPnyHM3grQq0BdXEkXAXL06Uq4cvtQkptPmWsicj6xCF0aVfshPBfYXAhX8R93QmKbwSdA=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "8 tháng trước",
+      "views": 136,
+      "length": "2:00",
+      "description": "G Agent is revolutionizing the Oil and Gas industry by bringing efficiency, safety, and sustainability. AI Agents are redefining ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/A8VyZzt38t4/hq720.jpg?sqp=-oaymwE2COgCEMoBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB_gmAAtAFigIMCAAQARgkICkofzAP&rs=AOn4CLDHQGz2yOMfDgHxEO59fqo53_fSnA",
+        "rich": "https://i.ytimg.com/an_webp/A8VyZzt38t4/mqdefault_6s.webp?du=3000&sqp=CLis8dAG&rs=AOn4CLAXx--IwSyNH6TaRrDvx1eJiMo6nw"
+      }
+    },
+    {
+      "position_on_page": 23,
+      "title": "I just made $395,000 with AI Agents. If you're just starting, watch this.",
+      "link": "https://www.youtube.com/watch?v=nxErurfV4CM",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=nxErurfV4CM",
+      "video_id": "nxErurfV4CM",
+      "channel": {
+        "name": "Caleb G",
+        "link": "https://www.youtube.com/@CalebGovenderAI",
+        "thumbnail": "https://yt3.ggpht.com/tZcbRqiuaxU1G0ekUNnXHhUuABI4gTM32w-jjYeCi00dpZ4IFoDCoNdiO5eNt-RrOP_dKVK46w=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "6 tháng trước",
+      "views": 355,
+      "length": "5:41",
+      "description": "Secure The ActivationAgents™ Playbook - https://link.activationagents.ai/5c2fda71.",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/nxErurfV4CM/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDmhQLnFl8cB5C76XtxuTeLkv4HRg",
+        "rich": "https://i.ytimg.com/an_webp/nxErurfV4CM/mqdefault_6s.webp?du=3000&sqp=COaM8dAG&rs=AOn4CLCDgW8grVtYYDgAZvjT9AIdC0-iIA"
+      }
+    },
+    {
+      "position_on_page": 24,
+      "title": "OpenAI’s Sam Altman Talks ChatGPT, AI Agents and Superintelligence — Live at TED2025",
+      "link": "https://www.youtube.com/watch?v=5MWT_doo68k",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=5MWT_doo68k",
+      "video_id": "5MWT_doo68k",
+      "channel": {
+        "name": "TED",
+        "link": "https://www.youtube.com/@TED",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/ytc/AIdro_koIFcCOrvh0KThLNOiazAIDu6hcs8bjkGNwe1f6A_OYm8=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "Phát trực tiếp 1 năm trước",
+      "views": 2292571,
+      "length": "47:30",
+      "description": "The AI revolution is here to stay, says Sam Altman, the CEO of OpenAI. In a probing, live conversation with head of TED Chris ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/5MWT_doo68k/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBKWOIbGtbrEvsu22AZz-R2D4tVlQ",
+        "rich": "https://i.ytimg.com/an_webp/5MWT_doo68k/mqdefault_6s.webp?du=3000&sqp=CKm18dAG&rs=AOn4CLA4jWw8Or3GIrDD6UMYKyvoUyNp3g"
+      }
+    },
+    {
+      "position_on_page": 25,
+      "title": "AI Agents Explained: The Technology That's Changing Everything (2025 Guide) & How to Build Your Own",
+      "link": "https://www.youtube.com/watch?v=BiN-NTTQ7tc",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=BiN-NTTQ7tc",
+      "video_id": "BiN-NTTQ7tc",
+      "channel": {
+        "name": "Tiff In Tech",
+        "link": "https://www.youtube.com/@TiffInTech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/ms-9sJ3mCrh9r95RVXrTTeKI3jF-IjRq3J2kIdB26l8-0sIZ5n_sl6sfngNBMCSG2aml7SPojQ=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 110539,
+      "length": "14:32",
+      "description": "I spent ALOT of time learning about AI Agents so you dont have to! Whether you're a complete beginner or tech enthusiast, this ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/BiN-NTTQ7tc/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD6VusEmAncpcLsUMDQQ-UP5VBIzg",
+        "rich": "https://i.ytimg.com/an_webp/BiN-NTTQ7tc/mqdefault_6s.webp?du=3000&sqp=COKU8dAG&rs=AOn4CLB8GicR1NcDe6SoRz2KUN2GbayqAA"
+      }
+    },
+    {
+      "position_on_page": 26,
+      "title": "How to Create a Voice Call AI Agent with n8n | Automate Calls & Follow-Ups",
+      "link": "https://www.youtube.com/watch?v=JinTKY1TJZY",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=JinTKY1TJZY",
+      "video_id": "JinTKY1TJZY",
+      "channel": {
+        "name": "Website Learners",
+        "link": "https://www.youtube.com/@WebsiteLearners",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/ytc/AIdro_nBkw8wpT6jglrHmh6VHiWmQ4Ul_pIZjcs_yUI5BvxXoPk=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "8 tháng trước",
+      "views": 206167,
+      "length": "18:56",
+      "description": "LIMITED TODAY:* Get *1 Year* of GravityWrite at _$97_ Visit ➜ https://gravitywrite.com/ ♥️ *Get N8n Hosting & Workflow* ...",
+      "extensions": [
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/JinTKY1TJZY/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDZCvQzsl1u0VpoFkvguxLtjBYM3Q",
+        "rich": "https://i.ytimg.com/an_webp/JinTKY1TJZY/mqdefault_6s.webp?du=3000&sqp=CKac8dAG&rs=AOn4CLCnn6EUohytVKH7rnJLP8mrbHRIIg"
+      }
+    },
+    {
+      "position_on_page": 27,
+      "title": "3 Advanced AI agent design patterns",
+      "link": "https://www.youtube.com/watch?v=89KKm_a4M7A",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=89KKm_a4M7A",
+      "video_id": "89KKm_a4M7A",
+      "channel": {
+        "name": "Google Cloud Tech",
+        "link": "https://www.youtube.com/@googlecloudtech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_XJ_FbhTDiTg7Zhr328vkGrw99p8-uQ3Y1nW2KZozueF_nkixmIhAbF2hUMFB9lUqMwSBo4etlY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tháng trước",
+      "views": 70268,
+      "length": "8:00",
+      "description": "Agentic pattern lab → https://goo.gle/agenticpattern Multi-agent pattern blog → https://goo.gle/multiagentpattern Design agentic ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/89KKm_a4M7A/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBq7KNPg3cauvbTcsQVDndANYODgw",
+        "rich": "https://i.ytimg.com/an_webp/89KKm_a4M7A/mqdefault_6s.webp?du=3000&sqp=CNCE8dAG&rs=AOn4CLCunFY4pd8qK9q4D029RqCWMGNdXA"
+      }
+    }
+  ],
+  "ads_results": [
+    {
+      "position_on_page": 6,
+      "title": "AI for Business Insights",
+      "website": "https://www.googleadservices.com/pagead/aclk?sa=L&ai=CVoySclwcatyLGOqGnb8PzdX1mAq-gMz8hQGOk_KsvxVkEAIgAGDJ7p6N7KSAEIIBF2NhLXB1Yi02MjE5ODExNzQ3MDQ5MzcxoAGzm6iTQ6gDBMgDCqoEqwJP0Ck_M3Sb5QbDX5nnoFQmT4DMfNpy1OPWiE-_7f1g59K7r1ZuC5KU55nx6dt4CzKHHdCFKyuq6mFssPA64ZITTmeL9SZITr0uQkZrctFw1QuPDXN7ucvzozOrCIXn5YQS0GAxB1jzQ8LM9RH9kk3kK0bmlSQKNe6o3B07Ec9x68qyn4ft23wGKIExKsiEYiDK-yglfyNUl8LI3W_ieq47vAIBlfdo6S3eFXZsRJ8IcFvt0Kfm0fNORh7Pq67NArVSuQvW8ycHMAs7F3jTHUXwYBpv5eiud__J4CV18i7VbXn7UzuJzjLUaOLkR5XT6nKvZt7mm69OLxkpyv9mS4Uk-ArIJiAZV5ZnNzXAXymsHKDLa2Q0TDvEoWFZwvbkmE9onLOlEkwCDh5CXIgF6YjWmFiSBQgIE3j-7NaVHqAGpAGAB7PT-PIdkAcEqAfywLECqAe4xLECqAfhtrECqAelz7ECqAfnnbECqAfonbECqAfvtbECqAfwtbECqAf507ECqAfJ2rECqAep4LECqAeECKgHptSxAqgHqNIbqAe2B6gHsdwbqAewm7ECqAeusbECqAf9srECqAfIz7ECqAfJz7ECqAfNx7ECqAfx0bECqAf81bECqAf71bECqAeM1rECqAeL1rECqAea4rECqAeb4rECqAed17ECqAed1LECqAeBxhuoB_yvsQKoB77ZsQKoB6vFG6gHt6GxAqgH1amxAqgH3rWxAqgH6rGxAqgHvrexAqgHmbWxAqgHhcGxAqgH66WxAqgHyqmxAtIILgiAQRABGF4yAoICOg-AQoDAgICAgICAAqqAgBBI2aDSNVAUWKj_gY3045QDYAGaCRRodHRwczovL2NvcnBvcmF0ZS5habEJHiWLepJxZAjICQCYCwG6C0EIAxAFGBYgCCgBMBxAAUgAWE5gAGgAcAGIAQCYAQGiAQgKAKgCAdgCAqgBAdgBAYACAYgCBboDCXZpbHBwemFiYdALEtIMAhAB2gwmCgsQ8PiAhZ7mqI31ARICAQMaDRjpiNaYWCD5u6Pn2QVAAUoCEB-aDQESqg0CVVPIDQHSDTxodHRwczovL2NvcnBvcmF0ZS5haT9nYWRfc291cmNlPTImZ2FkX2NhbXBhaWduaWQ9MjM2NzQwNjE5MjmwDoq9iPYYuBP___________8BsBQDwBWBgIBA0BUB2BUBmBYB4hYCCAGAFwGKFxgIAxgBIAEoATABOAFAAUgBUAFYAWACaAGgFwGpFyN0P7OcMxt2uhcGKAAwADgB0BgB8BgBwhkCCAE&ase=2&gclid=EAIaIQobChMI3IyCjfTjlAMVakPnAR3Nah2jEAEYAiAAEgLkH_D_BwE&num=2&cid=CAASqgHkaKpP8_hSnwZh4hNu7CMwXSUoyRgUKEBc1vtU8Js-kzpSv78oZGi3c3qLTwuLJL5IPtq5Ek5sBPkYe4k_H8QvYoSwXgiKR9H5bzvPii_0gSGwTQiYax_U42hPuW5P1j_2isTMl7BOgIbMEhEz5uVjxu5ZAxxOT94-2WhDelDzqBp66so2jDp6tPIuJT1qqij0GBde90WVV9PTJMVilxhJm_72vaAA5ds-mw&sig=AOD64_3o889BRiShsDSMNMi2tl_8Pk_lvA&ms=%5BCLICK_MS%5D&nb=2&nx=%5BNX%5D&ny=%5BNY%5D&dim=%5BDIM%5D",
+      "channel": {
+        "name": "Corporate.AI",
+        "thumbnail": "https://lh6.googleusercontent.com/proxy/MT67PYMJECsdfb8HgoVtBMfwZanpch47kEUH0T16e6LvC7YN3P7T0xzOXQIMEzG2uMPPI_9i8ulUpI4pdGgCjoF_EJ3txxJR_TpzDyN39d6ZhNkNILlK5wHMj8ywgavSXyk"
+      },
+      "description": "Don't get lost in the AI maze. Corporate.AI: Your trusted guide.",
+      "thumbnail": {
+        "static": "https://lh6.googleusercontent.com/proxy/MT67PYMJECsdfb8HgoVtBMfwZanpch47kEUH0T16e6LvC7YN3P7T0xzOXQIMEzG2uMPPI_9i8ulUpI4pdGgCjoF_EJ3txxJR_TpzDyN39d6ZhNkNILlK5wHMj8ywgavSXyk"
+      }
+    }
+  ],
+  "những_người_khác_cũng_xem": [
+    {
+      "position_on_page": 10,
+      "title": "One Life. One Folder.",
+      "link": "https://www.youtube.com/watch?v=51ZVWAjHurI",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=51ZVWAjHurI",
+      "video_id": "51ZVWAjHurI",
+      "channel": {
+        "name": "ICOR with Tom | AI Productivity",
+        "link": "https://www.youtube.com/@myicor",
+        "thumbnail": "https://yt3.ggpht.com/Au4etmMlR7QhASyOZEfaDisO3W42f7CNAmZ4W90_aaWGNyTDL-KMzEqt0n6HpjxA0bt7z2Zidw=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "18 giờ trước",
+      "views": 4033,
+      "length": "51:54",
+      "description": "One folder of plain text on my machine, and Claude runs my whole life and business from inside it. This is myPKA, my Personal ...",
+      "extensions": [
+        "Mới",
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/51ZVWAjHurI/hq720_custom_3.jpg?sqp=CKy48dAG-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAhPjG4qMLfF8dqqQM9FvpJrulYHA",
+        "rich": "https://i.ytimg.com/an_webp/51ZVWAjHurI/mqdefault_6s.webp?du=3000&sqp=COD38NAG&rs=AOn4CLCB3RQwMGZ08eT8YI6JbLPZZYIVNw"
+      }
+    },
+    {
+      "position_on_page": 11,
+      "title": "From Zero to Your First AI Agent in 25 Minutes (No Coding)",
+      "link": "https://www.youtube.com/watch?v=EH5jx5qPabU",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=EH5jx5qPabU",
+      "video_id": "EH5jx5qPabU",
+      "channel": {
+        "name": "Futurepedia và AI Agent Lab",
+        "thumbnail": "https://yt3.ggpht.com/7gpWN95XOZ-MO30txO1hyDUM9b830cX3mMANqWNVLVegO4LaoWueslV370g-8dBdkirYOKhUCw=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 3744428,
+      "length": "25:58",
+      "description": "Download the free AI Agents Resources: https://clickhubspot.com/39c59b More from Futurepedia: Join the fastest-growing AI ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/EH5jx5qPabU/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLC-q1thMsvvishAsnLTpd6BspNt8g",
+        "rich": "https://i.ytimg.com/an_webp/EH5jx5qPabU/mqdefault_6s.webp?du=3000&sqp=CJGX8dAG&rs=AOn4CLDgFtvsjBtceQWqQmu9GuIwOJ4Mbw"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "Higgsfield Supercomputer: The Powerful AI Agent for Creative Work",
+      "link": "https://www.youtube.com/watch?v=AoLjxnkylFU",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=AoLjxnkylFU",
+      "video_id": "AoLjxnkylFU",
+      "channel": {
+        "name": "Paul J Lipsky",
+        "link": "https://www.youtube.com/@PaulJLipsky",
+        "thumbnail": "https://yt3.ggpht.com/ABQ6aFf51m-8plR4kJ-pJNUOrVf_X5OISauKR7XVS56EBriwvKj4aQus5X1cHHjLLCcqPE-LsA=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 ngày trước",
+      "views": 4719,
+      "length": "7:46",
+      "description": "Try Higgsfield Supercomputer: https://higgsfield.ai/s/supercomputer-pauljlipsky-iSPvsR I tested Higgsfield Supercomputer, the first ...",
+      "extensions": [
+        "Mới",
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/AoLjxnkylFU/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBHhaZoSBFSpqWxK4kRFJC8YVMbKA",
+        "rich": "https://i.ytimg.com/an_webp/AoLjxnkylFU/mqdefault_6s.webp?du=3000&sqp=CJCF8dAG&rs=AOn4CLDW9hXQYWNdZTm2-FlfMzOX_y-W7Q"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "Don't learn AI Agents without Learning these Fundamentals",
+      "link": "https://www.youtube.com/watch?v=ZaPbP9DwBOE",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=ZaPbP9DwBOE",
+      "video_id": "ZaPbP9DwBOE",
+      "channel": {
+        "name": "KodeKloud",
+        "link": "https://www.youtube.com/@KodeKloud",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_pHLjGmYVp9Qv6r57IhDnEsej2tgpxSyBzD8kUUvDetLLPLGSkDlh77JLxtchccZhBwG8iqq=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "7 tháng trước",
+      "views": 827754,
+      "length": "56:40",
+      "description": "AI Agents Labs for Free: https://kode.wiki/3Wh4DZ6 Learn everything about AI agents from scratch in this comprehensive tutorial.",
+      "extensions": [
+        "Cơ bản",
+        "Tổng quan"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/ZaPbP9DwBOE/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCoSqlIEGJKowjqjWG3cciSQ4EvIw",
+        "rich": "https://i.ytimg.com/an_webp/ZaPbP9DwBOE/mqdefault_6s.webp?du=3000&sqp=CJ638dAG&rs=AOn4CLA4KWWTMLu9TbOZzZXqFmcz_Bxa1g"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "Peter Thiel & Javier Milei - Secret AI Power Move",
+      "link": "https://www.youtube.com/watch?v=p2LWi7oiMgg",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=p2LWi7oiMgg",
+      "video_id": "p2LWi7oiMgg",
+      "channel": {
+        "name": "AI Stocks Report with Warren Redlich",
+        "link": "https://www.youtube.com/@WarrenRedlich",
+        "thumbnail": "https://yt3.ggpht.com/Aaw1GkyzKSIWo8-nYHWa-a3TVyj6N8evXy35aTew8AJ7i8kgz_ub0quW0lu5hKXcI6fkKDza=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "Phát trực tiếp 2 giờ trước",
+      "views": 467,
+      "length": "44:35",
+      "description": "Peter Thiel moved to Argentina to work with Javier Milei. The media says he's escaping taxes. The Left says he's the Antichrist ...",
+      "extensions": [
+        "Mới",
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/p2LWi7oiMgg/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAedu8ArUMjSlpJJq4cCvc5hnAPsw",
+        "rich": "https://i.ytimg.com/an_webp/p2LWi7oiMgg/mqdefault_6s.webp?du=3000&sqp=CICH8dAG&rs=AOn4CLCm7DdjWShkZYRJGTowLMs_Pc6vWg"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "Google Gemini’s NEW Spark 24/7 Automation Agent is INSANE! (Must Try Use Cases)",
+      "link": "https://www.youtube.com/watch?v=xq6x3nUnr9k",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=xq6x3nUnr9k",
+      "video_id": "xq6x3nUnr9k",
+      "channel": {
+        "name": "Rob The AI Guy",
+        "link": "https://www.youtube.com/@realrobtheaiguy",
+        "thumbnail": "https://yt3.ggpht.com/EIPTj5uy4_ap4KavUrzcTA56yDgRFh4ZEZ3_CWbJ6bpZVM0ibboGEV4ALdgwHnlFeSle3SJdsA=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "3 ngày trước",
+      "views": 14603,
+      "length": "12:01",
+      "description": "Get Started with MyPromptBuddy for free: https://mypromptbuddy.ai/ Google Gemini finally released their 24/7 Spark Automation ...",
+      "extensions": [
+        "Mới"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/xq6x3nUnr9k/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAthSKE8PUUduVW2GpwrYuX2Yl3qA",
+        "rich": "https://i.ytimg.com/an_webp/xq6x3nUnr9k/mqdefault_6s.webp?du=3000&sqp=CNCh8dAG&rs=AOn4CLB9sQDQo5GJu09RrvpwGYZx-PEyOQ"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "AI agent design patterns",
+      "link": "https://www.youtube.com/watch?v=GDm_uH6VxPY",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=GDm_uH6VxPY",
+      "video_id": "GDm_uH6VxPY",
+      "channel": {
+        "name": "Google Cloud Tech",
+        "link": "https://www.youtube.com/@googlecloudtech",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/_XJ_FbhTDiTg7Zhr328vkGrw99p8-uQ3Y1nW2KZozueF_nkixmIhAbF2hUMFB9lUqMwSBo4etlY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "3 tháng trước",
+      "views": 364312,
+      "length": "8:21",
+      "description": "Agentic Pattern lab→ https://goo.gle/agenticpattern Multi-Agent Pattern blog → https://goo.gle/multiagentpattern Design agentic ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/GDm_uH6VxPY/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDATO5R3y5nTDSe62k5AVicdFJj_Q",
+        "rich": "https://i.ytimg.com/an_webp/GDm_uH6VxPY/mqdefault_6s.webp?du=3000&sqp=CJyu8dAG&rs=AOn4CLBPNSHtAosUyty7XUObmeRoaVBgfw"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "I Tried 100+ Claude Code Skills. These 6 Are The Best.",
+      "link": "https://www.youtube.com/watch?v=ZSvcxjNZdxk",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=ZSvcxjNZdxk",
+      "video_id": "ZSvcxjNZdxk",
+      "channel": {
+        "name": "Tech With Tim",
+        "link": "https://www.youtube.com/@TechWithTim",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/ytc/AIdro_k15oXl74WcnpdL-uVBv6IHBgAfXEEnpUiS-IoEyV1auyY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 ngày trước",
+      "views": 19371,
+      "length": "19:19",
+      "description": "Claude Code skills are one of the most underrated features in AI coding right now — and most people aren't using them. I went ...",
+      "extensions": [
+        "Mới",
+        "4K"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/ZSvcxjNZdxk/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAywragHUhIj0PrBm_Hx4Sg1_MVnw",
+        "rich": "https://i.ytimg.com/an_webp/ZSvcxjNZdxk/mqdefault_6s.webp?du=3000&sqp=CN2j8dAG&rs=AOn4CLDWPIJ6sMwjpU5N8VKnYHl_OS_lgw"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "AI Agents Full Course 2026: Master Agentic AI (2 Hours)",
+      "link": "https://www.youtube.com/watch?v=EsTrWCV0Ph4",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=EsTrWCV0Ph4",
+      "video_id": "EsTrWCV0Ph4",
+      "channel": {
+        "name": "Nick Saraev",
+        "link": "https://www.youtube.com/@nicksaraev",
+        "thumbnail": "https://yt3.ggpht.com/UiYMoH6AkOr2inSVDC9yG7Reb-ASc4gnr8uxUgbIa-KrzUjeRI7lMs6fO9OGeaCBvebijMmgOQE=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tháng trước",
+      "views": 327366,
+      "length": "2:13:15",
+      "description": "Join Maker School & get customer #1 guaranteed: https://skool.com/makerschool/about All course files: ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/EsTrWCV0Ph4/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBvzE6EiYTbTVvrbPYvmLLhaQ2KWw",
+        "rich": "https://i.ytimg.com/an_webp/EsTrWCV0Ph4/mqdefault_6s.webp?du=3000&sqp=CNqE8dAG&rs=AOn4CLAXB_EzZkymiyQYLIbK4nDYafqKTg"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "AI Engineering with the Google Gemini 2.5 Model Family - Philipp Schmid, Google DeepMind",
+      "link": "https://www.youtube.com/watch?v=zK9lYrLbjSg",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=zK9lYrLbjSg",
+      "video_id": "zK9lYrLbjSg",
+      "channel": {
+        "name": "AI Engineer",
+        "link": "https://www.youtube.com/@aiDotEngineer",
+        "thumbnail": "https://yt3.ggpht.com/ajVemEB89DAOemsbfuMY6ZOWXJAACx3cbty9z21jeqRKODaVkDBSRun1b1xfQJljEsziOWS_Mg=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "10 tháng trước",
+      "views": 4819,
+      "length": "1:44:51",
+      "description": "Hands on Workshop on learning to use Gemini 2.5 Pro in combination with Agentic tooling and MCP Servers. About Philipp ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/zK9lYrLbjSg/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDw9S7Uv5mBFImhzlqScsvCaXJhdw",
+        "rich": "https://i.ytimg.com/an_webp/zK9lYrLbjSg/mqdefault_6s.webp?du=3000&sqp=CNCQ8dAG&rs=AOn4CLDXwDpo39QT4cwVtbRDmqW42sfJVQ"
+      }
+    }
+  ],
+  "shorts_results": [
+    {
+      "position_on_page": 14,
+      "shorts": [
+        {
+          "title": "Meet Gemini Spark, your 24/7 personal AI agent✨",
+          "link": "https://www.youtube.com/shorts/LEldTW4Zkhg",
+          "thumbnail": "https://i.ytimg.com/vi/LEldTW4Zkhg/frame0.jpg",
+          "views_original": "14 N lượt xem",
+          "views": 14000,
+          "video_id": "LEldTW4Zkhg"
+        },
+        {
+          "title": "What is an AI agent?",
+          "link": "https://www.youtube.com/shorts/v3k65QQXWE8",
+          "thumbnail": "https://i.ytimg.com/vi/v3k65QQXWE8/frame0.jpg",
+          "views_original": "4,7 N lượt xem",
+          "views": 4700,
+          "video_id": "v3k65QQXWE8"
+        },
+        {
+          "title": "Comment \"G\" to get free dropshipping agent",
+          "link": "https://www.youtube.com/shorts/hmUkwpMi1TA",
+          "thumbnail": "https://i.ytimg.com/vi/hmUkwpMi1TA/frame0.jpg",
+          "views_original": "0 lượt xem",
+          "views": 0,
+          "video_id": "hmUkwpMi1TA"
+        },
+        {
+          "title": "Instagram Automation: Grow Your Business with AI Agents",
+          "link": "https://www.youtube.com/shorts/fxyfYGL2C-g",
+          "thumbnail": "https://i.ytimg.com/vi/fxyfYGL2C-g/frame0.jpg",
+          "views_original": "325 lượt xem",
+          "views": 325,
+          "video_id": "fxyfYGL2C-g"
+        },
+        {
+          "title": "AI Agents Explained! #technology #ai #machinelearningplus",
+          "link": "https://www.youtube.com/shorts/1AwRTqZXN-g",
+          "thumbnail": "https://i.ytimg.com/vi/1AwRTqZXN-g/frame0.jpg",
+          "views_original": "77 lượt xem",
+          "views": 77,
+          "video_id": "1AwRTqZXN-g"
+        }
+      ]
+    },
+    {
+      "position_on_page": 17,
+      "shorts": [
+        {
+          "title": "G-Mobile Pt2: Subtle Signs Your Customer Service Agent Is About to SNAP!",
+          "link": "https://www.youtube.com/shorts/pSScyj3nF24",
+          "thumbnail": "https://i.ytimg.com/vi/pSScyj3nF24/frame0.jpg",
+          "views_original": "8 lượt xem",
+          "views": 8,
+          "video_id": "pSScyj3nF24"
+        },
+        {
+          "title": "How do you manage 40K AI agents?",
+          "link": "https://www.youtube.com/shorts/X2q4xTj5i-g",
+          "thumbnail": "https://i.ytimg.com/vi/X2q4xTj5i-g/frame0.jpg",
+          "views_original": "495 lượt xem",
+          "views": 495,
+          "video_id": "X2q4xTj5i-g"
+        },
+        {
+          "title": "🤖 Agentic AI Explained | NVIDIA GTC 2025 Keynote with Jensen Huang 🚀",
+          "link": "https://www.youtube.com/shorts/AnaBQacfH50",
+          "thumbnail": "https://i.ytimg.com/vi/AnaBQacfH50/frame0.jpg",
+          "views_original": "365 N lượt xem",
+          "views": 365000,
+          "video_id": "AnaBQacfH50"
+        },
+        {
+          "title": "This AI Agent closes deals while you are sleeping",
+          "link": "https://www.youtube.com/shorts/g-IQipi_ZUk",
+          "thumbnail": "https://i.ytimg.com/vi/g-IQipi_ZUk/frame0.jpg",
+          "views_original": "49 lượt xem",
+          "views": 49,
+          "video_id": "g-IQipi_ZUk"
+        },
+        {
+          "title": "AI Agents are here!",
+          "link": "https://www.youtube.com/shorts/G-0e7Z9k4hA",
+          "thumbnail": "https://i.ytimg.com/vi/G-0e7Z9k4hA/frame0.jpg",
+          "views_original": "416 lượt xem",
+          "views": 416,
+          "video_id": "G-0e7Z9k4hA"
+        },
+        {
+          "title": "AI Agents explained in 3 steps",
+          "link": "https://www.youtube.com/shorts/BF2k_fKuCVM",
+          "thumbnail": "https://i.ytimg.com/vi/BF2k_fKuCVM/frame0.jpg",
+          "views_original": "633 N lượt xem",
+          "views": 633000,
+          "video_id": "BF2k_fKuCVM"
+        },
+        {
+          "title": "Google’s Project Mariner Explained – The AI Agent That Learns Like a Human 🤯",
+          "link": "https://www.youtube.com/shorts/GkaHJcrx2-g",
+          "thumbnail": "https://i.ytimg.com/vi/GkaHJcrx2-g/frame0.jpg",
+          "views_original": "815 lượt xem",
+          "views": 815,
+          "video_id": "GkaHJcrx2-g"
+        },
+        {
+          "title": "What an AI agent built in 3 hours - Virtual try on for your wardrobe",
+          "link": "https://www.youtube.com/shorts/CyFrRa4xurI",
+          "thumbnail": "https://i.ytimg.com/vi/CyFrRa4xurI/frame0.jpg",
+          "views_original": "4,8 N lượt xem",
+          "views": 4800,
+          "video_id": "CyFrRa4xurI"
+        },
+        {
+          "title": "Comment \"G\" to get free dropshipping agent",
+          "link": "https://www.youtube.com/shorts/wdHxxalz93I",
+          "thumbnail": "https://i.ytimg.com/vi/wdHxxalz93I/frame0.jpg",
+          "views_original": "498 lượt xem",
+          "views": 498,
+          "video_id": "wdHxxalz93I"
+        },
+        {
+          "title": "Mastering Flik's Generative AI Agent: A Hands-On G #Shorts",
+          "link": "https://www.youtube.com/shorts/f3L48O73DZk",
+          "thumbnail": "https://i.ytimg.com/vi/f3L48O73DZk/frame0.jpg",
+          "views_original": "0 lượt xem",
+          "views": 0,
+          "video_id": "f3L48O73DZk"
+        },
+        {
+          "title": "Using ChatGPT Agent - But Beware!",
+          "link": "https://www.youtube.com/shorts/4GgLa7rTWeM",
+          "thumbnail": "https://i.ytimg.com/vi/4GgLa7rTWeM/frame0.jpg",
+          "views_original": "1,2 N lượt xem",
+          "views": 1200,
+          "video_id": "4GgLa7rTWeM"
+        },
+        {
+          "title": "5 tips to creating production-ready AI agents",
+          "link": "https://www.youtube.com/shorts/ahxR1LqTS7M",
+          "thumbnail": "https://i.ytimg.com/vi/ahxR1LqTS7M/frame0.jpg",
+          "views_original": "4,6 N lượt xem",
+          "views": 4600,
+          "video_id": "ahxR1LqTS7M"
+        },
+        {
+          "title": "Nvidia GTC 2026: Vera Rubin & AI Agents #tech #ai #shorts",
+          "link": "https://www.youtube.com/shorts/Yf9oGfJsd-g",
+          "thumbnail": "https://i.ytimg.com/vi/Yf9oGfJsd-g/frame0.jpg",
+          "views_original": "1 lượt xem",
+          "views": 1,
+          "video_id": "Yf9oGfJsd-g"
+        },
+        {
+          "title": "This is what happens when agent's can read books.  “More AI & GTM content on SyntaxGTM YouTube”",
+          "link": "https://www.youtube.com/shorts/IYB33pTSsrg",
+          "thumbnail": "https://i.ytimg.com/vi/IYB33pTSsrg/frame0.jpg",
+          "views_original": "5 lượt xem",
+          "views": 5,
+          "video_id": "IYB33pTSsrg"
+        },
+        {
+          "title": "AI Agent vs Agentic AI — What’s the Difference?",
+          "link": "https://www.youtube.com/shorts/3Y68D4DU8Os",
+          "thumbnail": "https://i.ytimg.com/vi/3Y68D4DU8Os/frame0.jpg",
+          "views_original": "215 N lượt xem",
+          "views": 215000,
+          "video_id": "3Y68D4DU8Os"
+        },
+        {
+          "title": "AI chatbot vs AI Agent.                                   #viralreels #ai #automation #shots",
+          "link": "https://www.youtube.com/shorts/Q5r6JXBeS-g",
+          "thumbnail": "https://i.ytimg.com/vi/Q5r6JXBeS-g/frame0.jpg",
+          "views_original": "67 lượt xem",
+          "views": 67,
+          "video_id": "Q5r6JXBeS-g"
+        },
+        {
+          "title": "Elite guinea pig agents saving the world? 🐹💥 G-Force Recap | Disney's most underrated spy flick!",
+          "link": "https://www.youtube.com/shorts/rYGtYC8G_jo",
+          "thumbnail": "https://i.ytimg.com/vi/rYGtYC8G_jo/frame0.jpg",
+          "views_original": "184 lượt xem",
+          "views": 184,
+          "video_id": "rYGtYC8G_jo"
+        },
+        {
+          "title": "Learn how to create a Copilot Agent that works for you!",
+          "link": "https://www.youtube.com/shorts/F_FmYwudGHE",
+          "thumbnail": "https://i.ytimg.com/vi/F_FmYwudGHE/frame0.jpg",
+          "views_original": "286 N lượt xem",
+          "views": 286000,
+          "video_id": "F_FmYwudGHE"
+        },
+        {
+          "title": "Can They Build an AI Agent in 3 Hours [Trailer]",
+          "link": "https://www.youtube.com/shorts/NfxwE-DWy04",
+          "thumbnail": "https://i.ytimg.com/vi/NfxwE-DWy04/frame0.jpg",
+          "views_original": "10 N lượt xem",
+          "views": 10000,
+          "video_id": "NfxwE-DWy04"
+        },
+        {
+          "title": "3 tips to become a top 1% agent operator",
+          "link": "https://www.youtube.com/shorts/A72hJaeTeJQ",
+          "thumbnail": "https://i.ytimg.com/vi/A72hJaeTeJQ/frame0.jpg",
+          "views_original": "628 lượt xem",
+          "views": 628,
+          "video_id": "A72hJaeTeJQ"
+        }
+      ]
+    }
+  ],
+  "khám_phá_thêm": [
+    {
+      "position_on_page": 20,
+      "title": "It’s Been a Good Run, Phone Providers (Part 2)",
+      "link": "https://www.youtube.com/watch?v=YE1T3XuOpow",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=YE1T3XuOpow",
+      "video_id": "YE1T3XuOpow",
+      "channel": {
+        "name": "Data Slayer",
+        "link": "https://www.youtube.com/@DataSlayerMedia",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/6TRyVj9MHL3EGD55gh-ucRHVVm0_UWHw9_YNbjrinqVKTI5MKxIKCkXW6DQkKY3JJq3Uaz9Lwoo=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 năm trước",
+      "views": 3079528,
+      "length": "15:51",
+      "description": "How are these legal? Explore DIY trackers, routers, and guides → https://buildwithparallel.com **Product Links** RakWireless ...",
+      "extensions": [
+        "4K",
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/YE1T3XuOpow/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBkv2DS0DmlI-hzaZWMPgdsWEbbmQ",
+        "rich": "https://i.ytimg.com/an_webp/YE1T3XuOpow/mqdefault_6s.webp?du=3000&sqp=CLi08dAG&rs=AOn4CLDFvL35CebOXLA68Ubo5uP5evPNsg"
+      }
+    },
+    {
+      "position_on_page": 21,
+      "title": "Typing speed comparison india 🇮🇳 vs china 🇨🇳",
+      "link": "https://www.youtube.com/watch?v=CklGg_M180E",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=CklGg_M180E",
+      "video_id": "CklGg_M180E",
+      "channel": {
+        "name": "INNOVATIVE AJIT",
+        "link": "https://www.youtube.com/@innovativeajit",
+        "thumbnail": "https://yt3.ggpht.com/o9iInP1hgm6xz5kttn6oHN8C44tv73h45ueeM7t04BrHTpDDr3zfiHjrN2o-mmyBNK7LJf4OLQ=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "3 năm trước",
+      "views": 6233905,
+      "length": "0:33",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/CklGg_M180E/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCQVmlnADR8z1sU4qJv9CkKBsm3_A",
+        "rich": "https://i.ytimg.com/an_webp/CklGg_M180E/mqdefault_6s.webp?du=3000&sqp=CJKb8dAG&rs=AOn4CLDW-UKisiPhdsgJrQXpjdJgViLqKA"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "I Tried the First Humanoid Home Robot. It Got Weird. | WSJ",
+      "link": "https://www.youtube.com/watch?v=f3c4mQty_so",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=f3c4mQty_so",
+      "video_id": "f3c4mQty_so",
+      "channel": {
+        "name": "The Wall Street Journal",
+        "link": "https://www.youtube.com/@wsj",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/zbPzRWTIiIg_sNPoAgBf4COWvAoac3vgbiTEu1dfpqH3YPDNvnxMjDtAGftuw5EPx8wfSjMzr2I=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "7 tháng trước",
+      "views": 2513107,
+      "length": "9:15",
+      "description": "The 1X Neo is one of the first humanoid robots built for your home and is equipped with full AI software. For $20000, you can ...",
+      "extensions": [
+        "Phụ đề"
+      ],
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/f3c4mQty_so/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDVCDb_zIEQXaKFkX7-gDpy1fjAXw",
+        "rich": "https://i.ytimg.com/an_webp/f3c4mQty_so/mqdefault_6s.webp?du=3000&sqp=CPid8dAG&rs=AOn4CLBcTTWwSoaPMtQiw1VSYFS666dMXg"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "What Courtship Was Really Like in the Victorian Age | History for Sleep",
+      "link": "https://www.youtube.com/watch?v=9P1Gq5WMoy8",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=9P1Gq5WMoy8",
+      "video_id": "9P1Gq5WMoy8",
+      "channel": {
+        "name": "Sleepy History with Oliver",
+        "link": "https://www.youtube.com/@SleepyHistorywithOliver",
+        "thumbnail": "https://yt3.ggpht.com/4Qhz5VbYF9Lo5HTjSmIbpQlESoZnHF6GWtxc_RzARta-osl_bW1bf8tBdKOVkZoq_nbIp7_P=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 tháng trước",
+      "views": 49674,
+      "length": "2:55:28",
+      "description": "In the Victorian era, courtship followed a structured set of customs shaped by etiquette, family expectations, and social reputation.",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/9P1Gq5WMoy8/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLB8D4XH0z8htUwnLm3HhSAlNN8NAw",
+        "rich": "https://i.ytimg.com/an_webp/9P1Gq5WMoy8/mqdefault_6s.webp?du=3000&sqp=CIef8dAG&rs=AOn4CLCe3IZwmkmeLU25a4A9eMZYGWkBCg"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "China Just Dropped Self-Evolving AI Robots With Real Human Physical Intuition",
+      "link": "https://www.youtube.com/watch?v=pvOLxYhpwO0",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=pvOLxYhpwO0",
+      "video_id": "pvOLxYhpwO0",
+      "channel": {
+        "name": "AI Revolution",
+        "link": "https://www.youtube.com/@airevolutionx",
+        "verified": true,
+        "thumbnail": "https://yt3.ggpht.com/XRZC_XqZoSUtB_Zo9R0w2vDRqGqVv0lKZTRYI6b-7DPKi32MtByVhxgIokLAguhf7fw__K8o3g=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "7 tháng trước",
+      "views": 847659,
+      "length": "9:59",
+      "description": "China just dropped WoW — the world's first self-evolving world model that teaches robots to think, move, and act with human-like ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/pvOLxYhpwO0/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD3HGEnrTvYpVTOoI700Be27jQceQ",
+        "rich": "https://i.ytimg.com/an_webp/pvOLxYhpwO0/mqdefault_6s.webp?du=3000&sqp=CKqP8dAG&rs=AOn4CLA884dZ8K56pTOvfJgumkY5OXC8dQ"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "🕯️💔🏃‍♀️ What Happened to Women Who Ran Away From Arranged Marriages 📜😴 | History for Sleep",
+      "link": "https://www.youtube.com/watch?v=2hM3imL8WNE",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=2hM3imL8WNE",
+      "video_id": "2hM3imL8WNE",
+      "channel": {
+        "name": "Sleepy Past",
+        "link": "https://www.youtube.com/@SleepyPast86",
+        "thumbnail": "https://yt3.ggpht.com/sqh7W1a60rZW8IP_L7gTVnNsj9JPdmfNk7fjFLo0uJvzZuGoOWgBwQYYhHVU6vSWnn87rxnY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 tháng trước",
+      "views": 6887,
+      "length": "2:41:24",
+      "description": "Step into a quieter side of history, where personal choices sometimes collided with powerful family expectations. In this gentle ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/2hM3imL8WNE/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCRd2wnYDAFOQxms9Z4PQG-tQ4TFw",
+        "rich": "https://i.ytimg.com/an_webp/2hM3imL8WNE/mqdefault_6s.webp?du=3000&sqp=CPj98NAG&rs=AOn4CLDCNKVOP7Q0C6oeEsLKB-1qh04FsQ"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "The Rules 1950s Girls Had to Follow Before They Were Even Teenagers | Boring History for Sleep",
+      "link": "https://www.youtube.com/watch?v=BudvB63eYlI",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=BudvB63eYlI",
+      "video_id": "BudvB63eYlI",
+      "channel": {
+        "name": "The Snoozetorian",
+        "link": "https://www.youtube.com/@snoozetorian",
+        "thumbnail": "https://yt3.ggpht.com/pu149YhMGtndjFsi7y3-Zbb9t7KuLXUWrwcQzR-E9ukVBNzprsgkexXTjHNmo7MK113T3sXa=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 tháng trước",
+      "views": 7502,
+      "length": "2:26:18",
+      "description": "Hey guys! We're now live on Spotify Listen here: https://open.spotify.com/show/3K57vHeztR0HKUbKeXtEnx Before they were ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/BudvB63eYlI/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBwaeuBRH4BP8RFSCF4BXVc1TkJJw",
+        "rich": "https://i.ytimg.com/an_webp/BudvB63eYlI/mqdefault_6s.webp?du=3000&sqp=CMan8dAG&rs=AOn4CLA7kwan3l2ZAW1bgcNom0VY09p0FA"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "What 1950s American Beauty Salons Were Actually Like",
+      "link": "https://www.youtube.com/watch?v=R_nUAlcSIb4",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=R_nUAlcSIb4",
+      "video_id": "R_nUAlcSIb4",
+      "channel": {
+        "name": "Jukebox America và The Snoozetorian",
+        "thumbnail": "https://yt3.ggpht.com/nsMFrY4QLdStAvmvHoQO-G6sMXTG7PEIZgx49pyXDi8AzII97bmlrbiqwBK2CRopgwCxxX3jOg=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "1 tháng trước",
+      "views": 9037,
+      "length": "2:20:58",
+      "description": "Hey guys! We're now live on Spotify ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/R_nUAlcSIb4/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBtJW_iJ73xrIVWb0FBOuXpjymzLg",
+        "rich": "https://i.ytimg.com/an_webp/R_nUAlcSIb4/mqdefault_6s.webp?du=3000&sqp=CPq18dAG&rs=AOn4CLD_R31aCq3r_gYvrAbY-xPvAWtzCg"
+      }
+    },
+    {
+      "position_on_page": "hidden",
+      "title": "💐🏛️Why Some Victorian Women Refused to Marry — The Quiet Lives They Built Instead 😴History for Sleep",
+      "link": "https://www.youtube.com/watch?v=mZUgRQr9ooU",
+      "serpapi_link": "https://serpapi.com/search.json?engine=youtube_video&gl=vn&hl=vi&v=mZUgRQr9ooU",
+      "video_id": "mZUgRQr9ooU",
+      "channel": {
+        "name": "Sleepy Past",
+        "link": "https://www.youtube.com/@SleepyPast86",
+        "thumbnail": "https://yt3.ggpht.com/sqh7W1a60rZW8IP_L7gTVnNsj9JPdmfNk7fjFLo0uJvzZuGoOWgBwQYYhHVU6vSWnn87rxnY=s68-c-k-c0x00ffffff-no-rj"
+      },
+      "published_date": "2 tháng trước",
+      "views": 9117,
+      "length": "3:08:15",
+      "description": "Why Some Victorian Women Refused to Marry — The Quiet Lives They Built Instead | History for Sleep Step quietly into the ...",
+      "thumbnail": {
+        "static": "https://i.ytimg.com/vi/mZUgRQr9ooU/hq720.jpg?sqp=-oaymwEcCOgCEMoBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA3ZRIPIGXDjL_ppYjKPI4gBW8SeQ",
+        "rich": "https://i.ytimg.com/an_webp/mZUgRQr9ooU/mqdefault_6s.webp?du=3000&sqp=CIG08dAG&rs=AOn4CLA_TEKKztSgw0zueo2ZNfJgZi4T2w"
+      }
+    }
+  ],
+  "pagination": {
+    "current": "https://www.youtube.com/results?search_query=G-Agent+Tech&gl=vn&hl=vi",
+    "next": "https://www.youtube.com/results?gl=vn&hl=vi&search_query=G-Agent%20Tech&sp=SBSCAQthRnNBT3UyYmdGa4IBC05zOUlldHFRRV9BggELWloyUVVDZVBnWXeCAQt6dy1yQ0FCWmwwd4IBC0JxWGY4MkxLdC1nggELUTRJZ0pORl9WNXeCAQtGd09UczRVeFFTNIIBC3Jqb01aeXhuY1VJggELNU05b2lyQmZ4LWeCAQtVU1JmUnYzNEhtUYIBC1lscVhLRFAxYzVrggELWUtDeVRKOXhtMGeCAQtsNmVnMUsydzd0MIIBC2tQVlpRM2FlNy04ggELQThWeVp6dDM4dDSCAQtueEVydXJmVjRDTYIBCzVNV1RfZG9vNjhrggELQmlOLU5UVFE3dGOCAQtKaW5US1kxVEpaWYIBCzg5S0ttX2E0TTdBsgEGCgQIGhAC6gEECAIQGQ%253D%253D",
+    "next_page_token": "SBSCAQthRnNBT3UyYmdGa4IBC05zOUlldHFRRV9BggELWloyUVVDZVBnWXeCAQt6dy1yQ0FCWmwwd4IBC0JxWGY4MkxLdC1nggELUTRJZ0pORl9WNXeCAQtGd09UczRVeFFTNIIBC3Jqb01aeXhuY1VJggELNU05b2lyQmZ4LWeCAQtVU1JmUnYzNEhtUYIBC1lscVhLRFAxYzVrggELWUtDeVRKOXhtMGeCAQtsNmVnMUsydzd0MIIBC2tQVlpRM2FlNy04ggELQThWeVp6dDM4dDSCAQtueEVydXJmVjRDTYIBCzVNV1RfZG9vNjhrggELQmlOLU5UVFE3dGOCAQtKaW5US1kxVEpaWYIBCzg5S0ttX2E0TTdBsgEGCgQIGhAC6gEECAIQGQ%3D%3D"
+  },
+  "serpapi_pagination": {
+    "current": "https://serpapi.com/search.json?engine=youtube&gl=vn&hl=vi&search_query=G-Agent+Tech",
+    "next": "https://serpapi.com/search.json?engine=youtube&gl=vn&hl=vi&search_query=G-Agent+Tech&sp=SBSCAQthRnNBT3UyYmdGa4IBC05zOUlldHFRRV9BggELWloyUVVDZVBnWXeCAQt6dy1yQ0FCWmwwd4IBC0JxWGY4MkxLdC1nggELUTRJZ0pORl9WNXeCAQtGd09UczRVeFFTNIIBC3Jqb01aeXhuY1VJggELNU05b2lyQmZ4LWeCAQtVU1JmUnYzNEhtUYIBC1lscVhLRFAxYzVrggELWUtDeVRKOXhtMGeCAQtsNmVnMUsydzd0MIIBC2tQVlpRM2FlNy04ggELQThWeVp6dDM4dDSCAQtueEVydXJmVjRDTYIBCzVNV1RfZG9vNjhrggELQmlOLU5UVFE3dGOCAQtKaW5US1kxVEpaWYIBCzg5S0ttX2E0TTdBsgEGCgQIGhAC6gEECAIQGQ%253D%253D",
+    "next_page_token": "SBSCAQthRnNBT3UyYmdGa4IBC05zOUlldHFRRV9BggELWloyUVVDZVBnWXeCAQt6dy1yQ0FCWmwwd4IBC0JxWGY4MkxLdC1nggELUTRJZ0pORl9WNXeCAQtGd09UczRVeFFTNIIBC3Jqb01aeXhuY1VJggELNU05b2lyQmZ4LWeCAQtVU1JmUnYzNEhtUYIBC1lscVhLRFAxYzVrggELWUtDeVRKOXhtMGeCAQtsNmVnMUsydzd0MIIBC2tQVlpRM2FlNy04ggELQThWeVp6dDM4dDSCAQtueEVydXJmVjRDTYIBCzVNV1RfZG9vNjhrggELQmlOLU5UVFE3dGOCAQtKaW5US1kxVEpaWYIBCzg5S0ttX2E0TTdBsgEGCgQIGhAC6gEECAIQGQ%3D%3D"
+  }
+}
