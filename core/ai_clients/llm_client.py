@@ -108,6 +108,16 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
         except Exception as e:
             logger.error(f"Error loading dynamic LLM client: {e}")
             raise
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_random_exponential(min=1, max=5)
+)
+def _invoke_llm_with_retry(model, messages):
+    return model.invoke(messages)
+
 def generate_text(prompt: str, system_prompt: str = None, json_format: bool = False, workspace_id: str = None) -> str:
     """Generate text using SiliconFlow ChatOpenAI model dynamically configured by workspace settings."""
     try:
@@ -118,7 +128,7 @@ def generate_text(prompt: str, system_prompt: str = None, json_format: bool = Fa
             messages.append(SystemMessage(content=system_prompt))
         messages.append(HumanMessage(content=prompt))
         
-        response = model.invoke(messages)
+        response = _invoke_llm_with_retry(model, messages)
         
         # Extract token metrics for granular cost auditing
         try:

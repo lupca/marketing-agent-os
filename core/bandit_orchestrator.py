@@ -18,21 +18,25 @@ def calculate_reward(metrics: Dict[str, Any], objective: str) -> float:
     CMO-CTO Aligned Reward Calculation formula.
     Prevents bidding conflict while providing clear metric direction.
     """
-    impressions = float(metrics.get("impressions", 0))
-    clicks = float(metrics.get("clicks", 0))
-    conversions = float(metrics.get("conversions", 0))
-    spend = float(metrics.get("spend", 0))
-    
-    ctr = clicks / impressions if impressions > 0 else 0.0
-    cpm = (spend / impressions) * 1000 if impressions > 0 else 0.0
-    cpa = spend / conversions if conversions > 0 else 0.0
+    try:
+        impressions = float(metrics.get("impressions") or 0)
+        clicks = float(metrics.get("clicks") or 0)
+        conversions = float(metrics.get("conversions") or 0)
+        spend = float(metrics.get("spend") or 0)
+        
+        ctr = clicks / impressions if impressions > 0 else 0.0
+        cpm = (spend / impressions) * 1000 if impressions > 0 else 0.0
+        cpa = spend / conversions if conversions > 0 else 0.0
 
-    if objective == "BRAND_AWARENESS":
-        return (impressions / 1000.0) * 0.5 - (cpm * 0.3) + (ctr * 0.2)
-    elif objective == "LEAD_GEN":
-        if cpa == 0:
-            return 0.0
-        return 1.0 / cpa
+        if objective == "BRAND_AWARENESS":
+            return (impressions / 1000.0) * 0.5 - (cpm * 0.3) + (ctr * 0.2)
+        elif objective == "LEAD_GEN":
+            if cpa <= 0:
+                return 0.0
+            return 1.0 / cpa
+    except Exception as e:
+        logger.error(f"Error calculating reward: {e}. Fallback to 0.0")
+        return 0.0
     return 0.0
 
 def solve_cold_start(db: Session, objective: str) -> Dict[str, Any]:
@@ -41,22 +45,30 @@ def solve_cold_start(db: Session, objective: str) -> Dict[str, Any]:
     Avoids semantic RAG searches for metrics, using statistical campaign averages instead.
     """
     logger.info("Solving Cold Start via SQL average metrics...")
-    query = text("""
-        SELECT 
-            COALESCE(AVG(impressions), 10000) as avg_imp,
-            COALESCE(AVG(clicks), 500) as avg_clk,
-            COALESCE(AVG(conversions), 10) as avg_conv,
-            COALESCE(AVG(spend), 2000000.00) as avg_spend
-        FROM campaign_analytics
-    """)
-    res = db.execute(query).fetchone()
-    
     avg_metrics = {
-        "impressions": float(res[0]) if res else 10000.0,
-        "clicks": float(res[1]) if res else 500.0,
-        "conversions": float(res[2]) if res else 10.0,
-        "spend": float(res[3]) if res else 2000000.0
+        "impressions": 10000.0,
+        "clicks": 500.0,
+        "conversions": 10.0,
+        "spend": 2000000.0
     }
+    try:
+        query = text("""
+            SELECT 
+                AVG(impressions) as avg_imp,
+                AVG(clicks) as avg_clk,
+                AVG(conversions) as avg_conv,
+                AVG(spend) as avg_spend
+            FROM campaign_analytics
+        """)
+        res = db.execute(query).fetchone()
+        if res:
+            avg_metrics["impressions"] = float(res[0]) if res[0] is not None else 10000.0
+            avg_metrics["clicks"] = float(res[1]) if res[1] is not None else 500.0
+            avg_metrics["conversions"] = float(res[2]) if res[2] is not None else 10.0
+            avg_metrics["spend"] = float(res[3]) if res[3] is not None else 2000000.0
+    except Exception as e:
+        logger.error(f"Cold-start SQL baseline calculation failed: {e}. Falling back to default uniform metrics.")
+        
     logger.info(f"Cold start baseline metrics calculated: {avg_metrics}")
     return avg_metrics
 

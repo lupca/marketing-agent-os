@@ -287,6 +287,23 @@ def insight_generator_node(state: AgencyState) -> dict:
     """
     try:
         insight_text = generate_text(prompt, system_prompt="You are a senior CMO Analyst.", workspace_id=workspace_id)
+        # Robustly parse JSON if it is returned in a wrapped format (Edge Case 2)
+        try:
+            parsed = parse_llm_json(insight_text)
+            parsed_insight = parsed.get("insight") or parsed.get("insight_text")
+            if parsed_insight:
+                insight_text = str(parsed_insight)
+            elif parsed:
+                insight_text = str(next(iter(parsed.values())))
+        except Exception:
+            cleaned = insight_text.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            elif cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            insight_text = cleaned.strip()
     except Exception:
         insight_text = "Hành vi người dùng đang có xu hướng ưu tiên các góc độ Social Proof (Đánh giá thực tế) do sợ mua phải hàng giả, hàng nhái trôi nổi trên thị trường."
         
@@ -318,45 +335,51 @@ def publisher_node(state: AgencyState) -> dict:
     variants = state.get("generated_variants") or []
     
     with get_session() as db:
-        ws_id = uuid.UUID(str(workspace_id))
-        camp_uuid = uuid.UUID(str(campaign_id)) if campaign_id else uuid.UUID("00000000-0000-0000-0000-000000000001")
-        
-        # Save master content to satisfy foreign key constraint
-        from core.models import MasterContent
-        master = MasterContent(
-            id=uuid.uuid4(),
-            workspace_id=ws_id,
-            campaign_id=camp_uuid,
-            core_message="Autonomous Creative Engine Generated Copy Master",
-            approval_status="approved"
-        )
-        db.add(master)
-        db.commit()
-        
-        # Save variants to PostgreSQL
-        for v in variants:
-            pv = PlatformVariant(
-                id=uuid.UUID(v["variant_id"]),
-                workspace_id=ws_id,
-                master_content_id=master.id,
-                platform=v.get("platform", "facebook"),
-                adapted_copy=v.get("adapted_copy", ""),
-                publish_status="published",
-                content_type="text",
-                meta_data={"angle_name": v.get("angle_name")}
-            )
-            db.add(pv)
-            db.commit()
+        try:
+            ws_id = uuid.UUID(str(workspace_id))
+            camp_uuid = uuid.UUID(str(campaign_id)) if campaign_id else uuid.UUID("00000000-0000-0000-0000-000000000001")
             
-            # Map internal Variant_ID to external Platform_Ad_ID in ad_mapper
-            plat_ad_id = f"act_10509876_{uuid.uuid4().hex[:8]}"
-            mapper = AdMapper(
-                variant_id=pv.id,
-                platform_ad_id=plat_ad_id
+            # Save master content to satisfy foreign key constraint
+            from core.models import MasterContent
+            master = MasterContent(
+                id=uuid.uuid4(),
+                workspace_id=ws_id,
+                campaign_id=camp_uuid,
+                core_message="Autonomous Creative Engine Generated Copy Master",
+                approval_status="approved"
             )
-            db.add(mapper)
+            db.add(master)
+            
+            # Save variants to PostgreSQL
+            for v in variants:
+                pv = PlatformVariant(
+                    id=uuid.UUID(v["variant_id"]),
+                    workspace_id=ws_id,
+                    master_content_id=master.id,
+                    platform=v.get("platform", "facebook"),
+                    adapted_copy=v.get("adapted_copy", ""),
+                    publish_status="published",
+                    content_type="text",
+                    meta_data={"angle_name": v.get("angle_name")}
+                )
+                db.add(pv)
+                
+                # Map internal Variant_ID to external Platform_Ad_ID in ad_mapper
+                plat_ad_id = f"act_10509876_{uuid.uuid4().hex[:8]}"
+                mapper = AdMapper(
+                    variant_id=pv.id,
+                    platform_ad_id=plat_ad_id
+                )
+                db.add(mapper)
+                logger.info(f"Buffered mapping: Variant {pv.id} -> Ad {plat_ad_id}")
+                
+            # Atomic commit at the very end
             db.commit()
-            logger.info(f"Registered mapping: Variant {pv.id} -> Ad {plat_ad_id}")
+            logger.info("Successfully persisted all published campaign contents atomically in database!")
+        except Exception as e:
+            logger.error(f"Transaction failed: {e}. Performing rollback...")
+            db.rollback()
+            raise
             
     logger.info("Stateless execution loop finished! Releasing system resources.")
     return {
