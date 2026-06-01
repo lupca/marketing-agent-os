@@ -3,171 +3,144 @@ import os
 import sys
 import uuid
 import unittest
-from langchain_core.messages import HumanMessage
+from sqlalchemy.orm import Session
 
 # Add root folder to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal
-from db.seed import seed_database
-from core.models import PlatformVariant, MasterContent
-from graphs.main_router import graph
+from core.models import (
+    Workspace, ProductService, MarketingCampaign,
+    PlatformVariant, AdMapper, AIInsightPending, RAGChunk
+)
+from core.bandit_orchestrator import compute_mab_beliefs, trigger_autonomous_generation
 from tests.mock_ollama import LocalOllamaTestCase
 
-# Query seeded Workspace & Product IDs dynamically from DB to avoid hardcoding
-def _get_test_seeded_ids():
-    from core.models import Workspace, ProductService
-    with SessionLocal() as db:
-        ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
-        if not ws:
-            ws = db.query(Workspace).first()
-        ws_id = str(ws.id) if ws else "00000000-0000-0000-0000-000000000002"
-        
-        prod = None
-        if ws:
-            prod = db.query(ProductService).filter_by(workspace_id=ws.id).first()
-        if not prod:
-            prod = db.query(ProductService).first()
-        prod_id = str(prod.id) if prod else "00000000-0000-0000-0000-000000000005"
-        
-        return ws_id, prod_id
-
-SEED_WORKSPACE_ID, SEED_PRODUCT_ID = _get_test_seeded_ids()
-
-class TestMultiAgentWorkflow(LocalOllamaTestCase):
+class TestAutonomousCreativeEngine(LocalOllamaTestCase):
     
     def setUp(self):
         super().setUp()
         self.db = SessionLocal()
-        seed_database(self.db)
-        self.thread_id = str(uuid.uuid4())
+        
+        # Verify that the database is already seeded with "TOP VN SPORTS Workspace"
+        self.ws = self.db.query(Workspace).filter_by(name="TOP VN SPORTS Workspace").first()
+        if not self.ws:
+            # Fallback mock setup if DB seeding ran out of context
+            self.ws = Workspace(
+                id=uuid.uuid4(),
+                name="TOP VN SPORTS Workspace",
+                settings={}
+            )
+            self.db.add(self.ws)
+            self.db.commit()
+            
+        self.prod = self.db.query(ProductService).filter_by(workspace_id=self.ws.id).first()
+        if not self.prod:
+            # Mock brand identity
+            from core.models import BrandIdentity
+            brand = BrandIdentity(
+                id=uuid.uuid4(),
+                workspace_id=self.ws.id,
+                brand_name="TOP VN SPORTS (ShopVNB)",
+                voice_and_tone="Duy trì một giọng điệu truyền thông chuyên gia thân thiện.",
+                dos_and_donts={"dos": ["hàng chính hãng"], "donts": ["hàng giả"]}
+            )
+            self.db.add(brand)
+            self.db.commit()
+            
+            self.prod = ProductService(
+                id=uuid.uuid4(),
+                workspace_id=self.ws.id,
+                brand_id=brand.id,
+                name="Vợt cầu lông VNB V200i",
+                description="Đũa dẻo trợ lực tối đa",
+                usp="Khung sợi carbon chịu sức căng cao"
+            )
+            self.db.add(self.prod)
+            self.db.commit()
+
+        # Create a new active campaign to run MAB on
+        self.camp = MarketingCampaign(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            product_id=self.prod.id,
+            name=f"Chiến dịch Test Tự Trị {uuid.uuid4().hex[:6]}",
+            campaign_type="LEAD_GEN",
+            status="active",
+            budget=5000000.0
+        )
+        self.db.add(self.camp)
+        self.db.commit()
         
     def tearDown(self):
+        # Clean up campaign and generated variants
+        self.db.query(AdMapper).delete()
+        self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).delete()
+        self.db.query(AIInsightPending).filter_by(workspace_id=self.ws.id).delete()
+        self.db.query(MarketingCampaign).filter_by(id=self.camp.id).delete()
+        self.db.commit()
         self.db.close()
         super().tearDown()
         
-    def test_full_agent_workflow(self):
-        """Simulate the complete SOP sequence and verify that it halts at the approval barrier."""
-        print(f"\n[START WORKFLOW TEST] Thread ID: {self.thread_id}")
+    def test_mab_cold_start_math(self):
+        """Verify that the MAB computes priors and baseline metrics during Cold Start using SQL."""
+        print("\n[START COLD START MAB MATH TEST]")
         
-        config = {
-            "configurable": {
-                "thread_id": self.thread_id,
-                "workspace_id": SEED_WORKSPACE_ID,
-                "product_id": SEED_PRODUCT_ID
-            }
-        }
+        mab_res = compute_mab_beliefs(self.db, str(self.camp.id), "LEAD_GEN")
         
-        initial_state = {
-            "messages": [HumanMessage(content="Lên camp mới cho sản phẩm G-Agent Tech")],
-            "current_channel": "#phong-kinh-doanh",
-            "workspace_id": SEED_WORKSPACE_ID,
-            "product_id": SEED_PRODUCT_ID,
-            "sop_stage": "triage",
-            "feedback_log": [],
-            "killed_variants_feedback": []
-        }
+        self.assertTrue(mab_res["cold_start"])
+        self.assertIn("beliefs", mab_res)
+        self.assertIn("metrics", mab_res)
         
-        # 1. Step through LangGraph (Phase 1: Triage -> Analyst -> Draft Approval pause)
-        print("Stepping through LangGraph Nodes (Phase 1)...")
-        for event in graph.stream(initial_state, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                print(f" -> Completed Node: '{node_name}'")
-                if node_name == "analyst":
-                    self.assertIn("target_cpa", node_update)
-                    self.assertIn("test_budget", node_update)
-                    self.assertEqual(node_update["target_cpa"], 1050000.0)
-                    self.assertEqual(node_update["test_budget"], 2000000.0)
-                    print(f"    [CHECK] Analyst Node calculated CPA target successfully: {node_update['target_cpa']} VNĐ")
-                    
-        # Verify graph paused at draft approval barrier (waiting_draft_approval)
-        current_state = graph.get_state(config)
-        self.assertTrue(len(current_state.next) > 0)
-        self.assertEqual(current_state.next[0], "waiting_draft_approval")
-        print("    [SUCCESS] LangGraph successfully paused at draft approval barrier!")
+        # All 6 angles should receive a baseline priority distribution weight
+        beliefs = mab_res["beliefs"]
+        self.assertEqual(len(beliefs), 6)
+        self.assertAlmostEqual(sum(beliefs.values()), 1.0)
         
-        # Resume Phase 2: Approve the draft plan to trigger strategist, copywriter, and brand guardian
-        print("CMO approved draft plan. Resuming to Creative Graph (Phase 2)...")
-        graph.update_state(config, {"draft_approved": True})
+        print(" -> Cold-start SQL calculations validated successfully!")
         
-        for event in graph.stream(None, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                print(f" -> Completed Node: '{node_name}'")
-                if node_name == "creative_subgraph":
-                    self.assertIn("master_content", node_update)
-                    self.assertIn("variants", node_update)
-                    print(f"    [CHECK] Creative Sub-graph generated Core message and variants successfully!")
-                    
-        # 2. Verify graph paused at copy approval barrier (waiting_approval_barrier)
-        current_state = graph.get_state(config)
-        self.assertTrue(len(current_state.next) > 0)
-        self.assertEqual(current_state.next[0], "waiting_approval_barrier")
-        print("    [SUCCESS] LangGraph successfully paused at copy approval barrier for Human-in-the-loop!")
+    def test_stateless_execution_pipeline(self):
+        """Simulate the uninterrupted, stateless creative generation execution loop."""
+        print(f"\n[START STATELESS EXECUTION PIPELINE TEST] Campaign ID: {self.camp.id}")
         
-        # 3. Resume the graph (Approve the proposed copy)
-        print("CEO approved kịch bản. Resuming LangGraph workflow...")
+        # Verify database starts with 0 variants for this run
+        var_count_before = self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).count()
+        self.assertEqual(var_count_before, 0)
         
-        # Count variants before resume
-        vars_count_before = self.db.query(PlatformVariant).count()
+        # Execute the stateless pipeline
+        import asyncio
+        loop = asyncio.get_event_loop()
+        task = trigger_autonomous_generation(
+            workspace_id=str(self.ws.id),
+            campaign_id=str(self.camp.id),
+            product_id=str(self.prod.id),
+            db=self.db
+        )
+        result_state = loop.run_until_complete(task)
         
-        # Stream resume by passing None to the memory saver config
-        for event in graph.stream(None, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                print(f" -> Resumed Node: '{node_name}'")
-                
-        # 4. Verify publisher stored content in database
-        vars_count_after = self.db.query(PlatformVariant).count()
-        self.assertTrue(vars_count_after > vars_count_before)
+        # Verify graph completed fully
+        self.assertEqual(result_state["sop_stage"], "completed")
+        self.assertTrue(len(result_state["generated_variants"]) > 0)
         
-        # Query saved variant
-        saved_var = self.db.query(PlatformVariant).order_by(PlatformVariant.created_at.desc()).first()
+        # 1. Verify variants were persisted in PostgreSQL
+        var_count_after = self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).count()
+        self.assertTrue(var_count_after > 0)
+        
+        # 2. Verify AdMapper mapped variant IDs to external platform Ad IDs
+        mapped_entries = self.db.query(AdMapper).count()
+        self.assertTrue(mapped_entries > 0)
+        
+        # 3. Verify AI post-mortem explanation is registered in ai_insights_pending table
+        pending_insights = self.db.query(AIInsightPending).filter_by(workspace_id=self.ws.id).count()
+        self.assertTrue(pending_insights > 0)
+        
+        # 4. Verify context was fetched without hallucination
+        saved_var = self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).first()
         self.assertIsNotNone(saved_var)
-        self.assertEqual(saved_var.publish_status, "scheduled")
-        print(f"    [SUCCESS] Kịch bản saved to DB. Publish Status: {saved_var.publish_status}")
-        print("    [CHECK] Adapted Copy:\n", saved_var.adapted_copy)
+        self.assertIn("facebook", saved_var.platform)
         
-        print("[WORKFLOW TEST COMPLETED SUCCESSFULLY!]")
-
-    def test_research_routing_workflow(self):
-        """Simulate the general policy query and verify that it routes to Researcher Node and runs RAG QA."""
-        print(f"\n[START RESEARCH ROUTING TEST] Thread ID: {self.thread_id}")
-        
-        config = {
-            "configurable": {
-                "thread_id": self.thread_id,
-                "workspace_id": SEED_WORKSPACE_ID,
-                "product_id": SEED_PRODUCT_ID
-            }
-        }
-        
-        initial_state = {
-            "messages": [HumanMessage(content="Quảng cáo bị Facebook quét từ khóa cấm là gì?")],
-            "current_channel": "#phong-sang-tao",
-            "workspace_id": SEED_WORKSPACE_ID,
-            "product_id": SEED_PRODUCT_ID,
-            "sop_stage": "triage",
-            "feedback_log": [],
-            "killed_variants_feedback": []
-        }
-        
-        # Step through LangGraph
-        print("Stepping through LangGraph Nodes for Research intent...")
-        stages_hit = []
-        for event in graph.stream(initial_state, config=config, stream_mode="updates"):
-            for node_name, node_update in event.items():
-                print(f" -> Completed Node: '{node_name}'")
-                stages_hit.append(node_name)
-                
-                if node_name == "researcher_agent":
-                    self.assertIn("messages", node_update)
-                    report_msg = node_update["messages"][-1].content
-                    self.assertTrue(len(report_msg) > 50)
-                    self.assertIn("Facebook", report_msg)
-                    print(f"    [SUCCESS] Researcher synthesized report successfully:\n{report_msg[:200]}...")
-                    
-        self.assertIn("triage", stages_hit)
-        self.assertIn("researcher_agent", stages_hit)
-        print("[RESEARCH ROUTING TEST COMPLETED SUCCESSFULLY!]")
+        print(" -> Uninterrupted stateless execution pipeline ran to completion successfully!")
+        print(" -> Database variant persistency, AdMapper indexing, and Pending Insights validated successfully!")
 
 if __name__ == "__main__":
     unittest.main()

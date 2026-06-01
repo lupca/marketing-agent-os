@@ -213,7 +213,7 @@ def inject_antipatterns_to_prompt(
         db=db,
         workspace_id=workspace_id,
         query=query,
-        access_tags=["anti_patterns", "manager_feedback"],
+        access_tags=["anti_patterns", "sandbox_feedback"],
         limit=2,
     )
 

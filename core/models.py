@@ -407,6 +407,49 @@ class ChatThread(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+# 26. Model: CampaignAnalytics
+class CampaignAnalytics(Base):
+    __tablename__ = "campaign_analytics"
+    
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID_TYPE, ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
+    platform = Column(String(50), nullable=False)
+    impressions = Column(Integer, default=0)
+    clicks = Column(Integer, default=0)
+    conversions = Column(Integer, default=0)
+    spend = Column(Numeric(15, 2), default=0.00)
+    cpc = Column(Numeric(15, 2), default=0.00)
+    cpa = Column(Numeric(15, 2), default=0.00)
+    cpm = Column(Numeric(15, 2), default=0.00)
+    ctr = Column(Numeric(5, 4), default=0.0000)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# 27. Model: AIInsightPending
+class AIInsightPending(Base):
+    __tablename__ = "ai_insights_pending"
+    
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID_TYPE, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    campaign_id = Column(UUID_TYPE, ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=True)
+    insight_text = Column(Text, nullable=False)
+    priors_shift = Column(JSON_TYPE, default=dict)
+    approval_status = Column(String(50), default="pending")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+
+
+# 28. Model: AdMapper
+class AdMapper(Base):
+    __tablename__ = "ad_mapper"
+    
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    variant_id = Column(UUID_TYPE, ForeignKey("platform_variants.id", ondelete="CASCADE"), unique=True, nullable=False)
+    platform_ad_id = Column(String(255), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+
 
 
 
