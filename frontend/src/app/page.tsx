@@ -101,6 +101,18 @@ interface AIModelRecord {
   is_new?: boolean;
 }
 
+interface SocialAccountRecord {
+  id: string;
+  platform: string;
+  account_name: string;
+  account_id: string;
+  app_id?: string;
+  app_secret?: string;
+  access_token?: string;
+  status: string;
+  created_at?: string;
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -178,6 +190,19 @@ export default function Dashboard() {
   const [formIntKey, setFormIntKey] = useState("");
   const [formIntValue, setFormIntValue] = useState("");
   const [formIntActive, setFormIntActive] = useState(true);
+
+  // Tab: Social Accounts States
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccountRecord[]>([]);
+  const [editingSocialId, setEditingSocialId] = useState<string | null>(null);
+  
+  // Social Account Form States
+  const [formSocialPlatform, setFormSocialPlatform] = useState("facebook");
+  const [formSocialAccountName, setFormSocialAccountName] = useState("");
+  const [formSocialAccountId, setFormSocialAccountId] = useState("");
+  const [formSocialAppId, setFormSocialAppId] = useState("");
+  const [formSocialAppSecret, setFormSocialAppSecret] = useState("");
+  const [formSocialAccessToken, setFormSocialAccessToken] = useState("");
+  const [formSocialStatus, setFormSocialStatus] = useState("active");
 
   // Model Config States
   const [modelsList, setModelsList] = useState<AIModelRecord[]>([]);
@@ -279,12 +304,12 @@ export default function Dashboard() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Load configuration items
   useEffect(() => {
     if (activeTab === "config") {
       fetchIntegrations();
       fetchAISettings();
       fetchModelsList();
+      fetchSocialAccounts();
     }
   }, [activeTab]);
 
@@ -444,6 +469,105 @@ export default function Dashboard() {
       updated.add(id);
     }
     setVisibleKeyIds(updated);
+  };
+
+  // ──────────────────────────────────────────────────────────
+  // Backend Social Accounts API calls
+  // ──────────────────────────────────────────────────────────
+  const fetchSocialAccounts = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/workspace/social-accounts");
+      const res = await response.json();
+      if (res.status === "success") {
+        setSocialAccounts(res.data || []);
+      } else {
+        showToast("Error loading social accounts: " + (res.error || "Unknown"), "error");
+      }
+    } catch (e: any) {
+      showToast("Connection to backend social accounts failed.", "error");
+    }
+  };
+
+  const handleSaveSocialAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formSocialPlatform || !formSocialAccountName || !formSocialAccountId) {
+      showToast("Please fill all required social account parameters.", "error");
+      return;
+    }
+
+    const payload: any = {
+      platform: formSocialPlatform.trim().toLowerCase(),
+      account_name: formSocialAccountName.trim(),
+      account_id: formSocialAccountId.trim(),
+      app_id: formSocialAppId.trim(),
+      app_secret: formSocialAppSecret.trim(),
+      access_token: formSocialAccessToken.trim(),
+      status: formSocialStatus
+    };
+    if (editingSocialId) {
+      payload.id = editingSocialId;
+    }
+
+    try {
+      const response = await fetch("http://localhost:8000/api/workspace/social-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const res = await response.json();
+      if (res.status === "success") {
+        showToast("Social account synchronized successfully.", "success");
+        handleCancelEditSocial();
+        fetchSocialAccounts();
+      } else {
+        showToast("Error saving social account: " + res.message, "error");
+      }
+    } catch (e) {
+      showToast("Social account API connection failed.", "error");
+    }
+  };
+
+  const handleDeleteSocialAccount = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this social account credential?")) return;
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts/${id}`, {
+        method: "DELETE"
+      });
+      const res = await response.json();
+      if (res.status === "success") {
+        showToast("Social account removed successfully.", "success");
+        fetchSocialAccounts();
+      } else {
+        showToast("Delete failure: " + res.error, "error");
+      }
+    } catch (e) {
+      showToast("API deletion failure.", "error");
+    }
+  };
+
+  const handleStartEditSocial = (id: string) => {
+    const record = socialAccounts.find(r => r.id === id);
+    if (!record) return;
+    setEditingSocialId(id);
+    setFormSocialPlatform(record.platform);
+    setFormSocialAccountName(record.account_name);
+    setFormSocialAccountId(record.account_id);
+    setFormSocialAppId(record.app_id || "");
+    setFormSocialAppSecret(record.app_secret || "");
+    setFormSocialAccessToken(record.access_token || "");
+    setFormSocialStatus(record.status);
+  };
+
+  const handleCancelEditSocial = () => {
+    setEditingSocialId(null);
+    setFormSocialPlatform("facebook");
+    setFormSocialAccountName("");
+    setFormSocialAccountId("");
+    setFormSocialAppId("");
+    setFormSocialAppSecret("");
+    setFormSocialAccessToken("");
+    setFormSocialStatus("active");
   };
 
   // ──────────────────────────────────────────────────────────
@@ -1424,7 +1548,7 @@ export default function Dashboard() {
 
           {activeTab === "config" && (
             <div className="space-y-6">
-              {/* SUB-TAB TOGGLES (Integrations vs System Models) */}
+              {/* SUB-TAB TOGGLES (Integrations vs System Models vs Social Accounts) */}
               <div className="flex border-b border-slate-900 gap-2 font-mono text-xs uppercase overflow-x-auto whitespace-nowrap">
                 <button
                   onClick={() => setConfigSubTab("integrations")}
@@ -1446,10 +1570,20 @@ export default function Dashboard() {
                 >
                   <span>🤖 Models & LLM Parameters</span>
                 </button>
+                <button
+                  onClick={() => setConfigSubTab("social-accounts")}
+                  className={`flex items-center gap-2 px-4 py-3 border-b-2 font-bold tracking-widest transition-all ${
+                    configSubTab === "social-accounts"
+                      ? "border-blue-500 text-blue-400 bg-slate-900/10"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <span>📊 Social Accounts Manager</span>
+                </button>
               </div>
 
               {/* CONFIG VIEW ISOLATOR */}
-              {configSubTab === "integrations" ? (
+              {configSubTab === "integrations" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* Left: Active Integration List */}
@@ -1612,7 +1746,9 @@ export default function Dashboard() {
                   </div>
 
                 </div>
-              ) : (
+              )}
+
+              {configSubTab === "models" && (
                 <div className="space-y-6">
                   
                   {/* wide LLM Model Configurations Toolbar */}
@@ -1880,6 +2016,185 @@ export default function Dashboard() {
 
                   </div>
 
+                </div>
+              )}
+
+              {configSubTab === "social-accounts" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Active Social Accounts List */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <h3 className="text-xs font-extrabold uppercase tracking-widest font-mono text-slate-300">
+                      📊 Registered Social Accounts
+                    </h3>
+                    
+                    {socialAccounts.length === 0 ? (
+                      <div className="bg-slate-900/10 border border-slate-900 rounded-xl p-12 text-center text-slate-500">
+                        <Database className="h-10 w-10 mx-auto text-slate-700 mb-3" />
+                        <p className="text-xs font-mono">No social media accounts connected. Connect one in the panel.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {socialAccounts.map((acc) => {
+                          const isMasked = !visibleKeyIds.has(acc.id);
+                          return (
+                            <div key={acc.id} className="bg-slate-900/35 border border-slate-900 rounded-xl p-4 flex justify-between items-center gap-4 hover:border-slate-800/80 transition-all font-mono text-xs">
+                              <div className="flex flex-col gap-1.5 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-blue-400 font-bold uppercase">{acc.platform}</span>
+                                  <span className="text-slate-700">/</span>
+                                  <span className="text-slate-300 font-semibold">{acc.account_name}</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                                  <div><span className="text-slate-600">Ad Account:</span> {acc.account_id}</div>
+                                  <div><span className="text-slate-600">App ID:</span> {acc.app_id || "N/A"}</div>
+                                  {acc.access_token && (
+                                    <div className="col-span-1 md:col-span-2 flex items-center gap-2">
+                                      <span className="text-slate-600">Token:</span> 
+                                      <span className="truncate max-w-[200px] sm:max-w-sm">
+                                        {isMasked ? "••••••••••••••••" : acc.access_token}
+                                      </span>
+                                      <button onClick={() => toggleKeyMask(acc.id)} className="text-slate-500 hover:text-slate-300">
+                                        {isMasked ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                  acc.status === 'active'
+                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-900/30"
+                                    : "bg-rose-500/15 text-rose-400 border border-rose-900/30"
+                                }`}>
+                                  {acc.status}
+                                </span>
+                                
+                                <button onClick={() => handleStartEditSocial(acc.id)} className="text-slate-400 hover:text-slate-200">
+                                  ✏️
+                                </button>
+                                <button onClick={() => handleDeleteSocialAccount(acc.id)} className="text-slate-500 hover:text-rose-400">
+                                  ❌
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Add / Update Social Account form */}
+                  <div className="bg-slate-900/35 border border-slate-900 rounded-xl p-5 h-fit space-y-4">
+                    <h3 className="text-xs font-extrabold uppercase tracking-widest font-mono text-blue-400">
+                      {editingSocialId ? "✏️ Edit Social Account" : "📝 Link Social Media Account"}
+                    </h3>
+
+                    <form onSubmit={handleSaveSocialAccount} className="space-y-4 font-mono text-xs">
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Platform</label>
+                        <select
+                          value={formSocialPlatform}
+                          onChange={(e) => setFormSocialPlatform(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        >
+                          <option value="facebook">Facebook Ads</option>
+                          <option value="tiktok">TikTok Ads</option>
+                          <option value="instagram">Instagram Ads</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Account Display Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="E.g. Top VN Sports Main Page..."
+                          value={formSocialAccountName}
+                          onChange={(e) => setFormSocialAccountName(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ad Account ID</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="E.g. act_12345678..."
+                          value={formSocialAccountId}
+                          onChange={(e) => setFormSocialAccountId(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">OAuth App ID</label>
+                        <input
+                          type="text"
+                          placeholder="Facebook App ID..."
+                          value={formSocialAppId}
+                          onChange={(e) => setFormSocialAppId(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">OAuth App Secret</label>
+                        <input
+                          type="password"
+                          placeholder="Facebook App Secret..."
+                          value={formSocialAppSecret}
+                          onChange={(e) => setFormSocialAppSecret(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">User Access Token</label>
+                        <textarea
+                          placeholder="EAAYigFc8hHsBR..."
+                          rows={3}
+                          value={formSocialAccessToken}
+                          onChange={(e) => setFormSocialAccessToken(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Account Status</label>
+                        <select
+                          value={formSocialStatus}
+                          onChange={(e) => setFormSocialStatus(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
+                        >
+                          <option value="active">Active State</option>
+                          <option value="disabled">Disabled State</option>
+                          <option value="restricted">Restricted State</option>
+                        </select>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="submit"
+                          className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold uppercase tracking-wider rounded border border-blue-500/30"
+                        >
+                          💾 Save Connection
+                        </button>
+                        {editingSocialId && (
+                          <button
+                            type="button"
+                            onClick={handleCancelEditSocial}
+                            className="px-3 bg-slate-900 border border-slate-800 text-slate-400 rounded hover:text-slate-200"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+
+                    </form>
+                  </div>
                 </div>
               )}
 

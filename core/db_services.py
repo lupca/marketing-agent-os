@@ -221,3 +221,54 @@ def get_unified_business_context(workspace_id: uuid.UUID, product_id: uuid.UUID 
         "product": product,
         "persona": persona
     }
+
+
+def save_publisher_state(
+    db: Session,
+    ws_id: uuid.UUID,
+    camp_uuid: uuid.UUID,
+    variants: list[dict],
+    ad_mappings: dict[str, str],
+    fb_account_id: str
+) -> None:
+    """
+    Saves master content, platform variants, and ad mappings atomically to PostgreSQL.
+    """
+    from core.models import MasterContent, PlatformVariant, AdMapper
+    
+    master = MasterContent(
+        id=uuid.uuid4(),
+        workspace_id=ws_id,
+        campaign_id=camp_uuid,
+        core_message="Autonomous Creative Engine Generated Copy Master",
+        approval_status="approved"
+    )
+    db.add(master)
+    
+    for v in variants:
+        v_id = v["variant_id"]
+        pv = PlatformVariant(
+            id=uuid.UUID(v_id),
+            workspace_id=ws_id,
+            master_content_id=master.id,
+            platform=v.get("platform", "facebook"),
+            adapted_copy=v.get("adapted_copy", ""),
+            publish_status="published",
+            content_type="text",
+            meta_data={"angle_name": v.get("angle_name")}
+        )
+        db.add(pv)
+        db.flush() # Force parent inserts to flush so Postgres registers and locks the foreign key before child insert
+        
+        # Get the external Platform_Ad_ID
+        plat_ad_id = ad_mappings.get(v_id) or f"{fb_account_id}_{uuid.uuid4().hex[:8]}"
+        logger.info(f"Mapping Variant {pv.id} -> Ad {plat_ad_id}")
+        
+        mapper = AdMapper(
+            variant_id=pv.id,
+            platform_ad_id=plat_ad_id
+        )
+        db.add(mapper)
+        
+    db.commit()
+    logger.info("Successfully persisted all published campaign contents atomically in database!")

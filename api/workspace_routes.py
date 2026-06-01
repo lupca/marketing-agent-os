@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 import uuid
 import logging
 from core.dependencies import get_db
-from core.models import Workspace, WorkspaceIntegration, AIModel
+from core.models import Workspace, WorkspaceIntegration, AIModel, SocialAccount
 from core.schemas import WorkspaceIntegrationSchema, AIModelSchema
 from typing import List
 
@@ -239,4 +239,105 @@ async def delete_model(model_uuid: str, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting model: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.get("/social-accounts")
+async def get_social_accounts(db: Session = Depends(get_db)):
+    try:
+        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        accounts = db.query(SocialAccount).filter_by(workspace_id=ws_id).order_by(
+            SocialAccount.platform, SocialAccount.account_name
+        ).all()
+        data = []
+        for a in accounts:
+            data.append({
+                "id": str(a.id),
+                "platform": a.platform,
+                "account_name": a.account_name,
+                "account_id": a.account_id,
+                "app_id": a.app_id,
+                "app_secret": a.app_secret,
+                "access_token": a.access_token,
+                "status": a.status or "active",
+                "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S') if a.created_at else None
+            })
+        return {"status": "success", "data": data}
+    except Exception as e:
+        logger.error(f"Error fetching social accounts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.post("/social-accounts")
+async def save_social_account(request: Request, db: Session = Depends(get_db)):
+    try:
+        body = await request.json()
+        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        
+        record_id = body.get("id")
+        platform = body.get("platform")
+        account_name = body.get("account_name")
+        account_id = body.get("account_id")
+        app_id = body.get("app_id")
+        app_secret = body.get("app_secret")
+        access_token = body.get("access_token")
+        status = body.get("status", "active")
+        
+        if not platform or not account_name or not account_id:
+            raise HTTPException(status_code=400, detail="Missing required fields: platform, account_name, account_id")
+            
+        existing = None
+        if record_id:
+            try:
+                existing = db.query(SocialAccount).filter_by(id=uuid.UUID(record_id)).first()
+            except Exception:
+                pass
+                
+        if not existing:
+            # Check by workspace, platform, account_id
+            existing = db.query(SocialAccount).filter_by(
+                workspace_id=ws_id,
+                platform=platform,
+                account_id=account_id
+            ).first()
+            
+        if existing:
+            existing.account_name = account_name
+            existing.app_id = app_id
+            existing.app_secret = app_secret
+            existing.access_token = access_token
+            existing.status = status
+            existing.updated_at = func.now()
+            db.commit()
+            return {"status": "success", "message": "Updated successfully"}
+        else:
+            new_social = SocialAccount(
+                workspace_id=ws_id,
+                platform=platform,
+                account_name=account_name,
+                account_id=account_id,
+                app_id=app_id,
+                app_secret=app_secret,
+                access_token=access_token,
+                status=status
+            )
+            db.add(new_social)
+            db.commit()
+            return {"status": "success", "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving social account: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.delete("/social-accounts/{account_uuid}")
+async def delete_social_account(account_uuid: str, db: Session = Depends(get_db)):
+    try:
+        account = db.query(SocialAccount).filter_by(id=uuid.UUID(account_uuid)).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Social Account not found")
+            
+        db.delete(account)
+        db.commit()
+        return {"status": "success", "message": "Deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting social account: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

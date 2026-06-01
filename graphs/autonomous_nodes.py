@@ -334,49 +334,67 @@ def publisher_node(state: AgencyState) -> dict:
     campaign_id = state.get("campaign_id")
     variants = state.get("generated_variants") or []
     
+    from core.integrations.fb_client import (
+        FacebookAccountDisabledError,
+        init_facebook_client,
+        batch_create_creatives,
+        batch_create_ads
+    )
+    from core.db_services import save_publisher_state
+    from core.decision_logger import log_decision
+
     with get_session() as db:
         try:
             ws_id = uuid.UUID(str(workspace_id))
             camp_uuid = uuid.UUID(str(campaign_id)) if campaign_id else uuid.UUID("00000000-0000-0000-0000-000000000001")
             
-            # Save master content to satisfy foreign key constraint
-            from core.models import MasterContent
-            master = MasterContent(
-                id=uuid.uuid4(),
-                workspace_id=ws_id,
-                campaign_id=camp_uuid,
-                core_message="Autonomous Creative Engine Generated Copy Master",
-                approval_status="approved"
-            )
-            db.add(master)
+            # 1. Resolve and initialize Facebook Client
+            api, fb_account_id, use_real_fb = init_facebook_client(workspace_id, db)
             
-            # Save variants to PostgreSQL
-            for v in variants:
-                pv = PlatformVariant(
-                    id=uuid.UUID(v["variant_id"]),
-                    workspace_id=ws_id,
-                    master_content_id=master.id,
-                    platform=v.get("platform", "facebook"),
-                    adapted_copy=v.get("adapted_copy", ""),
-                    publish_status="published",
-                    content_type="text",
-                    meta_data={"angle_name": v.get("angle_name")}
-                )
-                db.add(pv)
-                db.flush() # Force parent inserts to flush so Postgres registers and locks the foreign key before child insert
+            # 2. Batch upload creatives and ads to Facebook
+            ad_mappings = {}
+            if use_real_fb and variants:
+                logger.info(f"Starting batch publishing of {len(variants)} variants to Facebook Ads API...")
+                creative_responses = batch_create_creatives(api, fb_account_id, workspace_id, variants)
+                ad_mappings = batch_create_ads(api, fb_account_id, camp_uuid, creative_responses, db)
                 
-                # Map internal Variant_ID to external Platform_Ad_ID in ad_mapper
-                plat_ad_id = f"act_10509876_{uuid.uuid4().hex[:8]}"
-                mapper = AdMapper(
-                    variant_id=pv.id,
-                    platform_ad_id=plat_ad_id
-                )
-                db.add(mapper)
-                logger.info(f"Buffered mapping: Variant {pv.id} -> Ad {plat_ad_id}")
-                
-            # Atomic commit at the very end
-            db.commit()
-            logger.info("Successfully persisted all published campaign contents atomically in database!")
+            # 3. Atomically persist state and mappings in database
+            save_publisher_state(db, ws_id, camp_uuid, variants, ad_mappings, fb_account_id)
+            
+            log_decision(
+                workspace_id=ws_id,
+                agent_name="Publisher Node",
+                action="Facebook Ads Publishing",
+                decision_status="success",
+                reason=f"Successfully batch published {len(variants)} creative variants to Facebook Ads API.",
+                campaign_id=camp_uuid
+            )
+            
+        except FacebookAccountDisabledError as disabled_err:
+            logger.error(f"Terminal account restricted exception caught: {disabled_err}. Rollback transaction...")
+            db.rollback()
+            
+            feedbacks = list(state.get("sandbox_feedbacks") or [])
+            feedbacks.append({
+                "stage": "publisher",
+                "error": "Account Disabled/Restricted",
+                "reason": str(disabled_err)
+            })
+            
+            log_decision(
+                workspace_id=uuid.UUID(str(workspace_id)),
+                agent_name="Publisher Node",
+                action="Facebook Ads Publishing",
+                decision_status="failed",
+                reason=f"Account Disabled/Restricted during publishing: {disabled_err}",
+                campaign_id=uuid.UUID(str(campaign_id)) if campaign_id else None
+            )
+            
+            return {
+                "sandbox_feedbacks": feedbacks,
+                "sop_stage": "completed"
+            }
+            
         except Exception as e:
             logger.error(f"Transaction failed: {e}. Performing rollback...")
             db.rollback()

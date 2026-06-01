@@ -103,6 +103,9 @@ CREATE TABLE social_accounts (
     account_id VARCHAR(255) NOT NULL,
     access_token TEXT,
     refresh_token TEXT,
+    app_id VARCHAR(255),
+    app_secret VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'active',
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
