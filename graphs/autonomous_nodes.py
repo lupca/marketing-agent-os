@@ -363,6 +363,7 @@ def publisher_node(state: AgencyState) -> dict:
                     meta_data={"angle_name": v.get("angle_name")}
                 )
                 db.add(pv)
+                db.flush() # Force parent inserts to flush so Postgres registers and locks the foreign key before child insert
                 
                 # Map internal Variant_ID to external Platform_Ad_ID in ad_mapper
                 plat_ad_id = f"act_10509876_{uuid.uuid4().hex[:8]}"

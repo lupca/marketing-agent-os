@@ -4,15 +4,17 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import logging
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import FastAPI routers
 from api.rag_routes import rag_router
 from api.vault_routes import vault_router
 from api.dashboard_routes import dashboard_router
 from api.workspace_routes import workspace_router
+from api.test_routes import test_router, broadcaster
 
 # Initialize FastAPI app
 fastapi_app = FastAPI(
@@ -25,11 +27,35 @@ fastapi_app = FastAPI(
 logger = logging.getLogger("marketing_agent_os_app")
 logging.basicConfig(level=logging.INFO)
 
+# Configure CORS Middleware
+fastapi_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Include Specialized API Routers
 fastapi_app.include_router(rag_router)
 fastapi_app.include_router(vault_router)
 fastapi_app.include_router(dashboard_router)
 fastapi_app.include_router(workspace_router)
+fastapi_app.include_router(test_router)
+
+# Real-time Telemetry WebSocket endpoint
+@fastapi_app.websocket("/api/ws/telemetry")
+async def websocket_endpoint(websocket: WebSocket):
+    await broadcaster.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive by waiting for messages (though logs are mainly outbound)
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        broadcaster.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}")
+        broadcaster.disconnect(websocket)
 
 # Mount public directory for assets if it exists
 public_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "public"))
