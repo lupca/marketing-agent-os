@@ -1,44 +1,48 @@
-# 📚 HỆ THỐNG TÀI LIỆU DỰ ÁN: MARKETING AGENT OS v3.0
-*Chịu trách nhiệm cấu trúc: Chief Technology Officer (CTO)*
+# Marketing Agent OS (v3.0 Enterprise Edition)
 
-Tài liệu dự án đã được sắp xếp lại theo một **Kiến trúc Phân cấp Tiêu chuẩn Doanh nghiệp (Enterprise-grade Documentation Taxonomy)**. Cấu trúc được chia thành 5 danh mục được đánh số thứ tự khoa học để sếp và đội ngũ phát triển dễ dàng tra cứu, truy vết:
+**Marketing Agent OS** là một Hệ điều hành Marketing tự trị (Autonomous Creative Intelligence Engine), được xây dựng chuyên biệt để giải quyết bài toán sản xuất và tối ưu hóa nội dung quảng cáo ở quy mô lớn (Enterprise-scale).
 
----
-
-## 🗺️ BẢN ĐỒ TÀI LIỆU (DOCUMENTATION INDEX)
-
-### 📂 [01. Kế Hoạch Vĩ Mô & Phạm Vi (Project Planning)](file:///wsl.localhost/server/root/marketing-agent-os/docs/01_planning/)
-Chứa các văn bản về mục tiêu, phạm vi bàn giao và các tiêu chí nghiệm thu vĩ mô của hệ thống.
-*   📄 **[scope_statement.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/01_planning/scope_statement.md):** Bản đặc tả phạm vi dự án, rào cản phần cứng và tiêu chí nghiệm thu (Sign-off Criteria) của CEO.
+Dự án đã chính thức chuyển đổi từ mô hình "Chatbot tương tác" (Human-in-the-loop / Chainlit) sang **Mô hình Tự trị (Autonomous)** sử dụng Động cơ ra quyết định Toán học (Multi-Armed Bandits) và Kiến trúc Phân tán Không trạng thái (Stateless Event-Driven Architecture).
 
 ---
 
-### 📂 [02. Kiến Trúc Hệ Thống (System Architecture)](file:///wsl.localhost/server/root/marketing-agent-os/docs/02_architecture/)
-Đặc tả thiết kế sơ đồ khối, phân quyền chuyên môn giữa các phòng ban AI, và cơ chế tích hợp giao diện.
-*   📄 **[core_architecture.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/02_architecture/core_architecture.md):** 6 tinh túy kiến trúc của Agent OS v3.0 (Phân quyền Business/Creative, A/B Testing tự trị, RAG phân tầng).
-*   📄 **[chainlit_integration.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/02_architecture/chainlit_integration.md):** Hướng dẫn tích hợp luồng websocket Chainlit và giao thức Human-in-the-loop.
-*   📄 **[chainlit.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/02_architecture/chainlit.md):** Tài liệu cấu hình giao diện Chainlit.
+## 1. Tầm nhìn Kiến trúc (Core Vision)
+
+Hệ thống hoạt động dựa trên 3 trụ cột kỹ thuật:
+
+1.  **Creative Intelligence Engine (Không can thiệp Bidding):** Hệ thống không cố gắng tranh giành quyền phân bổ ngân sách với Meta/Google Ads. Thay vào đó, nó đóng vai trò là nhà máy sản xuất nguyên liệu: đẻ ra N biến thể nội dung cực kỳ chất lượng (Dynamic Creatives) và nhường quyền tiêu tiền cho thuật toán của Ad Network.
+2.  **Stateless LangGraph Execution:** Đồ thị LangGraph chỉ đóng vai trò là "Execution Layer". Nó nhận lệnh, chạy một lèo để đẻ bài viết, sau đó tự hủy (Terminate) ngay lập tức để giải phóng RAM. Chấm dứt hoàn toàn tình trạng State Bloat (phình to bộ nhớ do ngâm Graph chờ số liệu).
+3.  **Toán học hóa Quyết định (Multi-Armed Bandits):** Ứng dụng thuật toán Epsilon-Greedy / Thompson Sampling để quyết định sản lượng nội dung: Bao nhiêu % nội dung đi theo lối mòn an toàn (Exploit), bao nhiêu % dũng cảm thử nghiệm góc độ tâm lý mới (Explore).
 
 ---
 
-### 📂 [03. Thiết Kế Chi Tiết & Giải Thuật (System Design & Features)](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/)
-Chứa phân tích thiết kế chi tiết ở tầng kỹ thuật, thuật toán đo lường và các phân hệ chức năng chuyên sâu.
-*   📄 **[system_design_analysis.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/system_design_analysis.md):** Phân tích thiết kế hệ thống N-Tier, giải thuật quản trị bộ nhớ tránh tràn Context Window, và cơ chế lưu checkpoint của LangGraph.
-*   📄 **[cmo_bi_dashboard_design.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/cmo_bi_dashboard_design.md):** Đặc tả thiết kế phân hệ CMO BI Dashboard, công thức toán học tính Paid/Blended CAC, đèn báo LTV:CAC, và giải thuật phát hiện Creative Fatigue sớm.
-*   📄 **[semantic_router_researcher_v2.1.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/semantic_router_researcher_v2.1.md):** Bản nâng cấp v2.1 tích hợp Bộ định tuyến Ngữ nghĩa CSDL (pgvector Cosine distance) và Tác tử Nghiên cứu chính sách chạy ngầm tự trị. *(Legacy — đã được nâng cấp lên v3.0)*
-*   📄 **[intelligent_triage_design.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/intelligent_triage_design.md):** ✨ **(v3.0 — MỚI)** Thiết kế 4-Layer Intelligent Supervisor Hub: Context Aggregator, Dynamic Few-Shot, LLM CoT Router, State Injector. Bao gồm Pydantic schema, sơ đồ luồng, bảng so sánh v2.1 vs v3.0.
-*   📄 **[creative_report_design.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/03_design/creative_report_design.md):** ✨ **(v3.0 — MỚI)** Thiết kế Tác tử Báo cáo Sáng tạo (Creative Reporter) và Tác tử Báo cáo Hiệu suất (Performance Reporter) nâng cấp, bao gồm các cấu trúc prompt LLM nâng cao, liên kết thực thể CSDL (MasterContent, PlatformVariant), và giải pháp đồng bộ hóa trạng thái qua LangGraph.
+## 2. Hệ sinh thái Kỹ thuật (Tech Stack)
+
+*   **Backend & Orchestration:** FastAPI, Python, Celery/Airflow (Task Queue & Sync).
+*   **Agentic Framework:** LangGraph v0.2+ (Stateless Mode), LangChain.
+*   **Database (OLTP & OLAP):** PostgreSQL, pgvector (cho RAG).
+*   **Decision Math:** `pybandits`, Numpy, Bayesian Statistics.
+*   **LLM Providers:** OpenAI, Anthropic, Local Ollama.
 
 ---
 
-### 📂 [04. Tài Sản Sáng Tạo & Prompting (Reusable Assets & IP)](file:///wsl.localhost/server/root/marketing-agent-os/docs/04_reusable_assets/)
-Lưu trữ những "tinh hoa" kế thừa về prompting sáng tạo, ma trận chấm điểm và logic rẽ nhánh nền tảng.
-*   📄 **[reusable_assets.md](file:///wsl.localhost/server/root/marketing-agent-os/docs/04_reusable_assets/reusable_assets.md):** Đặc tả bảng dữ liệu quan hệ PostgreSQL và ma trận chấm điểm 100-Point tự trị của Brand Guardian Agent.
+## 3. Cấu trúc Tài liệu Kỹ thuật Mới nhất
+
+Toàn bộ tài liệu quy hoạch kiến trúc mới nhất nằm trong thư mục **`docs/agentic ai/`**. Đây là Nguồn sự thật duy nhất (Single Source of Truth) cho đội ngũ phát triển:
+
+*   [Bản thiết kế cốt lõi & Vòng lặp Học tập](agentic%20ai/AUTONOMOUS_REFACTOR_PLAN.md)
+*   [Thiết kế Nghiệp vụ & Cân bằng Ngân sách Nội dung](agentic%20ai/CMO_CTO_ALIGNMENT.md)
+*   [Phân tích Tác động Hệ thống & Lộ trình đập đi xây lại](agentic%20ai/SYSTEM_IMPACT_REPORT.md)
+*   [Kiến trúc RAG an toàn & Chống ảo giác](agentic%20ai/RAG_IMPACT_ANALYSIS.md)
+*   [Prompt tự động hóa dành cho AI Coder](agentic%20ai/AI_CODER_PROMPT.md)
 
 ---
 
-### 📂 [05. Tài Liệu Tham Khảo (Reference Materials)](file:///wsl.localhost/server/root/marketing-agent-os/docs/05_reference_materials/)
-Chứa toàn bộ các tài liệu hướng dẫn marketing chính thức và kịch bản mẫu được sử dụng để vector hóa và nạp tri thức ngữ nghĩa vào CSDL pgvector:
-*   📁 *Choose Your Objective, Platforms, Content Marketing Guidelines (PDFs)*
-*   📁 *Nội dung văn bản trích xuất Content Marketing Transcript (TXT)*
-*   📁 *Image, Text, Video Content và Bản kế hoạch (Plan)*
+## 4. Workflow Vận hành (Event-Driven)
+
+1.  **Data Ingestion:** Backend (Cronjob) kéo số liệu thực tế từ nền tảng Ads về lưu vào OLAP Database.
+2.  **Decision Making:** Backend chạy toán học Bandit để tính toán trọng số niềm tin (Priors) cho các góc độ sáng tạo dựa trên Campaign Objective (Mục tiêu chiến dịch).
+3.  **Graph Trigger:** Backend gọi API đánh thức LangGraph, bơm Priors vào.
+4.  **Stateless Execution:** Graph chạy qua các Node (Diagnostic $\rightarrow$ Scoring $\rightarrow$ Selector $\rightarrow$ Guardian $\rightarrow$ Publisher).
+5.  **Termination:** Graph xuất file Dynamic Creatives, ghi Log, lưu Insight chờ duyệt (HITL) và tắt hoàn toàn. 
+6.  **Human-in-the-Loop (HITL):** Quản lý vào Dashboard duyệt các AI Insights. Nếu pass, Insight mới được băm vector vào RAG để mồi kiến thức cho các chiến dịch sau.
