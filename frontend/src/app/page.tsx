@@ -209,6 +209,8 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
+  const [selectedModelSize, setSelectedModelSize] = useState<string | null>(null);
+  const [selectedContext, setSelectedContext] = useState<string | null>(null);
   const [modelSearch, setModelSearch] = useState("");
   
   // Global LLM Parameter States
@@ -237,6 +239,11 @@ export default function Dashboard() {
   const [formModelApiUrl, setFormModelApiUrl] = useState("");
   const [formModelApiKey, setFormModelApiKey] = useState("");
   const [formModelDescription, setFormModelDescription] = useState("");
+
+  // Workspaces and Campaigns states
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("00000000-0000-0000-0000-000000000002");
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToastMessage(message);
@@ -305,13 +312,33 @@ export default function Dashboard() {
   }, [logs]);
 
   useEffect(() => {
+    const fetchWorkspacesAndCampaigns = async () => {
+      try {
+        const wsRes = await fetch("http://localhost:8000/api/workspace/list");
+        const wsData = await wsRes.json();
+        if (wsData.status === "success") {
+          setWorkspaces(wsData.data || []);
+        }
+        const campRes = await fetch("http://localhost:8000/api/workspace/campaigns");
+        const campData = await campRes.json();
+        if (campData.status === "success") {
+          setCampaigns(campData.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load workspaces or campaigns:", err);
+      }
+    };
+    fetchWorkspacesAndCampaigns();
+  }, []);
+
+  useEffect(() => {
     if (activeTab === "config") {
       fetchIntegrations();
       fetchAISettings();
       fetchModelsList();
       fetchSocialAccounts();
     }
-  }, [activeTab]);
+  }, [activeTab, selectedWorkspaceId]);
 
   // Telemetry fluctuation intervals
   useEffect(() => {
@@ -344,7 +371,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchIntegrations = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/integrations");
+      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setIntegrations(res.data || []);
@@ -374,7 +401,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/integrations", {
+      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -405,7 +432,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/integrations", {
+      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -476,7 +503,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchSocialAccounts = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/social-accounts");
+      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setSocialAccounts(res.data || []);
@@ -509,7 +536,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/social-accounts", {
+      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -575,7 +602,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchAISettings = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/settings");
+      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
       const settings = await response.json();
       
       if (settings.ai_model) {
@@ -625,7 +652,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/settings", {
+      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -645,7 +672,7 @@ export default function Dashboard() {
 
   const fetchModelsList = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/models");
+      const response = await fetch(`http://localhost:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setModelsList(res.data || []);
@@ -693,7 +720,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/settings", {
+      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -770,8 +797,8 @@ export default function Dashboard() {
     };
 
     const targetUrl = formModelUuid 
-      ? `http://localhost:8000/api/workspace/models/${formModelUuid}` 
-      : "http://localhost:8000/api/workspace/models";
+      ? `http://localhost:8000/api/workspace/models/${formModelUuid}?workspace_id=${selectedWorkspaceId}` 
+      : `http://localhost:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`;
     const targetMethod = formModelUuid ? "PUT" : "POST";
 
     try {
@@ -815,6 +842,33 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   // Execute MAB Agent API Wiring
   // ──────────────────────────────────────────────────────────
+  const handleCampaignChange = (campaignIdVal: string) => {
+    const selectedCamp = campaigns.find(c => c.id === campaignIdVal);
+    if (selectedCamp) {
+      setCampaignId(selectedCamp.id);
+      setCampaignName(selectedCamp.name);
+      
+      // Auto-set the workspace of this campaign
+      setSelectedWorkspaceId(selectedCamp.workspace_id);
+      
+      // Auto-set the objective based on campaign type
+      const typeLower = selectedCamp.campaign_type ? selectedCamp.campaign_type.toLowerCase() : "";
+      if (typeLower.includes("awareness")) {
+        setObjective("BRAND_AWARENESS");
+      } else if (typeLower.includes("conversion") || typeLower.includes("lead")) {
+        setObjective("LEAD_GEN");
+      }
+      
+      // Auto-set product mapping if match is found
+      if (selectedCamp.product_id) {
+        setProductId(selectedCamp.product_id);
+      }
+    } else {
+      setCampaignId("");
+      setCampaignName("");
+    }
+  };
+
   const handleExecuteAgentLive = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsExecuting(true);
@@ -892,6 +946,23 @@ export default function Dashboard() {
             </button>
           )}
         </div>
+
+        {isSidebarOpen && (
+          <div className="px-4 py-3 border-b border-slate-900 space-y-1 bg-slate-950/20">
+            <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500 block">Workspace</span>
+            <select
+              value={selectedWorkspaceId}
+              onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-2.5 py-1.5 text-xs text-slate-200 outline-none transition-all font-mono"
+            >
+              {workspaces.map(w => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <nav className="flex-1 p-2 space-y-1">
           {[
@@ -1758,6 +1829,20 @@ export default function Dashboard() {
                     <div className="bg-slate-900/35 border border-slate-900 rounded-xl p-5 space-y-4 h-fit">
                       <div className="flex justify-between items-center border-b border-slate-900 pb-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">Catalog Filter Matrix</span>
+                        {(selectedCategory || selectedTag || selectedSeries || selectedModelSize || selectedContext) && (
+                          <button
+                            onClick={() => {
+                              setSelectedCategory(null);
+                              setSelectedTag(null);
+                              setSelectedSeries(null);
+                              setSelectedModelSize(null);
+                              setSelectedContext(null);
+                            }}
+                            className="text-[9px] text-rose-400 hover:text-rose-300 font-mono underline cursor-pointer bg-transparent border-none p-0 outline-none"
+                          >
+                            Clear all
+                          </button>
+                        )}
                         <Filter className="h-3.5 w-3.5 text-slate-500" />
                       </div>
 
@@ -1776,6 +1861,63 @@ export default function Dashboard() {
                                 }`}
                               >
                                 {c}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500 block">Model Size</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {["Under 10B", "10 ~ 50B", "50 ~ 100B", "Over 100B"].map(sz => (
+                              <button
+                                key={sz}
+                                onClick={() => setSelectedModelSize(prev => prev === sz ? null : sz)}
+                                className={`px-2 py-0.5 rounded text-[10px] border ${
+                                  selectedModelSize === sz
+                                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold"
+                                    : "border-slate-800 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                {sz}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500 block">Context Window</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[">= 8K", ">= 16K", ">= 32K", ">= 128K"].map(ctx => (
+                              <button
+                                key={ctx}
+                                onClick={() => setSelectedContext(prev => prev === ctx ? null : ctx)}
+                                className={`px-2 py-0.5 rounded text-[10px] border ${
+                                  selectedContext === ctx
+                                    ? "bg-amber-500/20 border-amber-500 text-amber-400 font-bold"
+                                    : "border-slate-800 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                {ctx}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500 block">Series</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {["Qwen", "DeepSeek", "Llama", "Kimi"].map(ser => (
+                              <button
+                                key={ser}
+                                onClick={() => setSelectedSeries(prev => prev === ser ? null : ser)}
+                                className={`px-2 py-0.5 rounded text-[10px] border ${
+                                  selectedSeries === ser
+                                    ? "bg-indigo-500/20 border-indigo-500 text-indigo-400 font-bold"
+                                    : "border-slate-800 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                {ser}
                               </button>
                             ))}
                           </div>
@@ -1831,6 +1973,9 @@ export default function Dashboard() {
                             if (modelSearch && !m.name.toLowerCase().includes(modelSearch.toLowerCase()) && !m.model_id.toLowerCase().includes(modelSearch.toLowerCase())) return false;
                             if (selectedCategory && m.category !== selectedCategory) return false;
                             if (selectedTag && !m.tags.includes(selectedTag)) return false;
+                            if (selectedSeries && m.series !== selectedSeries) return false;
+                            if (selectedModelSize && m.model_size !== selectedModelSize) return false;
+                            if (selectedContext && m.context_window !== selectedContext) return false;
                             return true;
                           })
                           .map((m) => {
@@ -1858,6 +2003,18 @@ export default function Dashboard() {
 
                                 <div className="space-y-2">
                                   <div className="flex flex-wrap gap-1">
+                                    {m.special_badge && (
+                                      <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold uppercase">{m.special_badge}</span>
+                                    )}
+                                    {m.series && (
+                                      <span className="bg-slate-950 text-indigo-400 border border-slate-900 px-1.5 py-0.2 rounded text-[8px] font-mono">Series: {m.series}</span>
+                                    )}
+                                    {m.model_size && (
+                                      <span className="bg-slate-950 text-emerald-400 border border-slate-900 px-1.5 py-0.2 rounded text-[8px] font-mono">Size: {m.model_size}</span>
+                                    )}
+                                    {m.context_window && (
+                                      <span className="bg-slate-950 text-amber-400 border border-slate-900 px-1.5 py-0.2 rounded text-[8px] font-mono">Ctx: {m.context_window}</span>
+                                    )}
                                     {m.tags.map(t => (
                                       <span key={t} className="bg-slate-950 text-slate-500 border border-slate-900 px-1.5 py-0.2 rounded text-[8px] font-mono">{t}</span>
                                     ))}
@@ -2278,28 +2435,62 @@ export default function Dashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Campaign Name Identifier</label>
-                  <input
-                    type="text"
-                    required
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Workspace Execution Path</label>
+                  <select
+                    value={selectedWorkspaceId}
+                    onChange={(e) => {
+                      const newWsId = e.target.value;
+                      setSelectedWorkspaceId(newWsId);
+                      // Clear selected campaign if it doesn't belong to the new workspace
+                      const currentCamp = campaigns.find(c => c.id === campaignId);
+                      if (currentCamp && currentCamp.workspace_id !== newWsId) {
+                        setCampaignId("");
+                        setCampaignName("");
+                      }
+                    }}
                     disabled={isExecuting}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-slate-200 outline-none transition-all font-mono"
-                  />
+                  >
+                    {workspaces.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Campaign UUID</label>
-                  <input
-                    type="text"
-                    required
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Marketing Campaign</label>
+                  <select
                     value={campaignId}
-                    onChange={(e) => setCampaignId(e.target.value)}
+                    onChange={(e) => handleCampaignChange(e.target.value)}
                     disabled={isExecuting}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-slate-200 outline-none transition-all font-mono text-[10px]"
-                  />
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-slate-200 outline-none transition-all font-mono"
+                  >
+                    <option value="">-- Choose Campaign --</option>
+                    {campaigns
+                      .filter(c => c.workspace_id === selectedWorkspaceId)
+                      .map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
+
+                {campaignId && (
+                  <div className="space-y-1.5 p-2.5 bg-slate-950/40 border border-slate-800/80 rounded-lg">
+                    <div className="flex justify-between">
+                      <span className="text-[9px] uppercase font-bold text-slate-500">Selected Campaign ID:</span>
+                      <span className="text-[9px] text-blue-400 font-bold font-mono">{campaignId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[9px] uppercase font-bold text-slate-500">Campaign Name:</span>
+                      <span className="text-[9px] text-slate-300 font-mono">{campaignName}</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Product Mapping Reference</label>
@@ -2540,6 +2731,24 @@ export default function Dashboard() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Toast Notifications Overlay */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[9999] transition-all duration-300 transform scale-100 opacity-100">
+          <div className={`flex items-center gap-3 px-4.5 py-3 rounded-xl border shadow-2xl backdrop-blur-md text-xs font-mono font-bold tracking-wider bg-slate-950/90 ${
+            toastType === "success" 
+              ? "border-emerald-500/30 text-emerald-400 shadow-emerald-950/20" 
+              : toastType === "error"
+              ? "border-rose-500/30 text-rose-400 shadow-rose-950/20"
+              : "border-blue-500/30 text-blue-400 shadow-blue-950/20"
+          }`}>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-[10px]">
+              {toastType === "success" ? "✓" : toastType === "error" ? "✗" : "ℹ"}
+            </span>
+            <span>{toastMessage}</span>
           </div>
         </div>
       )}

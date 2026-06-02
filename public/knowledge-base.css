@@ -476,6 +476,8 @@ body::before {
   border-radius: var(--radius-md);
   background: rgba(8, 9, 13, 0.4);
   min-height: 80px;
+  max-height: 120px;
+  overflow-y: auto !important;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -484,6 +486,15 @@ body::before {
   gap: 6px;
   cursor: pointer;
   transition: var(--transition-smooth);
+}
+
+.dz-custom-compact::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dz-custom-compact::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
 }
 
 .dz-custom-compact:hover {

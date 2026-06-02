@@ -1,4 +1,11 @@
 # core/integrations/fb_client.py
+import collections
+import collections.abc
+# Monkeypatch collections for Python 3.10+ compatibility with older facebook_business SDK
+for name in ['MutableMapping', 'Iterable', 'Mapping', 'MutableSequence', 'Sequence']:
+    if not hasattr(collections, name):
+        setattr(collections, name, getattr(collections.abc, name))
+
 import logging
 import uuid
 from typing import List, Dict, Any, Tuple
@@ -10,7 +17,7 @@ from facebook_business.adobjects.adsinsights import AdsInsights
 from facebook_business.exceptions import FacebookRequestError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from core.models import SocialAccount, AdMapper
+from core.models import SocialAccount, AdMapper, CampaignSocialAccount
 
 logger = logging.getLogger("fb_client")
 logger.setLevel(logging.INFO)
@@ -32,7 +39,7 @@ def check_and_raise_if_disabled(e: FacebookRequestError, fb_account_id: str = ""
         logger.error(f"Facebook Ad Account is disabled or restricted: {err_msg}")
         raise FacebookAccountDisabledError(f"Facebook Ad Account {fb_account_id} is disabled/restricted: {err_msg}") from e
 
-def get_fb_client(workspace_id: str, db: Session) -> Tuple[FacebookAdsApi, str]:
+def get_fb_client(workspace_id: str, db: Session, campaign_id: str = None) -> Tuple[FacebookAdsApi, str]:
     """
     Factory function that retrieves credentials from the database and initializes FacebookAdsApi.
     Returns a tuple of (api_instance, fb_account_id).
@@ -42,11 +49,41 @@ def get_fb_client(workspace_id: str, db: Session) -> Tuple[FacebookAdsApi, str]:
     except ValueError as val_err:
         raise ValueError(f"Invalid workspace_id UUID format: {workspace_id}") from val_err
 
-    # Query active social account for Facebook
-    account = db.query(SocialAccount).filter_by(
-        workspace_id=ws_uuid,
-        platform='facebook'
-    ).first()
+    from core.models import MarketingCampaign
+    account = None
+    if campaign_id:
+        try:
+            camp_uuid = uuid.UUID(str(campaign_id))
+            
+            # Tier 1: Query the new many-to-many CampaignSocialAccount junction table
+            account = db.query(SocialAccount).join(
+                CampaignSocialAccount,
+                CampaignSocialAccount.social_account_id == SocialAccount.id
+            ).filter(
+                CampaignSocialAccount.campaign_id == camp_uuid,
+                SocialAccount.platform == 'facebook'
+            ).first()
+
+            # Tier 2: Legacy Fallback to campaign.kpi_targets.social_account_id
+            if not account:
+                campaign = db.query(MarketingCampaign).filter_by(id=camp_uuid).first()
+                if campaign and campaign.kpi_targets:
+                    social_account_id_str = campaign.kpi_targets.get("social_account_id")
+                    if social_account_id_str:
+                        try:
+                            social_acc_uuid = uuid.UUID(str(social_account_id_str))
+                            account = db.query(SocialAccount).filter_by(id=social_acc_uuid, platform='facebook').first()
+                        except ValueError:
+                            pass
+        except ValueError:
+            pass
+
+    # Tier 3: Workspace Default Fallback (querying the first active Facebook account in the workspace)
+    if not account:
+        account = db.query(SocialAccount).filter_by(
+            workspace_id=ws_uuid,
+            platform='facebook'
+        ).first()
 
     if not account:
         raise ValueError(f"No Facebook social account found in workspace {workspace_id}")
@@ -190,24 +227,25 @@ def _fetch_campaign_metrics_impl(campaign_id: str, fb_account_id: str, db: Sessi
 
     return results
 
-def init_facebook_client(workspace_id: str, db: Session) -> Tuple[Any, str, bool]:
+def init_facebook_client(workspace_id: str, db: Session, campaign_id: str = None) -> Tuple[Any, str, bool]:
     """Helper to initialize the Facebook Ads client with workspace credentials."""
     use_real_fb = True
     try:
-        api, fb_account_id = get_fb_client(workspace_id, db)
+        api, fb_account_id = get_fb_client(workspace_id, db, campaign_id=campaign_id)
         if not fb_account_id.startswith('act_'):
             fb_account_id = f"act_{fb_account_id}"
         
         # Check for mock/dummy credentials
-        if not api or not api.access_token or "dummy" in api.access_token:
-            logger.warning("Mocking Facebook Ads API due to dummy credentials.")
-            use_real_fb = False
+        token = api._session.access_token if hasattr(api, "_session") else None
+        if not api or not token or "dummy" in token:
+            raise ValueError("Dummy or missing Facebook API credentials detected.")
+            
         return api, fb_account_id, use_real_fb
     except FacebookAccountDisabledError:
         raise
     except Exception as cred_err:
-        logger.warning(f"Could not initialize Facebook API ({cred_err}). Falling back to mock publishing.")
-        return None, "act_10509876_mock", False
+        logger.error(f"Could not initialize Facebook API ({cred_err}).")
+        raise RuntimeError(f"Failed to initialize Facebook API: {cred_err}") from cred_err
 
 def batch_create_creatives(api: Any, fb_account_id: str, workspace_id: str, variants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Uses the Facebook Batch API to upload the dynamic creatives in a single call."""
@@ -230,7 +268,8 @@ def batch_create_creatives(api: Any, fb_account_id: str, workspace_id: str, vari
     
     def make_creative_failure_callback(v_id):
         def callback(response):
-            logger.error(f"AdCreative batch creation failed for variant {v_id}: {response}")
+            err_detail = response.json() if hasattr(response, 'json') else str(response)
+            logger.error(f"AdCreative batch creation failed for variant {v_id}: {err_detail}")
             creative_responses.append({
                 "variant_id": v_id,
                 "creative_id": None,
@@ -239,8 +278,9 @@ def batch_create_creatives(api: Any, fb_account_id: str, workspace_id: str, vari
         return callback
     
     integration_configs = get_integration_config(workspace_id, "upload-post")
-    page_id = integration_configs.get("facebook_page_id") or "10509876"
-    
+    page_id = integration_configs.get("facebook_page_id")
+    if not page_id:
+        raise ValueError("Thiếu cấu hình 'facebook_page_id' trong mục cấu hình tích hợp (upload-post). Không thể tạo Creative.")
     for v in variants:
         v_id = v["variant_id"]
         copy = v.get("adapted_copy", "")
@@ -295,8 +335,7 @@ def batch_create_ads(api: Any, fb_account_id: str, campaign_id: uuid.UUID, creat
         target_adset_id = campaign.kpi_targets.get("facebook_adset_id")
     
     if not target_adset_id:
-        target_adset_id = "12021111002233" # Fallback sandbox adset ID
-        
+        raise ValueError("Thiếu cấu hình 'facebook_adset_id' (Target AdSet) trong mục tiêu chiến dịch. Không thể tạo Ads.")
     ad_batch = api.new_batch()
     ad_responses = []
     
@@ -313,7 +352,8 @@ def batch_create_ads(api: Any, fb_account_id: str, campaign_id: uuid.UUID, creat
     
     def make_ad_failure_callback(v_id):
         def callback(response):
-            logger.error(f"Ad batch creation failed for variant {v_id}: {response}")
+            err_detail = response.json() if hasattr(response, 'json') else str(response)
+            logger.error(f"Ad batch creation failed for variant {v_id}: {err_detail}")
             ad_responses.append({
                 "variant_id": v_id,
                 "ad_id": None,

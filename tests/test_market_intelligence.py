@@ -4,27 +4,41 @@ from unittest.mock import patch, MagicMock
 import os
 import sys
 import uuid
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine
 
 # Add root folder to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from db.connection import SessionLocal
+from db.connection import SessionLocal, POSTGRES_URL, Base
 from db.seed import seed_database
 from core.models import Workspace, ProductService, RAGDocument, RAGChunk, AgentDecision
 from core.ai_clients.serpapi_client import search_youtube, get_youtube_transcript, get_youtube_comments
 from core.market_intelligence import fetch_and_process_market_data
 from core.tasks import radar_market_first_cron
 
+# --- Setup Test DB connection ---
+base_url = POSTGRES_URL.rsplit('/', 1)[0]
+TEST_DB_URL = base_url + "/marketing_agent_test_db"
+test_engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
 class TestMarketIntelligence(unittest.TestCase):
     
+    @classmethod
+    def setUpClass(cls):
+        # Create all tables in the test database
+        Base.metadata.drop_all(bind=test_engine)
+        Base.metadata.create_all(bind=test_engine)
+
     def setUp(self):
-        self.db: Session = SessionLocal()
+        self.db: Session = TestingSessionLocal()
         seed_database(self.db)
         self.workspace = self.db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
         self.assertIsNotNone(self.workspace)
         self.workspace_id = str(self.workspace.id)
         # Clear existing workspace documents to prevent duplicate file hash collision during tests
+        # This now safely runs on the Mock Test DB!
         self.db.query(RAGDocument).filter_by(workspace_id=uuid.UUID(self.workspace_id)).delete()
         self.db.commit()
         
@@ -111,10 +125,17 @@ class TestMarketIntelligence(unittest.TestCase):
         self.assertIn("market_intel", doc.access_tags)
         self.assertEqual(doc.meta_data.get("hook"), "Giải pháp AI đột phá giảm 50% CPA")
         
+    @patch("core.tasks.get_session")
     @patch("core.tasks.generate_text")
     @patch("core.tasks.search_youtube")
-    def test_radar_market_first_cron(self, mock_search, mock_generate):
+    def test_radar_market_first_cron(self, mock_search, mock_generate, mock_get_session):
         """Verify that the daily radar cron job successfully scans competitor channels, triggers alerts and logs decisions."""
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_session_ctx():
+            yield self.db
+        mock_get_session.side_effect = mock_session_ctx
+        
         mock_search.return_value = {
             "video_results": [
                 {

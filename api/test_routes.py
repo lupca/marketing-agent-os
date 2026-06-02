@@ -79,15 +79,9 @@ async def trigger_autonomous(campaign_id: str, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid campaign_id format. Must be a valid UUID.")
 
-    # Query marketing campaign
     campaign = db.query(MarketingCampaign).filter_by(id=camp_uuid).first()
     if not campaign:
-        # Fallback helper: If the seeded campaign is expected but doesn't match the passed ID,
-        # we try to fetch the first active campaign in the DB to prevent breaking the flow.
-        campaign = db.query(MarketingCampaign).filter_by(status="active").first()
-        if not campaign:
-            raise HTTPException(status_code=404, detail="No active MarketingCampaign found in database to execute.")
-        logger.info(f"Requested campaign not found. Falling back to active campaign: {campaign.id}")
+        raise HTTPException(status_code=404, detail=f"MarketingCampaign with ID {campaign_id} not found in database.")
 
     try:
         # Call the orchestrator layer

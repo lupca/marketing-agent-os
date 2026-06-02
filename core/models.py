@@ -1,7 +1,7 @@
 # core/models.py
 import json
 import uuid
-from sqlalchemy import Column, String, Text, Numeric, Integer, Boolean, DateTime, Date, ForeignKey, JSON, TypeDecorator
+from sqlalchemy import Column, String, Text, Numeric, Integer, Boolean, DateTime, Date, ForeignKey, JSON, TypeDecorator, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
 from sqlalchemy.sql import func
 from db.connection import Base, IS_MOCK_DATABASE
@@ -160,6 +160,18 @@ class MarketingCampaign(Base):
     end_date = Column(Date)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+# 11b. Model: CampaignSocialAccount (Junction Table for Omnichannel campaign linking)
+class CampaignSocialAccount(Base):
+    __tablename__ = "campaign_social_accounts"
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID_TYPE, ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
+    social_account_id = Column(UUID_TYPE, ForeignKey("social_accounts.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('campaign_id', 'social_account_id', name='uq_campaign_social_account'),
+    )
 
 # 12. Model: ContentBrief
 class ContentBrief(Base):

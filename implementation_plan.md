@@ -250,3 +250,33 @@ Chúng ta sẽ viết bộ test suite trong thư mục `tests/` để xác minh 
 3.  **Kiểm tra Human-in-the-loop:** Chạy thử kịch bản sáng tạo nội dung, đợi Guardian chấm điểm và kiểm tra nút Approve/Reject.
 4.  **Kiểm tra quy trình Triage Router:** Nhập chat phiếm, hỏi metrics, tạo chiến dịch và xác minh xem Triage Node có chuyển hướng đúng vai trò không.
 5.  **Kiểm tra Giao thức cãi nhau:** Tạo giả lập một chiến dịch thất bại CPA > Target $\rightarrow$ Xác minh Copywriter nhận được message phản hồi ngược yêu cầu đổi Angle.
+
+---
+
+## 7. CHIẾN LƯỢC NỘI DUNG OMNICHANNEL (PLATFORM-SPECIFIC CONTENT GENERATION)
+
+Để giải quyết bài toán đa kênh (Omnichannel), đặc biệt là sự khác biệt về định dạng nội dung giữa các nền tảng (ví dụ: Facebook hỗ trợ Text/Image, TikTok bắt buộc Video Script), hệ thống sẽ được tái cấu trúc theo các bước sau:
+
+### 7.1. Truy xuất Nền Tảng Mục Tiêu (Platform Resolution)
+Tại `creative_generation_node`, thay vì hard-code `platform="facebook"`, hệ thống sẽ:
+1. Truy vấn bảng junction `campaign_social_accounts` để lấy danh sách các tài khoản MXH liên kết với Campaign hiện tại.
+2. Từ `social_account_id`, truy xuất bảng `social_accounts` để xác định chính xác danh sách các `platform` (facebook, tiktok, instagram, etc.) mà chiến dịch này nhắm tới.
+
+### 7.2. Sinh nội dung đặc thù theo Nền Tảng (Platform-Aware Generation)
+Quy trình gọi LLM sẽ được lặp qua từng `platform` mục tiêu. Prompt của Copywriter sẽ được tiêm thêm (inject) các ràng buộc định dạng:
+*   **Nếu `platform == 'facebook'`:** Prompt yêu cầu viết Bài đăng Quảng cáo (Ad Copy) tập trung vào Text, kèm Hook và Call-to-Action. `content_type` sẽ là `text` hoặc `image_prompt`.
+*   **Nếu `platform == 'tiktok'`:** Prompt YÊU CẦU BẮT BUỘC viết Kịch bản Video ngắn (Video Script). Định dạng phải chia thành 2 cột: [Hình ảnh/Video (Visual)] và [Lời bình/Âm thanh (Audio)]. `content_type` sẽ là `video_script`.
+*   Dữ liệu trả về sẽ lưu chính xác `platform` và `content_type` tương ứng vào cấu trúc của biến `generated_variants`.
+
+### 7.3. Kiểm duyệt đặc thù (Platform-Specific Guardian Sandbox)
+Tại `guardian_sandbox_node`, Brand Guardian sẽ chấm điểm dựa trên Context của nền tảng:
+*   **TikTok:** Phạt điểm nếu phát hiện văn phong quá dài dòng (dạng bài đọc) thay vì kịch bản nói ngắn gọn.
+*   **Facebook:** Kiểm tra kỹ các từ cấm (Chính sách quảng cáo Facebook) gắt gao hơn các từ khóa bị cấm trên TikTok.
+
+### 7.4. Phân luồng Xuất bản (Publisher Dispatcher)
+Tại `publisher_node`, hệ thống sẽ dựa trên `variant.platform` và `variant.content_type` để quyết định gọi API tương ứng (ví dụ: `upload_text`, `upload_video`, hoặc `upload_photos` trong hàm `publish_to_social` thay vì gộp chung).
+
+> [!IMPORTANT]
+> **Câu hỏi mở cho Sếp:**
+> 1. Hiện tại đối với TikTok (kịch bản video), hệ thống LLM chỉ có thể sinh ra "Kịch bản (Text)" để gửi cho đội media quay/dựng, hay sếp muốn hệ thống tự động đẩy kịch bản đó sang một AI Video Generator (như Sora/Runway) để tạo luôn video tự động trước khi publish?
+> 2. Kế hoạch này đã đáp ứng được mong muốn phân tách Text (Facebook) và Video (TikTok) của Sếp chưa? Vui lòng Review và Approve để tôi tiến hành sửa code trong `graphs/autonomous_nodes.py`.

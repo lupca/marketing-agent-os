@@ -167,6 +167,24 @@ def seed_vnb_data():
         db.add(stringing_service)
         
         db.commit()
+        # 6. SEED SOCIAL ACCOUNT
+        from core.models import SocialAccount
+        fb_account = db.query(SocialAccount).filter_by(workspace_id=workspace_id, platform="facebook").first()
+        if not fb_account:
+            fb_account = SocialAccount(
+                workspace_id=workspace_id,
+                platform="facebook",
+                account_name="VNB Sports Ad Account",
+                account_id="act_10509876",
+                app_id="dummy_app_id",
+                app_secret="dummy_app_secret",
+                access_token="dummy_access_token",
+                status="active"
+            )
+            db.add(fb_account)
+            db.commit()
+            logger.info("Seeded Mock Facebook Social Account")
+
         logger.info("Successfully seeded all VNB Sports data!")
 
 if __name__ == "__main__":

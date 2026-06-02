@@ -500,6 +500,7 @@ def sync_own_media_metrics(self):
     """
     from core.dependencies import get_session
     from core.models import PlatformVariant, SocialInteraction
+    from core.ai_clients.upload_post_client import UploadPostAuthError
     from core.document_service import process_and_store_document
     from datetime import datetime, timedelta
     import uuid

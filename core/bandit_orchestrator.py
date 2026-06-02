@@ -1,4 +1,19 @@
 # core/bandit_orchestrator.py
+"""
+Bandit Orchestrator — The MAB (Multi-Armed Bandit) Computation Layer.
+
+Responsibilities:
+    1. Reward calculation from campaign analytics metrics.
+    2. Cold-start resolution via SQL-based statistical baseline.
+    3. Epsilon-Greedy MAB prior computation (80% Exploit / 20% Explore).
+    4. Autonomous pipeline orchestration via ``trigger_autonomous_generation()``.
+
+Cockpit Integration (Phase 6):
+    - Kill switch is checked before graph.ainvoke() — raises if active.
+    - Execution mode (shadow / live) is read from pipeline_tracker and injected into state.
+    - PipelineRun records are created, completed, or failed via pipeline_tracker.
+    - ``_run_id`` and ``_execution_mode`` are injected into initial_state for node tracking.
+"""
 import random
 import logging
 import uuid
@@ -6,6 +21,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from core.models import MarketingCampaign, CampaignAnalytics, AIInsightPending
+from core import pipeline_tracker
 from graphs.main_router import graph
 
 logger = logging.getLogger("bandit_orchestrator")
@@ -17,6 +33,13 @@ def calculate_reward(metrics: Dict[str, Any], objective: str) -> float:
     """
     CMO-CTO Aligned Reward Calculation formula.
     Prevents bidding conflict while providing clear metric direction.
+
+    Args:
+        metrics:   Dict with keys: impressions, clicks, conversions, spend.
+        objective: 'BRAND_AWARENESS' or 'LEAD_GEN'.
+
+    Returns:
+        Scalar reward value. Higher = better performing angle.
     """
     try:
         impressions = float(metrics.get("impressions") or 0)
@@ -43,6 +66,13 @@ def solve_cold_start(db: Session, objective: str) -> Dict[str, Any]:
     """
     SQL-based Cold Start Solver.
     Avoids semantic RAG searches for metrics, using statistical campaign averages instead.
+
+    Args:
+        db:        Active SQLAlchemy session.
+        objective: Campaign objective string.
+
+    Returns:
+        Dict of average metrics (impressions, clicks, conversions, spend).
     """
     logger.info("Solving Cold Start via SQL average metrics...")
     avg_metrics = {
@@ -76,6 +106,15 @@ def compute_mab_beliefs(db: Session, campaign_id: str, objective: str, epsilon: 
     """
     Runs Epsilon-Greedy or Thompson Sampling mathematics to formulate beliefs/priors.
     Maps Content Generation Output mix: 80% Exploit (proven angles) / 20% Explore (wildcard).
+
+    Args:
+        db:          Active SQLAlchemy session.
+        campaign_id: UUID string of the target campaign.
+        objective:   'BRAND_AWARENESS' or 'LEAD_GEN'.
+        epsilon:     Exploration probability (default 0.2 → 20% Explore).
+
+    Returns:
+        Dict with keys: beliefs (Dict[angle, weight]), metrics (Dict), cold_start (bool).
     """
     logger.info(f"Computing MAB priors for campaign_id: {campaign_id}")
     
@@ -142,11 +181,47 @@ async def trigger_autonomous_generation(
     db: Session
 ) -> Dict[str, Any]:
     """
-    Orchestration layer. Computes beliefs, triggers LangGraph, and terminates immediately.
+    Orchestration layer. Computes MAB beliefs, creates a pipeline run record, triggers
+    LangGraph, and terminates immediately (stateless fire-and-observe pattern).
+
+    Cockpit Integration:
+        1. Kill switch check: raises ``RuntimeError`` if the switch is active.
+        2. Reads current execution mode from ``pipeline_tracker.get_execution_mode()``.
+        3. Creates a ``PipelineRun`` record via ``pipeline_tracker.start_run()``.
+        4. Injects ``_run_id`` and ``_execution_mode`` into ``initial_state`` for node tracking.
+        5. Calls ``pipeline_tracker.complete_run()`` on success.
+        6. Calls ``pipeline_tracker.fail_run()`` on exception, then re-raises.
+
+    Args:
+        workspace_id: UUID string of the workspace.
+        campaign_id:  UUID string of the campaign.
+        product_id:   UUID string of the product/service.
+        db:           Active SQLAlchemy session (used only for pre-flight queries here).
+
+    Returns:
+        result_state: The final AgencyState dict returned by graph.ainvoke().
+
+    Raises:
+        RuntimeError: If the kill switch is active.
+        ValueError:   If the campaign is not found in the database.
     """
     logger.info("Starting autonomous generation loop...")
-    
-    # Fetch campaign metadata
+
+    # ── Kill Switch Pre-flight ─────────────────────────────────────────────────
+    if pipeline_tracker.is_kill_switch_active(workspace_id=workspace_id):
+        msg = (
+            "[KILL SWITCH] Autonomous generation is BLOCKED. "
+            "The system kill switch is currently active. "
+            "Deactivate it via the Cockpit API before retrying."
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    # ── Read Current Execution Mode ────────────────────────────────────────────
+    execution_mode = pipeline_tracker.get_execution_mode()
+    logger.info(f"[COCKPIT] Execution mode for this run: {execution_mode.upper()}")
+
+    # ── Fetch campaign metadata ────────────────────────────────────────────────
     campaign = db.query(MarketingCampaign).filter_by(id=uuid.UUID(campaign_id)).first()
     if not campaign:
         raise ValueError(f"Campaign with ID {campaign_id} not found.")
@@ -155,12 +230,12 @@ async def trigger_autonomous_generation(
     if objective not in ["BRAND_AWARENESS", "LEAD_GEN"]:
         objective = "LEAD_GEN"
         
-    # 1. Compute MAB priors
+    # ── Compute MAB Priors ─────────────────────────────────────────────────────
     mab_result = compute_mab_beliefs(db, campaign_id, objective)
     priors = mab_result["beliefs"]
     metrics = mab_result["metrics"]
     
-    # 2. Setup initial stateless graph input
+    # ── Build Initial State ────────────────────────────────────────────────────
     initial_state = {
         "workspace_id": workspace_id,
         "campaign_id": campaign_id,
@@ -171,8 +246,20 @@ async def trigger_autonomous_generation(
         "sop_stage": "scoring",
         "selected_actions": [],
         "generated_variants": [],
-        "sandbox_feedbacks": []
+        "sandbox_feedbacks": [],
+        # Cockpit fields — consumed by autonomous_nodes.py for run tracking
+        "_execution_mode": execution_mode,
     }
+
+    # ── Create Pipeline Run Record ─────────────────────────────────────────────
+    run_id = pipeline_tracker.start_run(
+        workspace_id=workspace_id,
+        campaign_id=campaign_id,
+        execution_mode=execution_mode,
+        initial_state=initial_state,
+    )
+    # Inject run_id so every node can call pipeline_tracker.start_node(run_id, ...)
+    initial_state["_run_id"] = run_id
     
     config = {
         "configurable": {
@@ -182,9 +269,20 @@ async def trigger_autonomous_generation(
         }
     }
     
-    logger.info("Invoking Stateless LangGraph execution layer...")
-    # Trigger LangGraph synchronously (stateless run)
-    result_state = await graph.ainvoke(initial_state, config=config)
-    logger.info("Stateless LangGraph execution completed successfully and RAM is freed.")
-    
-    return result_state
+    # ── Invoke LangGraph Pipeline ──────────────────────────────────────────────
+    logger.info(f"[COCKPIT] Invoking LangGraph pipeline (run_id={run_id})...")
+    try:
+        result_state = await graph.ainvoke(initial_state, config=config)
+        pipeline_tracker.complete_run(run_id, dict(result_state))
+        logger.info(
+            f"[COCKPIT] Stateless LangGraph execution completed successfully (run_id={run_id})."
+        )
+        return result_state
+
+    except Exception as exc:
+        error_msg = str(exc)
+        logger.error(
+            f"[COCKPIT] LangGraph pipeline FAILED (run_id={run_id}): {error_msg}"
+        )
+        pipeline_tracker.fail_run(run_id, error_msg)
+        raise

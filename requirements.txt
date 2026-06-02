@@ -25,5 +25,5 @@ sentence-transformers
 transformers
 torch
 serpapi
-facebook_business==3.0.0
+facebook_business==25.0.1
 tenacity>=8.0.0

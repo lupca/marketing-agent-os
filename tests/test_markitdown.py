@@ -15,7 +15,7 @@ from core.parser import UniversalParser, semantic_chunk_text
 from db.connection import SessionLocal
 from db.seed import seed_database
 from core.models import RAGDocument
-from app import run_vectorization_pipeline
+from core.document_service import process_and_store_document, DuplicateDocumentError
 
 class TestMarkitdownAndDeduplication(unittest.TestCase):
 
@@ -75,64 +75,39 @@ class TestMarkitdownAndDeduplication(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
-    @patch("app.cl.user_session")
-    @patch("core.rag.ingest_document_task")
+    @patch("core.document_service.store_document")
     @patch("core.document_service.upload_file")
-    @patch("core.parser.MarkItDown") # Mock the heavy part
-    def test_rag_deduplication_logic(self, mock_mid_cls, mock_upload, mock_celery, mock_session):
+    def test_rag_deduplication_logic(self, mock_upload, mock_store):
         """Kiểm thử cơ chế chặn tải lên trùng lặp SHA-256."""
-        # Mock MarkItDown
-        mock_mid = mock_mid_cls.return_value
-        mock_res = MagicMock()
-        mock_res.text_content = "Fake markdown content"
-        mock_mid.convert_local.return_value = mock_res
-
-        # Query seeded Product ID dynamically
-        from core.models import ProductService
-        prod = self.db.query(ProductService).filter_by(workspace_id=uuid.UUID(self.workspace_id)).first()
-        if not prod:
-            prod = self.db.query(ProductService).first()
-        product_id = str(prod.id) if prod else "00000000-0000-0000-0000-000000000005"
-
-        # Mock session Chainlit
-        mock_session.get.side_effect = lambda key, default=None: {
-            "workspace_id": self.workspace_id,
-            "product_id": product_id
-        }.get(key, default)
+        # Mock store_document to return a mock document object
+        mock_doc = MagicMock()
+        mock_doc.document_id = "11111111-1111-1111-1111-111111111111"
+        mock_store.return_value = mock_doc
 
         # Định nghĩa nội dung file kiểm thử
         file_content = b"Day la tai lieu kiem thu cho co che chong trung lap SHA-256 cua Marketing Agent OS."
         file_name = f"test_md_excel_{uuid.uuid4().hex[:8]}.txt"
 
-        # Khởi tạo đối tượng upload giả lập
-        element = MagicMock()
-        element.name = file_name
-        element.content = file_content
-        # Ensure it doesn't have a 'path' or it's a valid one. 
-        # run_vectorization_pipeline checks hasattr(element, 'path')
-        element.path = None 
-
-        # Chạy Event Loop
-        loop = asyncio.get_event_loop()
-
-        # ---- LẦN TẢI LÊN 1 ----
-        result_1 = loop.run_until_complete(run_vectorization_pipeline(element))
-        self.assertTrue("Tài liệu đã được nhận và đang xử lý" in result_1)
-        self.assertTrue(mock_upload.called)
-
-        # Reset mock
-        mock_upload.reset_mock()
-        mock_celery.delay.reset_mock()
-
-        # ---- LẦN TẢI LÊN 2 (Trùng lặp) ----
-        result_2 = loop.run_until_complete(run_vectorization_pipeline(element))
+        # Mock the database query so that it returns None (no duplicate) on first call,
+        # and returns mock_doc (duplicate found) on the second call.
+        mock_query = MagicMock()
+        mock_query.filter.return_value.first.side_effect = [None, mock_doc]
         
-        # Xác minh cơ chế chặn trùng lặp
-        self.assertEqual(
-            result_2,
-            "Tài liệu này đã tồn tại trong Knowledge Base. Bỏ qua quá trình xử lý để tiết kiệm tài nguyên."
-        )
-        self.assertFalse(mock_upload.called)
+        with patch.object(self.db, "query", return_value=mock_query):
+            # ---- LẦN TẢI LÊN 1 ----
+            res1 = process_and_store_document(self.db, self.workspace_id, file_content, file_name)
+            self.assertEqual(res1["status"], "processing")
+            self.assertTrue(mock_upload.called)
+
+            # Reset mock
+            mock_upload.reset_mock()
+
+            # ---- LẦN TẢI LÊN 2 (Trùng lặp) ----
+            with self.assertRaises(DuplicateDocumentError) as context:
+                process_and_store_document(self.db, self.workspace_id, file_content, file_name)
+                
+            self.assertTrue("Tài liệu này đã tồn tại" in str(context.exception))
+            self.assertFalse(mock_upload.called)
 
 if __name__ == "__main__":
     unittest.main()

@@ -83,8 +83,4 @@ def creative_report_node(state: AgencyState) -> dict:
         
     except Exception as e:
         logger.error(f"Error executing creative_report_node: {e}", exc_info=True)
-        fallback = "Dạ chào Sếp, em đã cố gắng kết nối CSDL để truy xuất báo cáo của phòng Sáng Tạo nhưng gặp sự cố kết nối. Sếp vui lòng thử lại sau giây lát ạ!"
-        return {
-            "messages": [AIMessage(content=fallback)],
-            "sop_stage": "triage"
-        }
+        raise RuntimeError(f"Failed to generate creative report: {e}") from e

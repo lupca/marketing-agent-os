@@ -454,5 +454,18 @@ CREATE TABLE IF NOT EXISTS ad_mapper (
 CREATE INDEX IF NOT EXISTS idx_ad_mapper_variant ON ad_mapper (variant_id);
 
 
+-- 28. Table: campaign_social_accounts (Junction Table for Omnichannel campaign linking)
+CREATE TABLE IF NOT EXISTS campaign_social_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID NOT NULL REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+    social_account_id UUID NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_campaign_social_account UNIQUE (campaign_id, social_account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_social_accounts_campaign ON campaign_social_accounts(campaign_id);
+
+
+
 
 

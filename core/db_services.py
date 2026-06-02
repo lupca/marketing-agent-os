@@ -254,7 +254,7 @@ def save_publisher_state(
             platform=v.get("platform", "facebook"),
             adapted_copy=v.get("adapted_copy", ""),
             publish_status="published",
-            content_type="text",
+            content_type=v.get("content_type", "text"),
             meta_data={"angle_name": v.get("angle_name")}
         )
         db.add(pv)

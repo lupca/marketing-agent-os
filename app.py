@@ -15,6 +15,8 @@ from api.vault_routes import vault_router
 from api.dashboard_routes import dashboard_router
 from api.workspace_routes import workspace_router
 from api.test_routes import test_router, broadcaster
+from api.cockpit_routes import cockpit_router
+from core.pipeline_tracker import set_cockpit_broadcaster
 
 # Initialize FastAPI app
 fastapi_app = FastAPI(
@@ -36,12 +38,23 @@ fastapi_app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register cockpit broadcaster at application startup
+@fastapi_app.on_event("startup")
+async def register_cockpit_broadcaster():
+    """
+    Startup event: wire the shared WebSocket broadcaster into the pipeline_tracker module.
+    This allows all node execution events to be pushed in real-time to connected Cockpit clients.
+    """
+    set_cockpit_broadcaster(broadcaster)
+    logger.info("[COCKPIT] Broadcaster registered with pipeline_tracker on startup.")
+
 # Include Specialized API Routers
 fastapi_app.include_router(rag_router)
 fastapi_app.include_router(vault_router)
 fastapi_app.include_router(dashboard_router)
 fastapi_app.include_router(workspace_router)
 fastapi_app.include_router(test_router)
+fastapi_app.include_router(cockpit_router)
 
 # Real-time Telemetry WebSocket endpoint
 @fastapi_app.websocket("/api/ws/telemetry")
@@ -55,6 +68,26 @@ async def websocket_endpoint(websocket: WebSocket):
         broadcaster.disconnect(websocket)
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
+        broadcaster.disconnect(websocket)
+
+# Dedicated Cockpit WebSocket endpoint for real-time pipeline observability
+@fastapi_app.websocket("/api/ws/cockpit")
+async def cockpit_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for The Autopilot Cockpit frontend.
+
+    Shares the same broadcaster instance as /api/ws/telemetry so that all
+    pipeline events (node_start, node_complete, run_fail, quarantine, kill_switch, etc.)
+    are pushed to both the legacy telemetry consumers and the new Cockpit UI simultaneously.
+    """
+    await broadcaster.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        broadcaster.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"Cockpit WebSocket connection error: {e}")
         broadcaster.disconnect(websocket)
 
 # Mount public directory for assets if it exists

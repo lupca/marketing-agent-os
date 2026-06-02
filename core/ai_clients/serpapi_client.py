@@ -95,8 +95,8 @@ def search_youtube(
     """
     api_key = get_serpapi_key(workspace_id)
     if not api_key:
-        logger.warning("[SerpApi] API Key not found. Utilizing mock fallback search results.")
-        return _get_mock_search_results(query)
+        logger.error("[SerpApi] API Key not found.")
+        raise SerpApiUnauthorizedError("API key not provided for SerpApi Youtube Search.")
         
     try:
         logger.info(f"[SerpApi] Calling YouTube search for query: '{query}'...")
@@ -111,16 +111,15 @@ def search_youtube(
         
         if "error" in data or "video_results" not in data:
             err_msg = data.get("error", "Unknown error")
-            logger.warning(f"[SerpApi] Search returned error or missing results: {err_msg}. Utilizing fallback.")
-            return _get_mock_search_results(query)
+            raise SerpApiSDKError(f"Search returned error or missing results: {err_msg}")
         return dict(data)
     except Exception as e:
-        logger.error(f"[SerpApi] YouTube search failed: {e}. Utilizing fallback mock data.")
+        logger.error(f"[SerpApi] YouTube search failed: {e}.")
         try:
             _raise_custom_exception(e)
         except Exception as mapped_err:
             logger.error(f"[SerpApi] Detailed SDK Exception mapping: {type(mapped_err).__name__} - {mapped_err}")
-        return _get_mock_search_results(query)
+            raise mapped_err
 
 def get_youtube_transcript(
     video_id: str, 
@@ -133,8 +132,8 @@ def get_youtube_transcript(
     """
     api_key = get_serpapi_key(workspace_id)
     if not api_key:
-        logger.warning(f"[SerpApi] API Key not found. Utilizing mock fallback transcript for video {video_id}.")
-        return _get_mock_transcript(video_id)
+        logger.error(f"[SerpApi] API Key not found for transcript fetch.")
+        raise SerpApiUnauthorizedError("API key not provided for SerpApi Youtube Transcript.")
         
     try:
         logger.info(f"[SerpApi] Fetching transcript for video: {video_id}...")
@@ -147,16 +146,15 @@ def get_youtube_transcript(
         
         if "error" in data or "transcript" not in data:
             err_msg = data.get("error", "Unknown error")
-            logger.warning(f"[SerpApi] Transcript returned error or missing transcript: {err_msg}. Utilizing fallback.")
-            return _get_mock_transcript(video_id)
+            raise SerpApiSDKError(f"Transcript returned error or missing transcript: {err_msg}")
         return dict(data)
     except Exception as e:
-        logger.error(f"[SerpApi] Transcript fetch failed for video {video_id}: {e}. Utilizing fallback.")
+        logger.error(f"[SerpApi] Transcript fetch failed for video {video_id}: {e}.")
         try:
             _raise_custom_exception(e)
         except Exception as mapped_err:
             logger.error(f"[SerpApi] Detailed SDK Exception mapping: {type(mapped_err).__name__} - {mapped_err}")
-        return _get_mock_transcript(video_id)
+            raise mapped_err
 
 def get_youtube_comments(
     video_id: str, 
@@ -168,8 +166,8 @@ def get_youtube_comments(
     """
     api_key = get_serpapi_key(workspace_id)
     if not api_key:
-        logger.warning(f"[SerpApi] API Key not found. Utilizing mock fallback comments for video {video_id}.")
-        return _get_mock_comments(video_id)
+        logger.error(f"[SerpApi] API Key not found for comments fetch.")
+        raise SerpApiUnauthorizedError("API key not provided for SerpApi Youtube Comments.")
         
     try:
         logger.info(f"[SerpApi] Fetching comments for video: {video_id}...")
@@ -181,108 +179,15 @@ def get_youtube_comments(
         
         if "error" in data or "comments" not in data:
             err_msg = data.get("error", "Unknown error")
-            logger.warning(f"[SerpApi] Comments returned error or missing comments: {err_msg}. Utilizing fallback.")
-            return _get_mock_comments(video_id)
+            raise SerpApiSDKError(f"Comments returned error or missing comments: {err_msg}")
         return dict(data)
     except Exception as e:
-        logger.error(f"[SerpApi] Comments fetch failed for video {video_id}: {e}. Utilizing fallback.")
+        logger.error(f"[SerpApi] Comments fetch failed for video {video_id}: {e}.")
         try:
             _raise_custom_exception(e)
         except Exception as mapped_err:
             logger.error(f"[SerpApi] Detailed SDK Exception mapping: {type(mapped_err).__name__} - {mapped_err}")
-        return _get_mock_comments(video_id)
+            raise mapped_err
 
 
-# ---------------------------------------------------------------------------
-# FALLBACK MOCK DATA GENERATORS
-# ---------------------------------------------------------------------------
 
-def _get_mock_search_results(query: str) -> Dict[str, Any]:
-    return {
-        "video_results": [
-            {
-                "title": f"Hướng dẫn tối ưu CPA quảng cáo đột phá cho {query}",
-                "link": "https://www.youtube.com/watch?v=mockvid0001",
-                "video_id": "mockvid0001",
-                "channel": {"name": "Học Viện Marketing Tech"},
-                "description": f"Video chia sẻ bí quyết viết kịch bản và chạy quảng cáo {query} hiệu quả, tối ưu CPA vượt mong đợi."
-            },
-            {
-                "title": f"Sai lầm đốt tiền khi triển khai {query} - Bài học xương máu",
-                "link": "https://www.youtube.com/watch?v=mockvid0002",
-                "video_id": "mockvid0002",
-                "channel": {"name": "CMO Thực Chiến"},
-                "description": "Chia sẻ các kịch bản quảng cáo thất bại và cách khắc phục để đạt CPA target dưới ngưỡng biên lợi nhuận."
-            },
-            {
-                "title": f"Review G-Agent Tech: Tự động hóa 80% phòng Creative",
-                "link": "https://www.youtube.com/watch?v=mockvid0003",
-                "video_id": "mockvid0003",
-                "channel": {"name": "Review Công Nghệ"},
-                "description": "Đánh giá chi tiết Marketing Agent OS phần mềm tối ưu ads tự trị bằng AI Agents LangGraph."
-            }
-        ]
-    }
-
-def _get_mock_transcript(video_id: str) -> Dict[str, Any]:
-    # Custom transcripts based on mock video ID
-    if video_id == "mockvid0001":
-        snippet = (
-            "Chào mừng mọi người đã quay trở lại. Hôm nay tôi sẽ hướng dẫn các bạn cách tối ưu chi phí chuyển đổi CPA. "
-            "Nếu bạn đang chạy Ads mà CPA tăng vọt, hãy xem ngay 3 giây đầu tiên của video. Hook của bạn phải đánh thẳng vào "
-            "vấn đề của khách hàng. Hãy mua ngay phần mềm Marketing Agent OS của G-Agent Tech để tự động hóa 80% thời gian. "
-            "Chúng tôi cam kết giúp bạn giảm 50% CPA trong tuần đầu tiên. Hãy nhấn vào link dưới mô tả để đăng ký dùng thử ngay hôm nay!"
-        )
-    elif video_id == "mockvid0002":
-        snippet = (
-            "Có rất nhiều người đang chạy quảng cáo sai lầm. Đốt hàng trăm triệu nhưng không ra đơn. Sai lầm lớn nhất "
-            "là kịch bản quá chung chung, không có Call-to-action cụ thể. Rất nhiều kịch bản thất bại vì sến súa, "
-            "không có điểm nhấn hoặc cam kết quá đà 100% không căn cứ. Hãy thiết lập một quy trình an toàn ngân sách "
-            "để bảo vệ dòng tiền của bạn ngay hôm nay."
-        )
-    else:
-        snippet = (
-            "Hôm nay mình sẽ review một công cụ cực hot đó là Marketing Agent OS của G-Agent Tech. "
-            "Điểm nổi bật của phần mềm này là sử dụng hệ thống Multi-Agent LangGraph tự động tối ưu hóa CPA. "
-            "Nó giúp giải phóng 80% thời gian duyệt kịch bản của các sếp CMO bận rộn. Bạn không cần bận tâm về "
-            "Agency thủ công nữa. Liên hệ ngay G-Agent Tech để nhận ưu đãi dùng thử miễn phí."
-        )
-        
-    return {
-        "transcript": [
-            {
-                "start_ms": 200,
-                "end_ms": 10000,
-                "snippet": snippet,
-                "start_time_text": "0:00"
-            }
-        ]
-    }
-
-def _get_mock_comments(video_id: str) -> Dict[str, Any]:
-    if video_id == "mockvid0001":
-        comments = [
-            {"text": "Bí quyết này quá hay, mình đã áp dụng và giảm được kha khá CPA!", "author": "Hải Nam"},
-            {"text": "Phần mềm Marketing Agent OS dùng thử ở đâu thế admin ơi?", "author": "Vinh Nguyễn"},
-            {"text": "Cơ chế tự động hóa LangGraph này có khó cấu hình không ạ?", "author": "Khánh Linh"},
-            {"text": "Tôi đã dùng thử G-Agent Tech và thấy tiết kiệm được rất nhiều thời gian duyệt bài.", "author": "Minh Trần"},
-            {"text": "Cam kết giảm 50% CPA nghe hơi quá nhưng dùng thử xem thế nào.", "author": "Hoàng Anh"}
-        ]
-    elif video_id == "mockvid0002":
-        comments = [
-            {"text": "Bài học rất thực tế. K kịch bản quảng cáo cũ của mình đúng là sến súa thật, hèn gì CPA cao vút.", "author": "Quốc Huy"},
-            {"text": "Chạy ads bây giờ đắt quá, đúng là bị phụ thuộc agency mệt mỏi.", "author": "Thu Trang"},
-            {"text": "Lỗi cấm từ khóa của Facebook quét gắt thật, có cách nào tự động kiểm tra trước không?", "author": "Tuấn Anh"},
-            {"text": "Video rất bổ ích, mong kênh ra thêm các anti-pattern cần tránh nữa.", "author": "Hương Giang"},
-            {"text": "Nên tập trung vào số liệu thực tế thay vì quảng cáo hoa mỹ.", "author": "Đức Mạnh"}
-        ]
-    else:
-        comments = [
-            {"text": "Review chi tiết quá. Mình cũng đang tìm giải pháp giải phóng thời gian cho phòng creative.", "author": "Văn Dũng"},
-            {"text": "Marketing Agent OS giá bao nhiêu vậy G-Agent Tech?", "author": "Thanh Hằng"},
-            {"text": "Công cụ này đúng là điểm neo kinh tế tuyệt vời cho doanh nghiệp nhỏ.", "author": "Sơn Tùng"},
-            {"text": "Chạy thử nghiệm LangGraph thấy rất ổn định, hệ thống online 100%.", "author": "Mai Phương"},
-            {"text": "Giao diện Chainlit trực quan, dễ dùng cho CMO duyệt camp.", "author": "Ngọc Hải"}
-        ]
-        
-    return {"comments": comments}

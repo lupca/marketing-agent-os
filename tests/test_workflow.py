@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal
+from core import pipeline_tracker
 from core.models import (
     Workspace, ProductService, MarketingCampaign,
-    PlatformVariant, AdMapper, AIInsightPending, RAGChunk
+    PlatformVariant, AdMapper, AIInsightPending, RAGChunk,
+    SocialAccount, CampaignSocialAccount
 )
 from core.bandit_orchestrator import compute_mab_beliefs, trigger_autonomous_generation
 from tests.mock_ollama import LocalOllamaTestCase
@@ -21,6 +23,9 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
     def setUp(self):
         super().setUp()
         self.db = SessionLocal()
+        
+        # Explicitly set execution mode to live for workflow tests to trigger publisher DB writes
+        pipeline_tracker.set_execution_mode("live")
         
         # Verify that the database is already seeded with "TOP VN SPORTS Workspace"
         self.ws = self.db.query(Workspace).filter_by(name="TOP VN SPORTS Workspace").first()
@@ -73,6 +78,9 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         self.db.commit()
         
     def tearDown(self):
+        # Restore default shadow mode
+        pipeline_tracker.set_execution_mode("shadow")
+        
         # Clean up campaign and generated variants
         self.db.query(AdMapper).delete()
         self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).delete()
@@ -109,7 +117,11 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         
         # Execute the stateless pipeline
         import asyncio
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         task = trigger_autonomous_generation(
             workspace_id=str(self.ws.id),
             campaign_id=str(self.camp.id),
@@ -141,6 +153,118 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         
         print(" -> Uninterrupted stateless execution pipeline ran to completion successfully!")
         print(" -> Database variant persistency, AdMapper indexing, and Pending Insights validated successfully!")
+
+    def test_omnichannel_platform_specific_generation(self):
+        """Verify that the pipeline generates, validates, and publishes mixed platform variants (Facebook text and TikTok video scripts)."""
+        print(f"\n[START OMNICHANNEL PLATFORM SPECIFIC GENERATION TEST] Campaign ID: {self.camp.id}")
+        
+        # 1. Create a Facebook social account and link it
+        fb_acc = SocialAccount(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            platform="facebook",
+            account_name="Test Facebook Page",
+            account_id="fake_fb_account_id_123",
+            access_token="fake_token",
+            status="active"
+        )
+        self.db.add(fb_acc)
+        
+        # 2. Create a TikTok social account and link it
+        tt_acc = SocialAccount(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            platform="tiktok",
+            account_name="Test TikTok Account",
+            account_id="fake_tt_account_id_123",
+            access_token="fake_token",
+            status="active"
+        )
+        self.db.add(tt_acc)
+        self.db.commit()
+        
+        # 3. Create campaign many-to-many links
+        link_fb = CampaignSocialAccount(
+            id=uuid.uuid4(),
+            campaign_id=self.camp.id,
+            social_account_id=fb_acc.id
+        )
+        link_tt = CampaignSocialAccount(
+            id=uuid.uuid4(),
+            campaign_id=self.camp.id,
+            social_account_id=tt_acc.id
+        )
+        self.db.add(link_fb)
+        self.db.add(link_tt)
+        self.db.commit()
+        
+        # Verify links exist
+        links = self.db.query(CampaignSocialAccount).filter_by(campaign_id=self.camp.id).all()
+        self.assertEqual(len(links), 2)
+        
+        # 4. Execute the stateless pipeline
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        task = trigger_autonomous_generation(
+            workspace_id=str(self.ws.id),
+            campaign_id=str(self.camp.id),
+            product_id=str(self.prod.id),
+            db=self.db
+        )
+        result_state = loop.run_until_complete(task)
+        
+        # Verify graph completed fully
+        self.assertEqual(result_state["sop_stage"], "completed")
+        variants = result_state["generated_variants"]
+        self.assertTrue(len(variants) > 0)
+        
+        # Verify we generated variants for BOTH platforms
+        platforms = [v.get("platform") for v in variants]
+        self.assertIn("facebook", platforms)
+        self.assertIn("tiktok", platforms)
+        
+        # Verify content type and format logic
+        for v in variants:
+            platform = v.get("platform")
+            content_type = v.get("content_type")
+            copy = v.get("adapted_copy", "")
+            
+            if platform == "tiktok":
+                self.assertEqual(content_type, "video_script")
+                # TikTok video script should be structured with Visual/Audio or contain cues
+                self.assertTrue(("[Visual" in copy or "[Audio" in copy) or "Visual" in copy)
+            else:
+                self.assertEqual(platform, "facebook")
+                self.assertEqual(content_type, "text")
+                # Facebook variant should be regular text
+                self.assertNotIn("[Visual]", copy)
+                
+        # 5. Verify database PlatformVariant records contain the correct content_type
+        db_variants = self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).all()
+        self.assertTrue(len(db_variants) > 0)
+        
+        tiktok_db_vars = [pv for pv in db_variants if pv.platform == "tiktok"]
+        fb_db_vars = [pv for pv in db_variants if pv.platform == "facebook"]
+        
+        self.assertTrue(len(tiktok_db_vars) > 0)
+        self.assertTrue(len(fb_db_vars) > 0)
+        
+        for pv in tiktok_db_vars:
+            self.assertEqual(pv.content_type, "video_script")
+        for pv in fb_db_vars:
+            self.assertEqual(pv.content_type, "text")
+            
+        print(" -> Mixed Facebook text and TikTok video script generation completely verified!")
+        
+        # Clean up accounts and campaign links
+        self.db.query(CampaignSocialAccount).filter_by(campaign_id=self.camp.id).delete()
+        self.db.delete(fb_acc)
+        self.db.delete(tt_acc)
+        self.db.commit()
 
 if __name__ == "__main__":
     unittest.main()

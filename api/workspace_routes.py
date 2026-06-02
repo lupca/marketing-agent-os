@@ -4,18 +4,27 @@ from sqlalchemy.sql import func
 import uuid
 import logging
 from core.dependencies import get_db
-from core.models import Workspace, WorkspaceIntegration, AIModel, SocialAccount
+from core.models import Workspace, WorkspaceIntegration, AIModel, SocialAccount, MarketingCampaign
 from core.schemas import WorkspaceIntegrationSchema, AIModelSchema
 from typing import List
 
 logger = logging.getLogger("workspace_routes")
 
+def get_active_workspace_id(request: Request) -> uuid.UUID:
+    ws_id_str = request.query_params.get("workspace_id") or request.headers.get("x-workspace-id")
+    if ws_id_str:
+        try:
+            return uuid.UUID(ws_id_str)
+        except ValueError:
+            pass
+    return uuid.UUID("00000000-0000-0000-0000-000000000002")
+
 workspace_router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
 
 @workspace_router.get("/settings")
-async def get_settings(db: Session = Depends(get_db)):
+async def get_settings(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         ws = db.query(Workspace).filter_by(id=ws_id).first()
         return ws.settings if (ws and ws.settings) else {}
     except Exception as e:
@@ -41,12 +50,14 @@ async def update_settings(request: Request, db: Session = Depends(get_db)):
         if "enable_thinking" in filtered:
             filtered["enable_thinking"] = bool(filtered["enable_thinking"])
             
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         ws = db.query(Workspace).filter_by(id=ws_id).first()
         if ws:
             current_settings = dict(ws.settings) if ws.settings else {}
             current_settings.update(filtered)
             ws.settings = current_settings
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(ws, "settings")
             db.commit()
             return {"status": "success"}
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -56,9 +67,9 @@ async def update_settings(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.get("/integrations")
-async def get_integrations(db: Session = Depends(get_db)):
+async def get_integrations(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         integrations = db.query(WorkspaceIntegration).filter_by(workspace_id=ws_id).order_by(
             WorkspaceIntegration.platform_name, WorkspaceIntegration.config_key
         ).all()
@@ -81,7 +92,7 @@ async def get_integrations(db: Session = Depends(get_db)):
 async def update_integration(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
     
         record_id = body.get("id")
         platform_name = body.get("platform_name")
@@ -147,9 +158,9 @@ async def delete_integration(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.get("/models")
-async def get_models(db: Session = Depends(get_db)):
+async def get_models(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
         # Note: Logic to seed default models could be moved to a service or seed script.
         # For now, let's keep it here but using the new response model.
@@ -170,7 +181,7 @@ async def get_models(db: Session = Depends(get_db)):
 async def add_model(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         
         new_model = AIModel(
             workspace_id=ws_id,
@@ -242,9 +253,9 @@ async def delete_model(model_uuid: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.get("/social-accounts")
-async def get_social_accounts(db: Session = Depends(get_db)):
+async def get_social_accounts(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         accounts = db.query(SocialAccount).filter_by(workspace_id=ws_id).order_by(
             SocialAccount.platform, SocialAccount.account_name
         ).all()
@@ -270,7 +281,7 @@ async def get_social_accounts(db: Session = Depends(get_db)):
 async def save_social_account(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+        ws_id = get_active_workspace_id(request)
         
         record_id = body.get("id")
         platform = body.get("platform")
@@ -340,4 +351,33 @@ async def delete_social_account(account_uuid: str, db: Session = Depends(get_db)
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting social account: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.get("/list")
+async def list_workspaces(db: Session = Depends(get_db)):
+    try:
+        workspaces = db.query(Workspace).order_by(Workspace.name).all()
+        data = [{"id": str(w.id), "name": w.name} for w in workspaces]
+        return {"status": "success", "data": data}
+    except Exception as e:
+        logger.error(f"Error listing workspaces: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@workspace_router.get("/campaigns")
+async def list_campaigns(workspace_id: str = None, db: Session = Depends(get_db)):
+    try:
+        query = db.query(MarketingCampaign)
+        if workspace_id:
+            query = query.filter_by(workspace_id=uuid.UUID(workspace_id))
+        campaigns = query.order_by(MarketingCampaign.name).all()
+        data = [{
+            "id": str(c.id),
+            "name": c.name,
+            "workspace_id": str(c.workspace_id),
+            "product_id": str(c.product_id) if c.product_id else None,
+            "campaign_type": c.campaign_type
+        } for c in campaigns]
+        return {"status": "success", "data": data}
+    except Exception as e:
+        logger.error(f"Error listing campaigns: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

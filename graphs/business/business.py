@@ -81,7 +81,9 @@ def performance_node(state: AgencyState) -> dict:
     with get_session() as db:
     
         workspace_id = state.get("workspace_id")
-        target_cpa = state.get("target_cpa", 1050000.0) # Fallback to analyst anchor
+        target_cpa = state.get("target_cpa")
+        if target_cpa is None:
+            raise ValueError("Thiếu cấu hình Target CPA trong state.")
     
         # Query running platform variants in the active workspace
         variants = db.query(PlatformVariant).filter(
@@ -205,17 +207,6 @@ def performance_node(state: AgencyState) -> dict:
         except Exception as e:
             logger.error(f"Error calling LLM for performance report: {e}")
             raise ValueError("Dữ liệu AI trả về không hợp lệ, không thể tiếp tục") from e
-            report = (
-                f"### Báo Cáo Hiệu Suất Chiến Dịch (Fallback từ CSDL)\n\n"
-                f"Do sự cố kết nối LLM, dưới đây là tóm tắt thô từ CSDL:\n\n"
-                f"| Kênh | Lượt xem | Lượt thích | CPA thực tế | CPA Target | Trạng thái tối ưu |\n"
-                f"| :--- | :--- | :--- | :--- | :--- | :--- |\n"
-            )
-            for v in variants:
-                metrics = v.meta_data or {}
-                cpa = metrics.get("metric_cpa", 0.0)
-                report += f"| {v.platform.upper()} | {v.metric_views or 0:,} | {v.metric_likes or 0:,} | {cpa:,.0f} VNĐ | {target_cpa:,.0f} VNĐ | {v.publish_status.upper()} |\n"
-            
         # Log the decision to generate the report
         log_decision(
             workspace_id=workspace_id,
