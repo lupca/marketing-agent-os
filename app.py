@@ -90,64 +90,39 @@ async def cockpit_websocket_endpoint(websocket: WebSocket):
         logger.error(f"Cockpit WebSocket connection error: {e}")
         broadcaster.disconnect(websocket)
 
-# Mount public directory for assets if it exists
-public_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "public"))
-if os.path.exists(public_path):
-    fastapi_app.mount("/public", StaticFiles(directory=public_path), name="public")
+# Serve redirects to Next.js UI frontend
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
-# Serve UI template pages to preserve BI Dashboard integration
+# Mount storage directory under /public/storage for media files (mock storage compatibility)
+storage_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "storage"))
+os.makedirs(storage_path, exist_ok=True)
+fastapi_app.mount("/public/storage", StaticFiles(directory=storage_path), name="storage")
+
 @fastapi_app.get("/", response_class=RedirectResponse)
 async def root():
-    return RedirectResponse(url="/dashboard")
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
-@fastapi_app.get("/dashboard", response_class=HTMLResponse)
+@fastapi_app.get("/dashboard", response_class=RedirectResponse)
 async def serve_dashboard():
-    template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "dashboard.html"))
-    if not os.path.exists(template_path):
-        return HTMLResponse(content="<h1>CMO BI Dashboard Template Not Found</h1><p>Please ensure data/templates/dashboard.html exists.</p>", status_code=404)
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
-@fastapi_app.get("/settings", response_class=HTMLResponse)
-@fastapi_app.get("/settings/integrations", response_class=HTMLResponse)
+@fastapi_app.get("/settings", response_class=RedirectResponse)
+@fastapi_app.get("/settings/integrations", response_class=RedirectResponse)
 async def serve_settings_integrations():
-    template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings-integrations.html"))
-    if not os.path.exists(template_path):
-        template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings.html"))
-    if not os.path.exists(template_path):
-        return HTMLResponse(content="<h1>Settings Page Template Not Found</h1>", status_code=404)
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
-@fastapi_app.get("/settings/models", response_class=HTMLResponse)
+@fastapi_app.get("/settings/models", response_class=RedirectResponse)
 async def serve_settings_models():
-    template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "settings-models.html"))
-    if not os.path.exists(template_path):
-        return HTMLResponse(content="<h1>AI Models Library Template Not Found</h1>", status_code=404)
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
-@fastapi_app.get("/vault", response_class=HTMLResponse)
-@fastapi_app.get("/Vault", response_class=HTMLResponse)
+@fastapi_app.get("/vault", response_class=RedirectResponse)
+@fastapi_app.get("/Vault", response_class=RedirectResponse)
 async def serve_vault():
-    template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "templates", "vault.html"))
-    if not os.path.exists(template_path):
-        return HTMLResponse(content="<h1>Approved Asset Vault Template Not Found</h1>", status_code=404)
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
-@fastapi_app.get("/knowledge-base", response_class=HTMLResponse)
+@fastapi_app.get("/knowledge-base", response_class=RedirectResponse)
 async def serve_knowledge_base():
-    template_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "public", "knowledge-base.html"))
-    if not os.path.exists(template_path):
-        return HTMLResponse(content="<h1>Knowledge Base UI Not Found</h1>", status_code=404)
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
 
 # Health check endpoint
 @fastapi_app.get("/api/health")

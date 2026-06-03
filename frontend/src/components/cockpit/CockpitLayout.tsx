@@ -3,6 +3,7 @@
 // The Autopilot Cockpit — Main layout wrapper with 4 sub-tabs
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Eye, Radio, ShieldAlert, Zap, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { useCockpitWebSocket } from '@/hooks/useCockpitWebSocket';
 import { cockpitApi } from '@/lib/api';
@@ -96,6 +97,14 @@ export default function CockpitLayout() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Back to Dashboard Link */}
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs px-3 py-1.5 rounded-lg font-mono font-bold transition-all cursor-pointer mr-2"
+            >
+              ← Quay lại Dashboard
+            </Link>
+
             {/* Kill switch warning badge */}
             {killSwitchActive && (
               <div className="flex items-center gap-1.5 bg-red-500/20 border border-red-500/40 text-red-300 text-xs px-3 py-1.5 rounded-lg font-bold animate-pulse">
