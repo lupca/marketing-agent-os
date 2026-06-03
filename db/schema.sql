@@ -167,6 +167,7 @@ CREATE TABLE content_briefs (
     key_message_variation TEXT,
     call_to_action_direction TEXT,
     brief TEXT,
+    platform_meta JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

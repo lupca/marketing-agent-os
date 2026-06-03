@@ -180,7 +180,7 @@ def action_selector_node(state: AgencyState) -> dict:
 def creative_generation_node(state: AgencyState) -> dict:
     """
     Creative Generation Node (Copywriter Master).
-    Queries database directly to inject Top VN Sports brand context without hallucinatory data.
+    Queries database directly to inject TOPVNSPORT brand context without hallucinatory data.
 
     Instrumentation:
         - Records start/complete/fail to pipeline_node_executions via pipeline_tracker.
@@ -283,7 +283,7 @@ def creative_generation_node(state: AgencyState) -> dict:
                     """
                 
                 prompt = f"""
-                Nhiệm vụ: Bạn là Copywriter cao cấp cho thương hiệu Top VN Sports.
+                Nhiệm vụ: Bạn là Copywriter cao cấp cho thương hiệu TOPVNSPORT.
                 Sản phẩm: {product_name}
                 USP: {product_usp}
                 Khách hàng mục tiêu gặp nỗi đau: {persona_pains}

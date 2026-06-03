@@ -48,7 +48,7 @@ logger = logging.getLogger("pipeline_tracker")
 _cockpit_broadcaster = None
 
 # In-process execution mode — persisted to DB on every change
-_execution_mode_cache: Dict[str, str] = {"mode": "shadow"}
+_execution_mode_cache: Dict[str, str] = {"mode": "live"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

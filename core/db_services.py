@@ -255,7 +255,10 @@ def save_publisher_state(
             adapted_copy=v.get("adapted_copy", ""),
             publish_status="published",
             content_type=v.get("content_type", "text"),
-            meta_data={"angle_name": v.get("angle_name")}
+            meta_data={
+                "angle_name": v.get("angle_name"),
+                "destination_link": v.get("destination_link") or "https://shopee.vn/topvnsport"
+            }
         )
         db.add(pv)
         db.flush() # Force parent inserts to flush so Postgres registers and locks the foreign key before child insert

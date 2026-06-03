@@ -27,13 +27,13 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         # Explicitly set execution mode to live for workflow tests to trigger publisher DB writes
         pipeline_tracker.set_execution_mode("live")
         
-        # Verify that the database is already seeded with "TOP VN SPORTS Workspace"
-        self.ws = self.db.query(Workspace).filter_by(name="TOP VN SPORTS Workspace").first()
+        # Verify that the database is already seeded with "TOPVNSPORT Workspace"
+        self.ws = self.db.query(Workspace).filter_by(name="TOPVNSPORT Workspace").first()
         if not self.ws:
             # Fallback mock setup if DB seeding ran out of context
             self.ws = Workspace(
                 id=uuid.uuid4(),
-                name="TOP VN SPORTS Workspace",
+                name="TOPVNSPORT Workspace",
                 settings={}
             )
             self.db.add(self.ws)
@@ -46,7 +46,7 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
             brand = BrandIdentity(
                 id=uuid.uuid4(),
                 workspace_id=self.ws.id,
-                brand_name="TOP VN SPORTS (ShopVNB)",
+                brand_name="TOPVNSPORT (TOPVNSPORT)",
                 voice_and_tone="Duy trì một giọng điệu truyền thông chuyên gia thân thiện.",
                 dos_and_donts={"dos": ["hàng chính hãng"], "donts": ["hàng giả"]}
             )
@@ -57,7 +57,7 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
                 id=uuid.uuid4(),
                 workspace_id=self.ws.id,
                 brand_id=brand.id,
-                name="Vợt cầu lông VNB V200i",
+                name="Vợt cầu lông TOPVNSPORT V200i",
                 description="Đũa dẻo trợ lực tối đa",
                 usp="Khung sợi carbon chịu sức căng cao"
             )

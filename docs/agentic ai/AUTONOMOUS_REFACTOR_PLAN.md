@@ -48,7 +48,7 @@ graph TD
     %% External Trigger
     Cron[Airflow / Cronjob<br>Đồng bộ Data 24h/48h] --> Backend[Python Backend<br>Xử lý Toán học & Gọi Graph]
     
-    Backend -. 1. Tính toán MAB & Priors từ OLAP .-> DB[(OLAP Database<br>Metrics & Beliefs)]
+    Backend -. 1 Tính toán MAB & Priors từ OLAP .-> DB[OLAP Database<br>Metrics & Beliefs]
     
     %% LangGraph Execution
     Backend == "2. Trigger Graph\n(Truyền Priors)" ==> START((Bắt đầu Graph))

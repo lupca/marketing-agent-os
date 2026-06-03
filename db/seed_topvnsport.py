@@ -1,4 +1,4 @@
-# db/seed_vnb.py
+# db/seed_topvnsport.py
 import os
 import sys
 import uuid
@@ -16,9 +16,9 @@ from core.models import (
 )
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("db_vnb_seeder")
+logger = logging.getLogger("db_topvnsport_seeder")
 
-def seed_vnb_data():
+def seed_topvnsport_data():
     workspace_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
     
     with get_session() as db:
@@ -51,7 +51,7 @@ def seed_vnb_data():
         # 3. SEED BRAND IDENTITY
         brand = BrandIdentity(
             workspace_id=workspace_id,
-            brand_name="ShopVNB / VNB Sports",
+            brand_name="TOPVNSPORT",
             core_messaging={
                 "slogan": "Together we can (Cùng nhau chúng ta có thể)",
                 "mission": "Cam kết mang đến những sản phẩm, dịch vụ chất lượng tốt nhất phục vụ cho người chơi thể thao để nâng cao sức khỏe của chính mình.",
@@ -59,7 +59,7 @@ def seed_vnb_data():
                 "business_philosophy": "Lấy chất lượng và sự sáng tạo làm bạn đồng hành; xem khách hàng là trung tâm để không ngừng cải tiến sản phẩm và dịch vụ."
             },
             visual_assets={
-                "logo_design": "Chữ 'V' cách điệu cánh chim hoặc quả cầu lông đang chuyển động nhanh.",
+                "logo_design": "Chữ T và V cách điệu mạnh mẽ, gợi hình ảnh quả cầu lông đang chuyển động nhanh.",
                 "colors": ["Navy Blue (Xanh dương đậm)", "Orange (Cam)"],
                 "typography": "Sans-serif dày bản, mạnh mẽ, hơi nghiêng phải biểu thị tốc độ.",
                 "signage": "Chất liệu Aluminium cao cấp, chữ nổi Mica gắn LED cường độ cao."
@@ -77,21 +77,21 @@ def seed_vnb_data():
                 ],
                 "donts": [
                     "Tuyệt đối không bán hàng nhái, hàng kém chất lượng.",
-                    "Không tâng bốc sản phẩm VNB phi thực tế hoặc hạ thấp đối thủ.",
+                    "Không tâng bốc sản phẩm TOPVNSPORT phi thực tế hoặc hạ thấp đối thủ.",
                     "Tránh ngôn từ kích động, gây tranh cãi tiêu cực.",
                     "Nghiêm cấm nhượng quyền tự ý đưa sản phẩm ngoài hệ thống vào kinh doanh."
                 ]
             },
             content_pillars={
                 "Knowledge": "Chia sẻ Kiến thức & Kỹ thuật chơi cầu, căng vợt chuẩn.",
-                "Review": "Đánh giá & Trải nghiệm Sản phẩm sâu sắc (Yonex, Lining, VNB...).",
+                "Review": "Đánh giá & Trải nghiệm Sản phẩm sâu sắc (Yonex, Lining, TOPVNSPORT...).",
                 "Community": "Gắn kết Cộng đồng anh em lông thủ, khoảnh khắc ấn tượng.",
                 "News": "Tin tức Doanh nghiệp & Khuyến mãi, khai trương chi nhánh."
             }
         )
         db.add(brand)
         db.flush() 
-        logger.info("Seeded Brand Identity: VNB Sports")
+        logger.info("Seeded Brand Identity: TOPVNSPORT")
 
         # 4. SEED CUSTOMER PERSONA
         persona = CustomerPersona(
@@ -126,16 +126,16 @@ def seed_vnb_data():
         logger.info("Seeded Customer Persona: Lông thủ phong trào")
 
         # 5. SEED PRODUCTS & SERVICES
-        vnb_rackets = ProductService(
+        topvnsport_rackets = ProductService(
             workspace_id=workspace_id,
             brand_id=brand.id,
-            name="Dòng vợt cầu lông thương hiệu riêng VNB Sports (V200i, V200, V88, TC88)",
+            name="Dòng vợt cầu lông thương hiệu riêng TOPVNSPORT (V200i, V200, V88, TC88)",
             description="Vợt cầu lông được tối ưu về thiết kế và thông số cho thể trạng người Việt, phục vụ chuyên biệt người chơi phong trào.",
             usp="Vợt chính hãng Carbon siêu bền dưới 1 triệu, đũa dẻo trợ lực tối đa, sức căng vượt trội đến 30 LBS.",
             key_features={
-                "VNB V200i Hồng": "5U (75g), Nặng đầu, Đũa dẻo, Carbon High Modulus Graphite.",
-                "VNB V200 Xanh/Đỏ": "4U (84g), Công thủ toàn diện hoặc Thiên công, Khung khí động học.",
-                "VNB V88": "4U, Hơi nặng đầu, Đàn hồi nhanh, Smash uy lực."
+                "TOPVNSPORT V200i Hồng": "5U (75g), Nặng đầu, Đũa dẻo, Carbon High Modulus Graphite.",
+                "TOPVNSPORT V200 Xanh/Đỏ": "4U (84g), Công thủ toàn diện hoặc Thiên công, Khung khí động học.",
+                "TOPVNSPORT V88": "4U, Hơi nặng đầu, Đàn hồi nhanh, Smash uy lực."
             },
             key_benefits=[
                 "Trợ lực tối đa cho cổ tay, phòng tránh chấn thương khớp vai.",
@@ -144,12 +144,12 @@ def seed_vnb_data():
             ],
             default_offer="Tặng 02 quấn cán + túi đựng chuyên dụng. Đổi mới 1-đổi-1 nếu lỗi nhà sản xuất."
         )
-        db.add(vnb_rackets)
+        db.add(topvnsport_rackets)
 
         stringing_service = ProductService(
             workspace_id=workspace_id,
             brand_id=brand.id,
-            name="Dịch vụ đan vợt và bảo dưỡng tiêu chuẩn kỹ thuật cao tại ShopVNB",
+            name="Dịch vụ đan vợt và bảo dưỡng tiêu chuẩn kỹ thuật cao tại TOPVNSPORT",
             description="Dịch vụ giá trị gia tăng thực hiện bởi kỹ thuật viên kinh nghiệm tại hệ thống cửa hàng vật lý.",
             usp="Quy trình căng vợt chuẩn 4 nút Yonex trên máy điện tử hiện đại, đảm bảo lực căng đồng đều tuyệt đối.",
             key_features={
@@ -174,7 +174,7 @@ def seed_vnb_data():
             fb_account = SocialAccount(
                 workspace_id=workspace_id,
                 platform="facebook",
-                account_name="VNB Sports Ad Account",
+                account_name="TOPVNSPORT Ad Account",
                 account_id="act_10509876",
                 app_id="dummy_app_id",
                 app_secret="dummy_app_secret",
@@ -185,7 +185,7 @@ def seed_vnb_data():
             db.commit()
             logger.info("Seeded Mock Facebook Social Account")
 
-        logger.info("Successfully seeded all VNB Sports data!")
+        logger.info("Successfully seeded all TOPVNSPORT data!")
 
 if __name__ == "__main__":
-    seed_vnb_data()
+    seed_topvnsport_data()

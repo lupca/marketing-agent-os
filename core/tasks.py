@@ -314,11 +314,14 @@ def publish_to_social(self, variant_id: str):
             
             # 3. Retrieve Credentials from Workspace Integration configs (or environment variables)
             from core.utils import get_integration_config
-            integration_configs = get_integration_config(variant.workspace_id, "upload-post")
+            configs_post = get_integration_config(variant.workspace_id, "upload-post")
+            configs_pos = get_integration_config(variant.workspace_id, "upload-pos")
+            integration_configs = {**configs_pos, **configs_post}
             
             api_key = integration_configs.get("api_key")
-            if not api_key:
-                raise UploadPostAuthError("UPLOAD_POST_API_KEY is not configured in workspace integrations or env.")
+            is_upload_post_active = bool(api_key and api_key != "dummy_key")
+            if not is_upload_post_active and platform != "facebook":
+                raise UploadPostAuthError("UPLOAD_POST_API_KEY is not configured and native fallback is only supported for facebook.")
             
             user = integration_configs.get("user") or "topvnsport"
             config_fb_page_id = integration_configs.get("facebook_page_id")
@@ -334,17 +337,26 @@ def publish_to_social(self, variant_id: str):
                     logger.info(f"[publish_to_social] Using configured Facebook page ID: {fb_page_id} from integrations.")
                 else:
                     try:
-                        headers = {"Authorization": f"Apikey {api_key}"}
-                        response = requests.get("https://api.upload-post.com/api/uploadposts/facebook/pages", headers=headers, timeout=20)
-                        if response.status_code == 200:
-                            pages_data = response.json()
-                            pages = pages_data.get("pages", [])
-                            for p in pages:
-                                name = p.get("name", "").lower()
-                                if "top vn sport" in name or "topvnsport" in name:
-                                    fb_page_id = p.get("id")
-                                    logger.info(f"[publish_to_social] Resolved Facebook page ID: {fb_page_id} for name: {p.get('name')}")
-                                    break
+                        if is_upload_post_active:
+                            headers = {"Authorization": f"Apikey {api_key}"}
+                            response = requests.get("https://api.upload-post.com/api/uploadposts/facebook/pages", headers=headers, timeout=20)
+                            if response.status_code == 200:
+                                pages_data = response.json()
+                                pages = pages_data.get("pages", [])
+                                for p in pages:
+                                    name = p.get("name", "").lower()
+                                    if "top vn sport" in name or "topvnsport" in name:
+                                        fb_page_id = p.get("id")
+                                        logger.info(f"[publish_to_social] Resolved Facebook page ID: {fb_page_id} for name: {p.get('name')}")
+                                        break
+                        else:
+                            from core.models import SocialAccount
+                            account = db.query(SocialAccount).filter_by(workspace_id=variant.workspace_id, platform='facebook').first()
+                            if account and account.access_token:
+                                response = requests.get("https://graph.facebook.com/v19.0/me", params={"access_token": account.access_token}, timeout=20)
+                                if response.status_code == 200:
+                                    fb_page_id = response.json().get("id")
+                                    logger.info(f"[publish_to_social] Resolved Facebook page ID: {fb_page_id} from Native API")
                     except Exception as e:
                         logger.warning(f"[publish_to_social] Failed to dynamically query Facebook pages: {e}")
                     
@@ -378,36 +390,66 @@ def publish_to_social(self, variant_id: str):
                         photos.append(tmp_path)
                         tmp_files.append(tmp_path)
                     
-            # 7. Execute Call to Upload-Post API
-            if is_video_post and photos:
-                # Video publishing (Use the first media file as video)
-                api_res = upload_video(
-                    api_key=api_key,
-                    user=user,
-                    platforms=[platform],
-                    video_path=photos[0],
-                    title=title,
-                    facebook_page_id=fb_page_id
-                )
-            elif photos:
-                # Photos/Carousel publishing
-                api_res = upload_photos(
-                    api_key=api_key,
-                    user=user,
-                    platforms=[platform],
-                    photos=photos,
-                    title=title,
-                    facebook_page_id=fb_page_id
-                )
+            # 7. Execute Call to Upload-Post API or Native API
+            if platform == "facebook" and not is_upload_post_active:
+                logger.info(f"[publish_to_social] Native Facebook Publishing for {variant_id}")
+                from core.models import SocialAccount
+                account = db.query(SocialAccount).filter_by(workspace_id=variant.workspace_id, platform='facebook').first()
+                if not account or not account.access_token:
+                    raise UploadPostAuthError("Missing Facebook access_token for Native API publishing.")
+                token = account.access_token
+                
+                link_url = "https://shopee.vn/topvnsport"
+                if isinstance(variant.meta_data, dict) and variant.meta_data.get("destination_link"):
+                    link_url = variant.meta_data.get("destination_link")
+
+                if is_video_post and photos:
+                    url = f"https://graph.facebook.com/v19.0/{fb_page_id}/videos"
+                    with open(photos[0], "rb") as f:
+                        res = requests.post(url, data={"access_token": token, "description": title}, files={"source": f}, timeout=120)
+                elif photos:
+                    url = f"https://graph.facebook.com/v19.0/{fb_page_id}/photos"
+                    with open(photos[0], "rb") as f:
+                        res = requests.post(url, data={"access_token": token, "message": title}, files={"source": f}, timeout=90)
+                else:
+                    url = f"https://graph.facebook.com/v19.0/{fb_page_id}/feed"
+                    res = requests.post(url, data={"access_token": token, "message": title, "link": link_url}, timeout=60)
+                
+                if res.status_code >= 400:
+                    raise UploadPostServerError(f"Native Meta API error: {res.text}")
+                
+                res_data = res.json()
+                api_res = {"post_id": res_data.get("id"), "results": {"facebook": {"post_id": res_data.get("id")}}, "raw": res_data}
             else:
-                # Text-only publishing
-                api_res = upload_text(
-                    api_key=api_key,
-                    user=user,
-                    platforms=[platform],
-                    title=title,
-                    facebook_page_id=fb_page_id
-                )
+                if is_video_post and photos:
+                    # Video publishing (Use the first media file as video)
+                    api_res = upload_video(
+                        api_key=api_key,
+                        user=user,
+                        platforms=[platform],
+                        video_path=photos[0],
+                        title=title,
+                        facebook_page_id=fb_page_id
+                    )
+                elif photos:
+                    # Photos/Carousel publishing
+                    api_res = upload_photos(
+                        api_key=api_key,
+                        user=user,
+                        platforms=[platform],
+                        photos=photos,
+                        title=title,
+                        facebook_page_id=fb_page_id
+                    )
+                else:
+                    # Text-only publishing
+                    api_res = upload_text(
+                        api_key=api_key,
+                        user=user,
+                        platforms=[platform],
+                        title=title,
+                        facebook_page_id=fb_page_id
+                    )
             
             logger.info(f"[publish_to_social] API Response: {api_res}")
         
@@ -417,7 +459,13 @@ def publish_to_social(self, variant_id: str):
             variant.published_at = func.now()
         
             # If the API returned a post ID or job ID, store it in meta_data and platform_post_id
-            post_id = api_res.get("post_id") or api_res.get("request_id")
+            post_id = None
+            if isinstance(api_res, dict):
+                results = api_res.get("results") or {}
+                if platform in results:
+                    post_id = results.get(platform, {}).get("post_id")
+            if not post_id:
+                post_id = api_res.get("post_id") or api_res.get("request_id")
             if post_id:
                 variant.platform_post_id = str(post_id)
             

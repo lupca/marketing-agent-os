@@ -57,7 +57,7 @@ Acknowledge these instructions and execute Phase 1 and Phase 2 immediately.
 
 ## PHASE 5: DATA SEEDING & TESTING
 2 Once the architecture is refactored, you MUST test the Cold-Start and Context Injection logic.
-3 Locate and execute the SQL script at the following path to seed the PostgreSQL database with the "TOP VN SPORTS"
+3 Locate and execute the SQL script at the following path to seed the PostgreSQL database with the "TOPVNSPORT"
    brand identity, customer personas, and products:
 4
 5 `Target file:` `/root/marketing/marketing-agent-os/docs/agentic ai/brand/seed_topvnsports.sql`

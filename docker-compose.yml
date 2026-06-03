@@ -52,7 +52,7 @@ services:
   celery_worker:
     build: .
     container_name: agent_celery_worker
-    command: celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade
+    command: sh -c "pip install serpapi && celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade"
     depends_on:
       redis:
         condition: service_healthy

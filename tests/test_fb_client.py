@@ -218,29 +218,240 @@ class TestFacebookClientIntegration(unittest.TestCase):
 
     @patch("core.integrations.fb_client.get_fb_client")
     def test_init_facebook_client_fallback(self, mock_get_fb):
-        """Verify init_facebook_client falls back to mock if error occurs."""
+        """Verify init_facebook_client raises RuntimeError if error occurs."""
         mock_get_fb.side_effect = Exception("Auth Failure")
+        
+        with get_session() as db:
+            with self.assertRaises(RuntimeError):
+                init_facebook_client(str(self.workspace_id), db)
+
+    @patch("core.integrations.fb_client.get_fb_client")
+    def test_init_facebook_client_credentials_fallback(self, mock_get_fb):
+        """Verify init_facebook_client returns None for api but proceeds when credentials are not configured."""
+        mock_get_fb.side_effect = ValueError("Facebook credentials (app_id, app_secret, access_token) are not fully configured")
         
         with get_session() as db:
             api, acc_id, use_real = init_facebook_client(str(self.workspace_id), db)
             self.assertIsNone(api)
-            self.assertEqual(acc_id, "act_10509876_mock")
-            self.assertFalse(use_real)
+            self.assertEqual(acc_id, "mock_publisher_account")
+            self.assertTrue(use_real)
 
-    @patch("facebook_business.adobjects.adcreative.AdCreative.remote_create")
-    def test_batch_create_creatives_success(self, mock_remote_create):
-        """Verify batch_create_creatives successfully builds and runs batch calls."""
+    @patch("core.utils.get_integration_config")
+    @patch("time.sleep", return_value=None)
+    @patch("core.ai_clients.upload_text")
+    @patch("facebook_business.adobjects.adcreative.AdCreative.remote_create", autospec=True)
+    def test_batch_create_creatives_success(self, mock_remote_create, mock_upload_text, mock_sleep, mock_get_config):
+        """Verify batch_create_creatives successfully runs sequential calls for Upload-Post API and Creatives with dummy token (no sleep)."""
         mock_api = MagicMock()
-        mock_batch = MagicMock()
-        mock_api.new_batch.return_value = mock_batch
+        mock_api._session.access_token = "dummy_token"
+        mock_get_config.return_value = {"facebook_page_id": "1036098656250618", "api_key": "active_api_key"}
         
-        variants = [{"variant_id": str(uuid.uuid4()), "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        def mock_creative_call(*args, **kwargs):
+            if args:
+                args[0]['id'] = "creative_id_456"
+            return args[0] if args else None
+        mock_remote_create.side_effect = mock_creative_call
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
         
         res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
         
-        mock_api.new_batch.assert_called_once()
-        mock_batch.execute.assert_called_once()
+        mock_upload_text.assert_called_once()
         mock_remote_create.assert_called_once()
+        mock_sleep.assert_not_called()
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["creative_id"], "creative_id_456")
+
+    @patch("core.utils.get_integration_config")
+    @patch("time.sleep", return_value=None)
+    @patch("core.ai_clients.upload_text")
+    @patch("facebook_business.adobjects.adcreative.AdCreative.remote_create", autospec=True)
+    @patch("core.integrations.fb_client.requests.get")
+    def test_batch_create_creatives_polling_success(self, mock_get, mock_remote_create, mock_upload_text, mock_sleep, mock_get_config):
+        """Verify batch_create_creatives polls Meta Graph API and succeeds immediately on 200 OK."""
+        mock_api = MagicMock()
+        mock_api._session.access_token = "real_access_token"
+        mock_get_config.return_value = {"facebook_page_id": "1036098656250618", "api_key": "active_api_key"}
+        
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        # Mock requests.get to return 200 OK
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_get.return_value = mock_resp
+        
+        def mock_creative_call(*args, **kwargs):
+            if args:
+                args[0]['id'] = "creative_id_456"
+            return args[0] if args else None
+        mock_remote_create.side_effect = mock_creative_call
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
+        
+        mock_upload_text.assert_called_once_with(
+            api_key="active_api_key",
+            user="topvnsport",
+            platforms=["facebook"],
+            title="Variant Copy\n\n👉 Chi tiết sản phẩm: https://shopee.vn/topvnsport",
+            facebook_page_id="1036098656250618"
+        )
+        mock_get.assert_called_once()
+        mock_sleep.assert_not_called()
+        self.assertEqual(res[0]["creative_id"], "creative_id_456")
+
+    @patch("core.utils.get_integration_config")
+    @patch("time.sleep", return_value=None)
+    @patch("core.ai_clients.upload_text")
+    @patch("facebook_business.adobjects.adcreative.AdCreative.remote_create", autospec=True)
+    @patch("core.integrations.fb_client.requests.get")
+    def test_batch_create_creatives_polling_retry_success(self, mock_get, mock_remote_create, mock_upload_text, mock_sleep, mock_get_config):
+        """Verify batch_create_creatives polls Meta Graph API, retries on initial failure, and succeeds on second attempt."""
+        mock_api = MagicMock()
+        mock_api._session.access_token = "real_access_token"
+        mock_get_config.return_value = {"facebook_page_id": "1036098656250618", "api_key": "active_api_key"}
+        
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        # Mock requests.get to return 400 (not ready yet) then 200 OK (ready)
+        mock_resp_fail = MagicMock()
+        mock_resp_fail.status_code = 400
+        mock_resp_fail.text = "Not ready"
+        
+        mock_resp_ok = MagicMock()
+        mock_resp_ok.status_code = 200
+        
+        mock_get.side_effect = [mock_resp_fail, mock_resp_ok]
+        
+        def mock_creative_call(*args, **kwargs):
+            if args:
+                args[0]['id'] = "creative_id_456"
+            return args[0] if args else None
+        mock_remote_create.side_effect = mock_creative_call
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
+        
+        mock_upload_text.assert_called_once()
+        self.assertEqual(mock_get.call_count, 2)
+        mock_sleep.assert_called_once_with(2)
+        self.assertEqual(res[0]["creative_id"], "creative_id_456")
+
+    @patch("core.utils.get_integration_config")
+    @patch("core.ai_clients.upload_text")
+    def test_batch_create_creatives_post_failure(self, mock_upload_text, mock_get_config):
+        """Verify batch_create_creatives handles upload_text failure gracefully."""
+        mock_api = MagicMock()
+        mock_get_config.return_value = {"facebook_page_id": "1036098656250618", "api_key": "active_api_key"}
+        mock_upload_text.side_effect = Exception("Upload Post Failed")
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
+        self.assertEqual(res[0]["creative_id"], None)
+        self.assertIn("Upload Post Failed", res[0]["error"])
+
+    @patch("core.utils.get_integration_config")
+    @patch("core.ai_clients.upload_text")
+    def test_batch_create_creatives_without_ads_api(self, mock_upload_text, mock_get_config):
+        """Verify batch_create_creatives publishes the post but skips creative creation if Ads API client is None."""
+        mock_get_config.return_value = {"facebook_page_id": "1036098656250618", "api_key": "active_api_key"}
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        # Call batch_create_creatives with api=None
+        res = batch_create_creatives(None, "act_123456", str(self.workspace_id), variants)
+        
+        mock_upload_text.assert_called_once()
+        self.assertEqual(res[0]["creative_id"], None)
+        self.assertEqual(res[0]["error"], None)
+
+    @patch("core.utils.get_integration_config")
+    @patch("core.ai_clients.upload_text")
+    @patch("core.integrations.fb_client.requests.get")
+    def test_batch_create_creatives_dynamic_page_resolution(self, mock_requests_get, mock_upload_text, mock_get_config):
+        """Verify batch_create_creatives resolves page_id dynamically from API if not in DB config."""
+        mock_get_config.return_value = {"api_key": "real_api_key_123"}
+        
+        # Mock requests.get to return Facebook Pages
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "pages": [
+                {"id": "61580803074671", "name": "Top VN Sport Page"}
+            ]
+        }
+        mock_requests_get.return_value = mock_resp
+        
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        res = batch_create_creatives(None, "act_123456", str(self.workspace_id), variants)
+        
+        mock_requests_get.assert_called_once()
+        mock_upload_text.assert_called_once_with(
+            api_key="real_api_key_123",
+            user="topvnsport",
+            platforms=["facebook"],
+            title="Variant Copy\n\n👉 Chi tiết sản phẩm: https://shopee.vn/topvnsport",
+            facebook_page_id="61580803074671"
+        )
+        self.assertEqual(res[0]["creative_id"], None)
+        self.assertEqual(res[0]["error"], None)
+
+    @patch("core.utils.get_integration_config")
+    @patch("core.ai_clients.upload_text")
+    @patch("core.integrations.fb_client.requests.get")
+    @patch("facebook_business.adobjects.adcreative.AdCreative.remote_create", autospec=True)
+    def test_batch_create_creatives_meta_page_resolution(self, mock_remote_create, mock_requests_get, mock_upload_text, mock_get_config):
+        """Verify batch_create_creatives resolves page_id dynamically from Meta Graph API if not in DB config."""
+        mock_get_config.return_value = {"api_key": "real_api_key_123"}
+        
+        mock_api = MagicMock()
+        mock_api._session.access_token = "real_facebook_token"
+        
+        # Mock requests.get call for /me/accounts then requests.get for active polling verification
+        mock_resp_meta = MagicMock()
+        mock_resp_meta.status_code = 200
+        mock_resp_meta.json.return_value = {
+            "data": [
+                {"id": "61580803074671", "name": "topvnsport"}
+            ]
+        }
+        
+        mock_resp_polling = MagicMock()
+        mock_resp_polling.status_code = 200
+        
+        mock_requests_get.side_effect = [mock_resp_meta, mock_resp_polling]
+        
+        def mock_creative_call(*args, **kwargs):
+            if args:
+                args[0]['id'] = "creative_id_456"
+            return args[0] if args else None
+        mock_remote_create.side_effect = mock_creative_call
+        
+        mock_upload_text.return_value = {"post_id": "page_post_id_123"}
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000001", "adapted_copy": "Variant Copy", "angle_name": "Logic"}]
+        
+        res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
+        
+        self.assertEqual(mock_requests_get.call_count, 2)
+        mock_upload_text.assert_called_once_with(
+            api_key="real_api_key_123",
+            user="topvnsport",
+            platforms=["facebook"],
+            title="Variant Copy\n\n👉 Chi tiết sản phẩm: https://shopee.vn/topvnsport",
+            facebook_page_id="61580803074671"
+        )
+        self.assertEqual(res[0]["creative_id"], "creative_id_456")
+        self.assertEqual(res[0]["error"], None)
 
     @patch("facebook_business.adobjects.ad.Ad.remote_create")
     def test_batch_create_ads_success(self, mock_ad_remote_create):
@@ -252,10 +463,109 @@ class TestFacebookClientIntegration(unittest.TestCase):
         variants = [{"variant_id": "00000000-0000-0000-0000-000000000004", "creative_id": "c123"}]
         
         with get_session() as db:
-            res = batch_create_ads(mock_api, "act_123456", self.workspace_id, variants, db)
+            from core.models import MarketingCampaign
+            campaign = MarketingCampaign(
+                workspace_id=self.workspace_id,
+                name="Test Ad Campaign",
+                status="active",
+                budget=5000.0,
+                kpi_targets={"facebook_adset_id": "12021111002233"}
+            )
+            db.add(campaign)
+            db.commit()
+            db.refresh(campaign)
+            
+            res = batch_create_ads(mock_api, "act_123456", campaign.id, variants, db)
             mock_api.new_batch.assert_called_once()
             mock_batch.execute.assert_called_once()
             mock_ad_remote_create.assert_called_once()
+
+    @patch("facebook_business.adobjects.ad.Ad.remote_create")
+    @patch("facebook_business.adobjects.adaccount.AdAccount.create_campaign")
+    @patch("facebook_business.adobjects.adaccount.AdAccount.create_ad_set")
+    @patch("facebook_business.adobjects.adaccount.AdAccount.api_get")
+    def test_batch_create_ads_missing_adset_autocreation(self, mock_api_get, mock_create_ad_set, mock_create_campaign, mock_ad_remote_create):
+        """Verify batch_create_ads automatically creates Campaign and AdSet on Facebook when missing."""
+        mock_api = MagicMock()
+        mock_batch = MagicMock()
+        mock_api.new_batch.return_value = mock_batch
+        
+        # Setup mocks
+        mock_api_get.return_value = {"currency": "USD"}
+        
+        mock_camp_obj = MagicMock()
+        mock_camp_obj.get.return_value = "fb_camp_999"
+        mock_camp_obj.id = "fb_camp_999"
+        mock_create_campaign.return_value = mock_camp_obj
+        
+        mock_adset_obj = MagicMock()
+        mock_adset_obj.get.return_value = "fb_adset_999"
+        mock_adset_obj.id = "fb_adset_999"
+        mock_create_ad_set.return_value = mock_adset_obj
+        
+        variants = [{"variant_id": "00000000-0000-0000-0000-000000000004", "creative_id": "c123"}]
+        
+        with get_session() as db:
+            from core.models import MarketingCampaign
+            campaign = MarketingCampaign(
+                workspace_id=self.workspace_id,
+                name="Test Ad Campaign Auto Create",
+                status="active",
+                budget=5000.0,
+                kpi_targets={}  # Missing everything
+            )
+            db.add(campaign)
+            db.commit()
+            db.refresh(campaign)
+            
+            res = batch_create_ads(mock_api, "act_123456", campaign.id, variants, db)
+            
+            # Verify Facebook SDK calls
+            mock_create_campaign.assert_called_once()
+            mock_create_ad_set.assert_called_once()
+            mock_ad_remote_create.assert_called_once()
+            
+            # Verify DB updates
+            db.refresh(campaign)
+            self.assertEqual(campaign.kpi_targets.get("facebook_campaign_id"), "fb_camp_999")
+            self.assertEqual(campaign.kpi_targets.get("facebook_adset_id"), "fb_adset_999")
+
+    @patch("facebook_business.adobjects.adaccount.AdAccount.create_campaign")
+    @patch("facebook_business.adobjects.adaccount.AdAccount.create_ad_set")
+    @patch("facebook_business.adobjects.adaccount.AdAccount.api_get")
+    def test_ensure_facebook_campaign_and_adset_only_adset_missing(self, mock_api_get, mock_create_ad_set, mock_create_campaign):
+        """Verify ensure_facebook_campaign_and_adset creates only AdSet if campaign_id is already present."""
+        mock_api = MagicMock()
+        mock_api_get.return_value = {"currency": "VND"}
+        
+        mock_adset_obj = MagicMock()
+        mock_adset_obj.get.return_value = "fb_adset_888"
+        mock_adset_obj.id = "fb_adset_888"
+        mock_create_ad_set.return_value = mock_adset_obj
+        
+        with get_session() as db:
+            from core.models import MarketingCampaign
+            from core.integrations.fb_client import ensure_facebook_campaign_and_adset
+            campaign = MarketingCampaign(
+                workspace_id=self.workspace_id,
+                name="Test Ad Campaign Partial",
+                status="active",
+                budget=5000.0,
+                kpi_targets={"facebook_campaign_id": "fb_camp_existing"}
+            )
+            db.add(campaign)
+            db.commit()
+            db.refresh(campaign)
+            
+            adset_id = ensure_facebook_campaign_and_adset(mock_api, "act_123456", campaign.id, db)
+            
+            mock_create_campaign.assert_not_called()
+            mock_create_ad_set.assert_called_once()
+            self.assertEqual(adset_id, "fb_adset_888")
+            
+            db.refresh(campaign)
+            self.assertEqual(campaign.kpi_targets.get("facebook_campaign_id"), "fb_camp_existing")
+            self.assertEqual(campaign.kpi_targets.get("facebook_adset_id"), "fb_adset_888")
 
     def test_save_publisher_state_success(self):
         """Verify save_publisher_state correctly persists master content, variants, and mappings atomically."""

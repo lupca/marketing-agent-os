@@ -312,6 +312,7 @@ async def save_social_account(request: Request, db: Session = Depends(get_db)):
             
         if existing:
             existing.account_name = account_name
+            existing.account_id = account_id
             existing.app_id = app_id
             existing.app_secret = app_secret
             existing.access_token = access_token

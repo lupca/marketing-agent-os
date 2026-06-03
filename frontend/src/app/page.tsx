@@ -121,9 +121,9 @@ export default function Dashboard() {
   const [isExecuteOpen, setIsExecuteOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [objective, setObjective] = useState("LEAD_GEN");
-  const [campaignName, setCampaignName] = useState("TOP VN SPORTS Autumn Campaign");
+  const [campaignName, setCampaignName] = useState("TOPVNSPORT Autumn Campaign");
   const [campaignId, setCampaignId] = useState("ab510edb-0d33-4c94-b554-633481fee8d4");
-  const [productId, setProductId] = useState("prod_vn_sport_shoe_88");
+  const [productId, setProductId] = useState("prod_topvnsport_shoe_88");
   
   // Live output variables from DB
   const [generatedVariants, setGeneratedVariants] = useState<any[]>([]);
@@ -257,7 +257,7 @@ export default function Dashboard() {
   // WebSocket Telemetry Connection
   // ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8000/api/ws/telemetry");
+    const ws = new WebSocket("ws://127.0.0.1:8000/api/ws/telemetry");
     
     ws.onopen = () => {
       console.log("Telemetry WebSocket connected.");
@@ -314,12 +314,12 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchWorkspacesAndCampaigns = async () => {
       try {
-        const wsRes = await fetch("http://localhost:8000/api/workspace/list");
+        const wsRes = await fetch("http://127.0.0.1:8000/api/workspace/list");
         const wsData = await wsRes.json();
         if (wsData.status === "success") {
           setWorkspaces(wsData.data || []);
         }
-        const campRes = await fetch("http://localhost:8000/api/workspace/campaigns");
+        const campRes = await fetch("http://127.0.0.1:8000/api/workspace/campaigns");
         const campData = await campRes.json();
         if (campData.status === "success") {
           setCampaigns(campData.data || []);
@@ -371,7 +371,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchIntegrations = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`);
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setIntegrations(res.data || []);
@@ -401,7 +401,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -432,7 +432,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -453,7 +453,7 @@ export default function Dashboard() {
     if (!confirm("Are you sure you want to permanently delete this credential?")) return;
 
     try {
-      const response = await fetch("http://localhost:8000/api/workspace/integrations/delete", {
+      const response = await fetch("http://127.0.0.1:8000/api/workspace/integrations/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
@@ -503,7 +503,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchSocialAccounts = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setSocialAccounts(res.data || []);
@@ -536,7 +536,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -558,7 +558,7 @@ export default function Dashboard() {
     if (!confirm("Are you sure you want to permanently delete this social account credential?")) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/social-accounts/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/social-accounts/${id}`, {
         method: "DELETE"
       });
       const res = await response.json();
@@ -602,7 +602,7 @@ export default function Dashboard() {
   // ──────────────────────────────────────────────────────────
   const fetchAISettings = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
       const settings = await response.json();
       
       if (settings.ai_model) {
@@ -652,7 +652,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -672,7 +672,7 @@ export default function Dashboard() {
 
   const fetchModelsList = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
       if (res.status === "success") {
         setModelsList(res.data || []);
@@ -720,7 +720,7 @@ export default function Dashboard() {
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -797,8 +797,8 @@ export default function Dashboard() {
     };
 
     const targetUrl = formModelUuid 
-      ? `http://localhost:8000/api/workspace/models/${formModelUuid}?workspace_id=${selectedWorkspaceId}` 
-      : `http://localhost:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`;
+      ? `http://127.0.0.1:8000/api/workspace/models/${formModelUuid}?workspace_id=${selectedWorkspaceId}` 
+      : `http://127.0.0.1:8000/api/workspace/models?workspace_id=${selectedWorkspaceId}`;
     const targetMethod = formModelUuid ? "PUT" : "POST";
 
     try {
@@ -824,7 +824,7 @@ export default function Dashboard() {
     if (!confirm("Are you sure you want to permanently delete this model from library?")) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/workspace/models/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/workspace/models/${id}`, {
         method: "DELETE"
       });
       const res = await response.json();
@@ -875,7 +875,7 @@ export default function Dashboard() {
     showToast("Starting live MAB pipeline invocation...", "info");
 
     try {
-      const response = await fetch(`http://localhost:8000/api/test/trigger-autonomous/${campaignId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/test/trigger-autonomous/${campaignId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
@@ -1234,7 +1234,7 @@ export default function Dashboard() {
                     {[
                       { node: "scoring_node", desc: "MAB Beliefs evaluation and ranking", state: "COMPLETED", duration: "12ms", logs: "Solved cold-start baseline averages successfully." },
                       { node: "action_selector_node", desc: "Epsilon-Greedy 80/20 creative mix formulation", state: "COMPLETED", duration: "5ms", logs: "Mix formulated: ['Social Proof', 'Social Proof', 'Social Proof', 'Social Proof', 'Urgency']" },
-                      { node: "creative_generation_node", desc: "Asset extraction & LLM copies writing", state: "COMPLETED", duration: "1150ms", logs: "Successfully loaded TOP VN SPORTS identity metrics." },
+                      { node: "creative_generation_node", desc: "Asset extraction & LLM copies writing", state: "COMPLETED", duration: "1150ms", logs: "Successfully loaded TOPVNSPORT identity metrics." },
                       { node: "guardian_sandbox_node", desc: "Compliance safety and anti-pattern assessment", state: "COMPLETED", duration: "320ms", logs: "Sandbox score: 92. Safety constraints cleared." },
                       { node: "insight_generator_node", desc: "Metrics drift explanation writing", state: "COMPLETED", duration: "840ms", logs: "Insight safely parsed and persisted in ai_insights_pending." }
                     ].map((item, idx) => (
@@ -2267,7 +2267,7 @@ export default function Dashboard() {
                         <input
                           type="text"
                           required
-                          placeholder="E.g. Top VN Sports Main Page..."
+                          placeholder="E.g. TOPVNSPORT Main Page..."
                           value={formSocialAccountName}
                           onChange={(e) => setFormSocialAccountName(e.target.value)}
                           className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 text-slate-200 outline-none"
@@ -2500,8 +2500,8 @@ export default function Dashboard() {
                     disabled={isExecuting}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-slate-200 outline-none transition-all font-mono"
                   >
-                    <option value="prod_vn_sport_shoe_88">ShopVNB Badminton Racket Elite (TOP VN SPORTS)</option>
-                    <option value="prod_vnb_apparel_02">ShopVNB Breathable Jersey v2 (TOP VN SPORTS)</option>
+                    <option value="prod_topvnsport_shoe_88">TOPVNSPORT Badminton Racket Elite (Yonex Astrox 88 Play)</option>
+                    <option value="prod_topvnsport_apparel_02">TOPVNSPORT Breathable Jersey v2 (Official Teamwear)</option>
                     <option value="prod_generic_other">General MAB Experiment Sandbox</option>
                   </select>
                 </div>

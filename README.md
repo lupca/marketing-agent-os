@@ -144,12 +144,22 @@ python3 -m unittest tests/test_markitdown.py
 
 ---
 
-## 5. Khởi Chạy Giao Diện Web Chainlit UI (Run Application)
+## 5. Tích Hợp Facebook & Shopee (Facebook & Shopee Integration)
+
+Hệ thống đã được cấu hình chặt chẽ với Facebook Graph API và cửa hàng Shopee của TOPVNSPORT. Vui lòng tham khảo [Hướng dẫn Tích hợp Facebook](file:///wsl.localhost/server/root/marketing/marketing-agent-os/docs/05_reference_materials/FACEBOOK_INTEGRATION_GUIDE.md) để biết chi tiết về:
+*   Yêu cầu **Live Mode** của ứng dụng Facebook để đăng Ads thật.
+*   Cơ chế **tự động chèn link Shopee** (`https://shopee.vn/topvnsport`) vào toàn bộ nội dung.
+*   Cơ chế parse `ad_id` chính xác cho hệ thống Analytics & MAB.
+
+---
+
+## 6. Khởi Chạy Giao Diện Web Chainlit UI (Run Application)
 
 Khi tất cả các bài thử nghiệm đã vượt qua thành công, khởi động giao diện điều hành chính thức dành cho CEO / CMO:
 
 ```bash
-chainlit run app.py --port 8000
+uvicorn app:fastapi_app --host 0.0.0.0 --port 8000
+
 ```
 
 ### Cách Sử Dụng Trên UI:
@@ -160,3 +170,4 @@ chainlit run app.py --port 8000
     *   Nếu chọn *Duyệt và Đăng*, hệ thống tự động lưu vào CSDL PostgreSQL với trạng thái `scheduled`.
     *   Nếu chọn *Yêu cầu sửa*, bạn nhập phản hồi chi tiết để Copywriter tự động viết bản thảo mới tốt hơn.
 5.  **Vector hóa tài liệu (Interactive RAG):** Kéo thả file PDF/TXT hướng dẫn sản phẩm vào khung chat. Tiến trình RAG tự động vector hóa và lưu trữ phân đoạn tri thức vào CSDL PostgreSQL. Ban Sáng Tạo sẽ tự học và áp dụng cho các bài viết tiếp theo!
+

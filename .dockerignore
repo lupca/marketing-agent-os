@@ -5,3 +5,20 @@ __pycache__
 reference
 reference(just reference)
 data/mock_database.db
+frontend/node_modules
+node_modules
+.venv
+venv
+.venv-api
+.venv-light
+.files
+frontend
+frontend/**
+data/storage
+data/storage/**
+frontend/.next
+frontend/.next/**
+docs
+docs/**
+.reference
+.reference/**

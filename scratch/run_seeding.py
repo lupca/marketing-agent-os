@@ -22,7 +22,7 @@ def run_seeding():
         with engine.connect() as conn:
             conn.execute(text(sql_content))
             conn.commit()
-        print("Seeding script executed successfully! Database populated with TOP VN SPORTS data.")
+        print("Seeding script executed successfully! Database populated with TOPVNSPORT data.")
     except Exception as e:
         print(f"Failed to execute seeding script: {e}")
 
