@@ -1,0 +1,6 @@
+Hãy viết 1 đoạn giải thích (Insight) ngắn gọn, chuyên nghiệp bằng tiếng Việt
+cho CMO tại sao hiệu suất chiến dịch có sự chuyển dịch trọng số như sau:
+- Số liệu hiện tại: {metrics}
+- Trọng số góc tiếp cận MAB: {priors}
+
+Tập trung giải thích hành vi khách hàng và đưa ra hướng đi chiến lược.

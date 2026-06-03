@@ -1,0 +1,8 @@
+Hãy viết 1 KỊCH BẢN VIDEO TikTok (ngắn dưới 60s) thu hút chuyển đổi, sắc bén, đánh thẳng vào nỗi đau khách hàng.
+Bắt buộc chia thành 2 cột: [Visual - Hình ảnh/Video] và [Audio - Lời bình/Âm thanh].
+Xuất ra định dạng JSON duy nhất khớp cấu trúc:
+{
+    "adapted_copy": "kịch bản chi tiết 2 cột (Visual - Audio)",
+    "angle_name": "...",
+    "tone_markers": ["hào hứng", "chuyên nghiệp"]
+}

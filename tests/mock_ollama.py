@@ -21,7 +21,7 @@ class LocalOllamaTestCase(unittest.TestCase):
         self.mock_client = ChatOpenAI(
             base_url=ollama_url,
             api_key="ollama",  # dummy key for local Ollama
-            model="Qwen/Qwen2.5-7B-Instruct",
+            model="qwen2.5:3b",
             temperature=0.2,
             max_retries=1
         )

@@ -46,7 +46,7 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
             brand = BrandIdentity(
                 id=uuid.uuid4(),
                 workspace_id=self.ws.id,
-                brand_name="TOPVNSPORT (TOPVNSPORT)",
+                brand_name="TOPVNSPORT",
                 voice_and_tone="Duy trì một giọng điệu truyền thông chuyên gia thân thiện.",
                 dos_and_donts={"dos": ["hàng chính hãng"], "donts": ["hàng giả"]}
             )
@@ -75,6 +75,31 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
             budget=5000000.0
         )
         self.db.add(self.camp)
+        
+        # Seed a mock Facebook social account for the workspace
+        from core.models import SocialAccount
+        fb_acc = SocialAccount(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            platform="facebook",
+            account_name="Test Facebook Page",
+            account_id="fake_fb_account_id_123",
+            access_token="fake_token",
+            status="active"
+        )
+        self.db.add(fb_acc)
+        
+        # Seed WorkspaceIntegration with a mock facebook_page_id to satisfy publisher validation
+        from core.models import WorkspaceIntegration
+        integration = WorkspaceIntegration(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            platform_name="upload-post",
+            config_key="facebook_page_id",
+            config_value="61580803074671",
+            is_active=True
+        )
+        self.db.add(integration)
         self.db.commit()
         
     def tearDown(self):
@@ -85,6 +110,13 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         self.db.query(AdMapper).delete()
         self.db.query(PlatformVariant).filter_by(workspace_id=self.ws.id).delete()
         self.db.query(AIInsightPending).filter_by(workspace_id=self.ws.id).delete()
+        
+        # Avoid database state leakage across test runs
+        from core.models import WorkspaceIntegration, SocialAccount, CampaignSocialAccount
+        self.db.query(CampaignSocialAccount).filter(CampaignSocialAccount.campaign_id == self.camp.id).delete()
+        self.db.query(SocialAccount).filter_by(workspace_id=self.ws.id).delete()
+        self.db.query(WorkspaceIntegration).filter_by(workspace_id=self.ws.id).delete()
+        
         self.db.query(MarketingCampaign).filter_by(id=self.camp.id).delete()
         self.db.commit()
         self.db.close()

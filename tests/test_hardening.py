@@ -122,7 +122,7 @@ class TestSystemHardening(unittest.TestCase):
     # ──────────────────────────────────────────────────────────
     # Focus 3: Data Persistence (publisher_node Rollback)
     # ──────────────────────────────────────────────────────────
-    @patch("graphs.autonomous_nodes.get_session")
+    @patch("graphs.autonomous.publisher.get_session")
     def test_database_rollback_atomicity(self, mock_session_ctx):
         """Focus 3: Verify that an Exception during publisher transaction triggers db.rollback() automatically with no orphans."""
         mock_db = MagicMock(spec=Session)
@@ -172,8 +172,8 @@ class TestSystemHardening(unittest.TestCase):
     # ──────────────────────────────────────────────────────────
     # Edge Case 2: LLM Format Mutation (Malformed JSON)
     # ──────────────────────────────────────────────────────────
-    @patch("graphs.autonomous_nodes.get_session")
-    @patch("graphs.autonomous_nodes.generate_text")
+    @patch("graphs.autonomous.insight.get_session")
+    @patch("graphs.autonomous.insight.generate_text")
     def test_llm_format_mutation_json_repair(self, mock_gen_text, mock_session_ctx):
         """Edge Case 2: Assert insight_generator_node successfully cleans up and parses malformed wrapped JSON markdown output."""
         mock_db = MagicMock(spec=Session)

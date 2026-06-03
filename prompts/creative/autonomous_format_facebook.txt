@@ -1,0 +1,7 @@
+Hãy viết 1 bài viết quảng cáo Facebook thu hút chuyển đổi, sắc bén, đánh thẳng vào nỗi đau khách hàng. Tập trung vào nội dung Text (kèm Hook và Call-to-Action).
+Xuất ra định dạng JSON duy nhất khớp cấu trúc:
+{
+    "adapted_copy": "nội dung bài viết quảng cáo",
+    "angle_name": "...",
+    "tone_markers": ["hào hứng", "chuyên nghiệp"]
+}
