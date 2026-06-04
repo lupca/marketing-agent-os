@@ -62,14 +62,73 @@ def publisher_node(state: AgencyState) -> dict:
             ws_id = uuid.UUID(str(workspace_id))
             camp_uuid = uuid.UUID(str(campaign_id)) if campaign_id else uuid.UUID("00000000-0000-0000-0000-000000000001")
             
-            # 1. Separate variants by platform
-            fb_variants = [v for v in variants if v.get("platform", "facebook") == "facebook"]
-            tiktok_variants = [v for v in variants if v.get("platform") == "tiktok"]
+            # 1. Separate variants by content type: video vs text
+            video_variants = [v for v in variants if v.get("content_type") == "video_script"]
+            text_variants = [v for v in variants if v.get("content_type") != "video_script"]
             
             ad_mappings = {}
             fb_account_id = "mock_publisher_account"
             
-            # 2. Publish Facebook variants if any
+            # 2a. Delegate video variants to Video Agent (Asynchronous Continuation)
+            if video_variants:
+                from core.integrations.video_client import submit_video_job
+                from core.models import BrandIdentity, MarketingCampaign
+                
+                # Fetch brand context for Video Agent payload
+                brand = db.query(BrandIdentity).filter_by(workspace_id=ws_id).first()
+                brand_name = brand.brand_name if brand else ""
+                brand_voice = brand.voice_and_tone if brand else ""
+                
+                campaign = db.query(MarketingCampaign).filter_by(id=camp_uuid).first()
+                campaign_name = campaign.name if campaign else ""
+                campaign_objective = state.get("campaign_objective", "LEAD_GEN")
+                
+                for v in video_variants:
+                    v_id = v.get("variant_id") or v.get("id")
+                    angle_name = v.get("angle_name", "")
+                    script_content = v.get("adapted_copy") or v.get("copy") or ""
+                    platform = v.get("platform", "tiktok")
+                    
+                    try:
+                        result = submit_video_job(
+                            variant_id=str(v_id),
+                            video_script=script_content,
+                            platform=platform,
+                            workspace_id=str(workspace_id),
+                            campaign_id=str(campaign_id),
+                            brand_name=brand_name,
+                            brand_voice=brand_voice,
+                            campaign_name=campaign_name,
+                            campaign_objective=campaign_objective,
+                            angle_name=angle_name,
+                        )
+                        v["video_agent_job_id"] = result["job_id"]
+                        v["publish_status"] = "generating_media"
+                        logger.info(
+                            f"Video job submitted for variant {v_id}: "
+                            f"video_agent_job_id={result['job_id']}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to submit video job for variant {v_id}: {e}")
+                        v["publish_status"] = "video_submission_failed"
+                        v["meta_data"] = {
+                            **(v.get("meta_data") or {}),
+                            "video_error": str(e)
+                        }
+                
+                log_decision(
+                    workspace_id=ws_id,
+                    agent_name="Publisher Node",
+                    action="Video Agent Delegation",
+                    decision_status="success",
+                    reason=f"Delegated {len(video_variants)} video variant(s) to Video Agent for rendering.",
+                    campaign_id=camp_uuid
+                )
+            
+            # 2b. Publish TEXT Facebook variants if any
+            fb_variants = [v for v in text_variants if v.get("platform", "facebook") == "facebook"]
+            tiktok_text_variants = [v for v in text_variants if v.get("platform") == "tiktok"]
+            
             if fb_variants:
                 # Resolve and initialize Facebook Client
                 api, fb_account_id, use_real_fb = init_facebook_client(workspace_id, db, campaign_id=campaign_id)
@@ -77,7 +136,7 @@ def publisher_node(state: AgencyState) -> dict:
                 if execution_mode == "shadow":
                     logger.info("[SHADOW MODE] Overriding Facebook publishing to mock mode.")
                     use_real_fb = False
-
+ 
                 if use_real_fb:
                     logger.info(f"Starting batch publishing of {len(fb_variants)} Facebook variants to Facebook Ads API...")
                     creative_responses = batch_create_creatives(api, fb_account_id, workspace_id, fb_variants)
@@ -87,10 +146,10 @@ def publisher_node(state: AgencyState) -> dict:
                 else:
                     raise RuntimeError("Facebook real publishing is disabled but execution mode is not shadow.")
                         
-            # 3. Publish TikTok variants if any (Mocked as requested)
-            if tiktok_variants:
-                logger.info(f"TikTok integration is mocked. Simulating publishing of {len(tiktok_variants)} variants.")
-                for v in tiktok_variants:
+            # 3. Publish TikTok text variants if any (Mocked as requested)
+            if tiktok_text_variants:
+                logger.info(f"TikTok text integration is mocked. Simulating publishing of {len(tiktok_text_variants)} variants.")
+                for v in tiktok_text_variants:
                     v_id = v.get("variant_id") or v.get("id")
                     ad_mappings[v_id] = f"mock_tiktok_ad_{uuid.uuid4().hex[:6]}"
                 
@@ -99,9 +158,11 @@ def publisher_node(state: AgencyState) -> dict:
             
             reasons = []
             if fb_variants:
-                reasons.append(f"{len(fb_variants)} Facebook variants published")
-            if tiktok_variants:
-                reasons.append(f"{len(tiktok_variants)} TikTok script variants published")
+                reasons.append(f"{len(fb_variants)} Facebook text variants published")
+            if tiktok_text_variants:
+                reasons.append(f"{len(tiktok_text_variants)} TikTok text variants published")
+            if video_variants:
+                reasons.append(f"{len(video_variants)} video variants delegated to Video Agent")
             reason_str = ", ".join(reasons) if reasons else "No variants to publish"
             
             log_decision(

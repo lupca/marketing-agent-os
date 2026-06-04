@@ -14,6 +14,7 @@ class AgencyState(TypedDict):
     campaign_objective: str       # 'BRAND_AWARENESS' or 'LEAD_GEN'
     current_metrics: Dict[str, Any]   # Historical performance metrics of latest batch
     current_beliefs: Dict[str, Any]   # MAB calculated beliefs/priors per creative angle
+    baseline_copy: Optional[str]      # The text of the best performing variant to iterate upon
     
     # Internal generation state variables
     sop_stage: str                # Current stage in the automated SOP

@@ -21,7 +21,8 @@ def generate_platform_variant(
     brand_voice: str,
     angle: str,
     platform: str,
-    idx: int
+    idx: int,
+    baseline_copy: str = None
 ) -> dict:
     """
     Helper function to generate a single creative variant for a platform and angle.
@@ -41,7 +42,8 @@ def generate_platform_variant(
         brand_voice=brand_voice,
         angle=angle,
         platform_upper=platform.upper(),
-        format_instructions=format_instructions
+        format_instructions=format_instructions,
+        baseline_copy=baseline_copy or ""
     )
 
     logger.info(f"Generating variant #{idx+1} for angle: {angle} on platform {platform.upper()}...")
@@ -114,12 +116,21 @@ def creative_generation_node(state: AgencyState) -> dict:
         
     logger.info(f"Loaded Brand Context: Brand={brand.brand_name if brand else 'N/A'}, Target Platforms: {target_platforms}")
     
+    # Determine the exploit angle (the one with the highest MAB weight)
+    priors = state.get("current_beliefs") or {}
+    exploit_angle = max(priors, key=priors.get) if priors else None
+    
     generated_variants = []
     
     # Loop and generate copies using Ollama for each angle and platform in the mix
     for idx, action in enumerate(mix):
         angle = action["angle"]
         for platform in target_platforms:
+            # Only iterate on baseline copy for the exploit angle
+            current_baseline = None
+            if exploit_angle and angle == exploit_angle:
+                current_baseline = state.get("baseline_copy")
+                
             variant_data = generate_platform_variant(
                 workspace_id=workspace_id,
                 product_name=product_name,
@@ -128,7 +139,8 @@ def creative_generation_node(state: AgencyState) -> dict:
                 brand_voice=brand_voice,
                 angle=angle,
                 platform=platform,
-                idx=idx
+                idx=idx,
+                baseline_copy=current_baseline
             )
             generated_variants.append(variant_data)
             
