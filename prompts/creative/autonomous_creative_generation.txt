@@ -6,4 +6,14 @@ Giọng điệu thương hiệu: {brand_voice}
 Góc tiếp cận tâm lý học quảng cáo bắt buộc áp dụng: {angle}
 Nền tảng mục tiêu: {platform_upper}
 
+CƠ SỞ TỐI ƯU HÓA (BASELINE COPY):
+{baseline_copy}
+
+[HƯỚNG DẪN TỐI ƯU HÓA QUẢNG CÁO]:
+- Nếu phần CƠ SỞ TỐI ƯU HÓA (BASELINE COPY) ở trên bị trống, hãy sáng tạo nội dung mới hoàn toàn theo các thông tin được cung cấp.
+- Nếu phần CƠ SỞ TỐI ƯU HÓA (BASELINE COPY) có nội dung, ĐÂY LÀ KỊCH BẢN ĐANG CÓ CHI PHÍ RẺ NHẤT (V1). Nhiệm vụ của bạn là tạo ra một bản nâng cấp/phiên bản phái sinh V2 tối ưu hơn:
+  1. Giữ nguyên hướng tiếp cận, góc nhìn (Angle), và thông điệp cốt lõi thành công của bản V1.
+  2. Chỉ tinh chỉnh làm mượt mà văn phong, tối ưu lại tiêu đề (hook) hoặc làm lời kêu gọi hành động (CTA) thu hút hơn.
+  3. TUYỆT ĐỐI KHÔNG viết một bài hoàn toàn mới xa rời bản V1. Hãy kế thừa ít nhất 80% cấu trúc và câu chữ tốt nhất từ bản V1.
+
 {format_instructions}
