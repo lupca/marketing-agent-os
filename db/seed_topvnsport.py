@@ -17,18 +17,16 @@ from core.models import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_topvnsport_seeder")
-
 def seed_topvnsport_data():
-    workspace_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
-    
     with get_session() as db:
-        logger.info(f"Targeting Workspace ID: {workspace_id}")
-        
-        # 1. Ensure Workspace exists
-        ws = db.query(Workspace).filter_by(id=workspace_id).first()
+        ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
         if not ws:
-            logger.error("Workspace Team Alpha not found. Please run seed.py first.")
+            ws = db.query(Workspace).first()
+        if not ws:
+            logger.error("Workspace not found. Please run seed.py first.")
             return
+        workspace_id = ws.id
+        logger.info(f"Targeting Workspace ID: {workspace_id}")
 
         # 2. CLEAR EXISTING DATA (Overwrite requirement)
         # Delete in order of dependence (Cascade-like manual clear)

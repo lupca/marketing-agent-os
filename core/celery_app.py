@@ -37,6 +37,25 @@ celery_app.conf.update(
         "core.tasks.cascade_update_tags":  {"queue": "rag_cascade"},
         "core.tasks.cascade_soft_delete":  {"queue": "rag_cascade"},
         "core.tasks.publish_to_social":    {"queue": "social_publisher"},
+        "core.tasks.poll_video_agent_jobs": {"queue": "video_polling"},
+        "core.tasks.sync_paid_campaign_metrics_task": {"queue": "orchestrator"},
+        "core.tasks.state_orchestrator_cron": {"queue": "orchestrator"},
+    },
+
+    # Periodic tasks (Celery Beat schedule configuration)
+    beat_schedule={
+        "poll-video-agent-jobs-every-60s": {
+            "task": "core.tasks.poll_video_agent_jobs",
+            "schedule": 60.0,  # Run every 60 seconds
+        },
+        "sync-paid-campaign-metrics-every-30m": {
+            "task": "core.tasks.sync_paid_campaign_metrics_task",
+            "schedule": 1800.0,  # Run every 30 minutes
+        },
+        "state-orchestrator-cron-every-60s": {
+            "task": "core.tasks.state_orchestrator_cron",
+            "schedule": 60.0,  # Run every 60 seconds (Orchestrator ticks)
+        },
     },
 
     # Retry policy mặc định cho tất cả tasks

@@ -192,3 +192,31 @@ export interface ShadowDecision {
   variants?: GeneratedVariant[];
   sandbox_results?: SandboxFeedback[];
 }
+
+// ─── Authentication Models ───────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password?: string;
+}
+
+export interface LoginPayload {
+  username?: string;
+  email?: string;
+  password?: string;
+}
+

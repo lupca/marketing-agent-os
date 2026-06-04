@@ -34,11 +34,10 @@ class TestDashboardAPI(unittest.TestCase):
         cls.client_ctx.__exit__(None, None, None)
             
     def test_dashboard_page_status(self):
-        """Verify that GET /dashboard renders successfully."""
-        response = self.client.get("/dashboard")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("CMO Strategic BI Dashboard", response.text)
-        self.assertIn("cpaTrendChart", response.text)
+        """Verify that GET /dashboard redirects to frontend."""
+        response = self.client.get("/dashboard", follow_redirects=False)
+        self.assertEqual(response.status_code, 307)
+        self.assertTrue(response.headers["location"].endswith("/"))
         
     def test_api_dashboard_metrics(self):
         """Verify that GET /api/dashboard/metrics returns high-fidelity analytics."""

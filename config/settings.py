@@ -36,3 +36,10 @@ RAG_CHUNK_SEPARATORS = ["\n\n", "\n", ".", "?", "!", " "]
 RAG_RETRIEVAL_LIMIT = 5          # Số chunks trả về sau rerank (top-K)
 RAG_CANDIDATE_LIMIT = 10         # Số candidates trước khi rerank
 RAG_DEFAULT_TAGS = ["global"]    # Tags mặc định khi không có context cụ thể
+
+# ============================================================
+# Video Agent Integration (CTO v3 Integration Plan)
+# ============================================================
+VIDEO_AGENT_URL = os.getenv("VIDEO_AGENT_URL", "http://localhost:8001")
+VIDEO_AGENT_API_KEY = os.getenv("VIDEO_AGENT_API_KEY", "tmcp_secret_key_123")
+

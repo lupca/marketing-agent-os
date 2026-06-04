@@ -30,19 +30,24 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
     """
     with get_session() as db:
         try:
-            # Defensive programming: Fallback if workspace ID is missing or invalid
-            if not workspace_id_str or workspace_id_str == "None":
-                workspace_id_str = "00000000-0000-0000-0000-000000000002"
+            ws_id = None
+            if workspace_id_str and workspace_id_str != "None":
+                try:
+                    ws_id = uuid.UUID(workspace_id_str)
+                except ValueError:
+                    pass
             
-            try:
-                ws_id = uuid.UUID(workspace_id_str)
-            except ValueError:
-                workspace_id_str = "00000000-0000-0000-0000-000000000002"
-                ws_id = uuid.UUID(workspace_id_str)
-
-            ws = db.query(Workspace).filter_by(id=ws_id).first()
+            ws = None
+            if ws_id:
+                ws = db.query(Workspace).filter_by(id=ws_id).first()
+                
             if not ws:
-                raise ValueError(f"Workspace not found for ID: {workspace_id_str}")
+                ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+            if not ws:
+                ws = db.query(Workspace).first()
+                
+            if not ws:
+                raise ValueError("No workspaces found in database.")
             ws_settings = ws.settings or {}
             
             api_url = ws_settings.get("ai_api_url")

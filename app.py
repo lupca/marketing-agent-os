@@ -16,7 +16,10 @@ from api.dashboard_routes import dashboard_router
 from api.workspace_routes import workspace_router
 from api.test_routes import test_router, broadcaster
 from api.cockpit_routes import cockpit_router
+from api.auth_routes import auth_router
 from core.pipeline_tracker import set_cockpit_broadcaster
+from core.diagnostics import check_system_readiness
+from db.connection import SessionLocal
 
 # Initialize FastAPI app
 fastapi_app = FastAPI(
@@ -47,6 +50,13 @@ async def register_cockpit_broadcaster():
     """
     set_cockpit_broadcaster(broadcaster)
     logger.info("[COCKPIT] Broadcaster registered with pipeline_tracker on startup.")
+    
+    # Run System Diagnostics
+    db = SessionLocal()
+    try:
+        check_system_readiness(db)
+    finally:
+        db.close()
 
 # Include Specialized API Routers
 fastapi_app.include_router(rag_router)
@@ -55,6 +65,7 @@ fastapi_app.include_router(dashboard_router)
 fastapi_app.include_router(workspace_router)
 fastapi_app.include_router(test_router)
 fastapi_app.include_router(cockpit_router)
+fastapi_app.include_router(auth_router)
 
 # Real-time Telemetry WebSocket endpoint
 @fastapi_app.websocket("/api/ws/telemetry")
@@ -128,6 +139,17 @@ async def serve_knowledge_base():
 @fastapi_app.get("/api/health")
 async def health():
     return {"status": "healthy", "engine": "autonomous", "version": "3.0.0"}
+
+# Diagnostics readiness endpoint
+@fastapi_app.get("/api/diagnostics/readiness")
+async def readiness(request: Request):
+    ws_id = request.query_params.get("workspace_id") or request.headers.get("x-workspace-id")
+    db = SessionLocal()
+    try:
+        status = check_system_readiness(db, workspace_id=ws_id)
+        return status
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     uvicorn.run("app:fastapi_app", host="0.0.0.0", port=8000, reload=True)

@@ -46,23 +46,19 @@ class TestMarketIntelligence(unittest.TestCase):
         self.db.close()
         
     @patch("core.ai_clients.serpapi_client.get_serpapi_key")
-    def test_serpapi_client_fallback(self, mock_get_key):
-        """Verify that SerpApi client works correctly and yields mock fallbacks when API keys are empty."""
+    def test_serpapi_client_missing_key_error(self, mock_get_key):
+        """Verify that SerpApi client raises SerpApiUnauthorizedError when API keys are empty."""
         mock_get_key.return_value = ""
-        res_search = search_youtube("G-Agent Tech", self.workspace_id)
-        self.assertIn("video_results", res_search)
-        self.assertTrue(len(res_search["video_results"]) > 0)
-        self.assertEqual(res_search["video_results"][0]["video_id"], "mockvid0001")
+        from core.ai_clients.serpapi_client import SerpApiUnauthorizedError
         
-        res_trans = get_youtube_transcript("mockvid0001", self.workspace_id)
-        self.assertIn("transcript", res_trans)
-        self.assertTrue(len(res_trans["transcript"]) > 0)
-        self.assertIn("chi phí chuyển đổi", res_trans["transcript"][0]["snippet"])
+        with self.assertRaises(SerpApiUnauthorizedError):
+            search_youtube("G-Agent Tech", self.workspace_id)
+            
+        with self.assertRaises(SerpApiUnauthorizedError):
+            get_youtube_transcript("mockvid0001", self.workspace_id)
 
-        res_comments = get_youtube_comments("mockvid0001", self.workspace_id)
-        self.assertIn("comments", res_comments)
-        self.assertTrue(len(res_comments["comments"]) > 0)
-        self.assertEqual(res_comments["comments"][0]["author"], "Hải Nam")
+        with self.assertRaises(SerpApiUnauthorizedError):
+            get_youtube_comments("mockvid0001", self.workspace_id)
 
     @patch("core.market_intelligence.upload_file")
     @patch("core.market_intelligence.generate_text")

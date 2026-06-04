@@ -25,3 +25,4 @@ class AgencyState(TypedDict):
     # Autopilot Cockpit observability fields (injected by bandit_orchestrator)
     _run_id: Optional[str]        # UUID of the active PipelineRun record (None if tracker unavailable)
     _execution_mode: Optional[str]  # 'shadow' | 'live' — controls whether publisher calls real APIs
+    _skip_generation: Optional[bool] # Optional flag to bypass creative generation in Overload (Darwin Pruning) scenario

@@ -132,7 +132,7 @@ class TestSocialPublisherRefinements(unittest.TestCase):
             pv = PlatformVariant(
                 workspace_id=ws_id,
                 master_content_id=master.id,
-                platform="facebook",
+                platform="instagram",
                 adapted_copy="Test copy",
                 publish_status="scheduled"
             )
@@ -142,12 +142,12 @@ class TestSocialPublisherRefinements(unittest.TestCase):
             # Now run task with missing API Key
             res = publish_to_social(str(pv.id))
             self.assertEqual(res["status"], "failed")
-            self.assertIn("UPLOAD_POST_API_KEY is not configured in workspace integrations or env.", res["error"])
+            self.assertIn("UPLOAD_POST_API_KEY is not configured", res["error"])
             
             # Verify DB was updated to 'failed'
             db.refresh(pv)
             self.assertEqual(pv.publish_status, "failed")
-            self.assertIn("UPLOAD_POST_API_KEY is not configured in workspace integrations or env.", pv.meta_data.get("error_message", ""))
+            self.assertIn("UPLOAD_POST_API_KEY is not configured", pv.meta_data.get("error_message", ""))
             print("Missing API Key triggers permanent AuthError verified successfully.")
             
             # Clean up

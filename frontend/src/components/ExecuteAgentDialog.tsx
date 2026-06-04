@@ -66,7 +66,7 @@ export default function ExecuteAgentDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm font-sans text-xs">
-      <div className="absolute inset-0" onClick={() => !isExecuting && setIsExecuteOpen(false)}></div>
+      <div className="absolute inset-0" onClick={() => setIsExecuteOpen(false)}></div>
       
       <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl h-full flex flex-col justify-between p-6 animate-slide-in">
         <div className="space-y-6">
@@ -79,8 +79,7 @@ export default function ExecuteAgentDialog({
             </div>
             <button
               onClick={() => setIsExecuteOpen(false)}
-              disabled={isExecuting}
-              className="text-slate-500 hover:text-slate-300 disabled:opacity-50 p-1 hover:bg-slate-800 rounded cursor-pointer"
+              className="text-slate-500 hover:text-slate-300 p-1 hover:bg-slate-800 rounded cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>

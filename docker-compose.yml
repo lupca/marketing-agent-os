@@ -52,7 +52,7 @@ services:
   celery_worker:
     build: .
     container_name: agent_celery_worker
-    command: sh -c "pip install serpapi && celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade"
+    command: sh -c "pip install serpapi && celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade,video_polling,social_publisher"
     depends_on:
       redis:
         condition: service_healthy
@@ -66,12 +66,36 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadminpassword}
       - MINIO_BUCKET=${MINIO_BUCKET:-agent-uploads}
+      - VIDEO_AGENT_URL=${VIDEO_AGENT_URL:-http://172.22.45.28:8001}
+      - VIDEO_AGENT_API_KEY=${VIDEO_AGENT_API_KEY:-tmcp_secret_key_123}
     volumes:
       - .:/app
     working_dir: /app
     networks:
       - agent_network
     restart: unless-stopped
+
+  celery_beat:
+    build: .
+    container_name: agent_celery_beat
+    command: celery -A core.celery_app beat --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://agent_redis:6379/0
+      - DATABASE_URL=postgresql://postgres:secret_password@agent_postgres:5432/marketing_agent_db
+      - VIDEO_AGENT_URL=${VIDEO_AGENT_URL:-http://172.22.45.28:8001}
+      - VIDEO_AGENT_API_KEY=${VIDEO_AGENT_API_KEY:-tmcp_secret_key_123}
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - agent_network
+    restart: unless-stopped
+
 
 volumes:
   pgdata:

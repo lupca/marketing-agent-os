@@ -42,8 +42,9 @@ def test_sync_own_media_metrics_logic():
         db.commit()
         db.refresh(variant)
 
-        # 2. Mock API Requests
-        with patch("requests.get") as mock_get:
+        # 2. Mock API Requests and Environment Variables
+        with patch("requests.get") as mock_get, patch("os.getenv") as mock_getenv:
+            mock_getenv.side_effect = lambda key: "mock_upload_post_api_key_123" if key == "UPLOAD_POST_API_KEY" else os.environ.get(key)
             def mock_get_side_effect(url, **kwargs):
                 resp = MagicMock()
                 resp.status_code = 200

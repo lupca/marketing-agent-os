@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Column, String, Text, Numeric, Integer, Boolean, DateTime, Date, ForeignKey, JSON, TypeDecorator, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
 from sqlalchemy.sql import func
-from db.connection import Base, IS_MOCK_DATABASE
+from db.connection import Base
 
 # Resolve cross-database data types - PostgreSQL Native & pgvector Type Anchor
 UUID_TYPE = UUID(as_uuid=True)
@@ -235,6 +235,8 @@ class PlatformVariant(Base):
     metric_likes = Column(Integer, default=0)
     metric_shares = Column(Integer, default=0)
     metric_comments = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    sync_status = Column(String(50), default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

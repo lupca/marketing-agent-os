@@ -1,30 +1,41 @@
 # tests/mock_ollama.py
 import os
 import unittest
-from unittest.mock import patch
-from langchain_openai import ChatOpenAI
+from unittest.mock import patch, MagicMock
+from langchain_core.messages import AIMessage
 
 class LocalOllamaTestCase(unittest.TestCase):
     """
     Base test class for Clean Code multi-agent workflow testing.
-    Automatically patches get_dynamic_llm_client to return a local Ollama model instance,
+    Automatically patches get_dynamic_llm_client to return a mock local model instance,
     safeguarding against all cloud LLM API cost consumption during tests.
     """
     
     def setUp(self):
-        # Determine local Ollama URL
-        ollama_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        if not ollama_url.endswith("/v1"):
-            ollama_url = ollama_url.rstrip("/") + "/v1"
+        # Create a mock client that returns structured JSON
+        self.mock_client = MagicMock()
+        self.mock_client.model = "qwen2.5:3b"
+        
+        # Default mock response representing a platform variant copy dynamic to platform
+        def mock_invoke(messages, *args, **kwargs):
+            # Extract content from human message
+            human_content = ""
+            for msg in messages:
+                if getattr(msg, "content", None) and msg.__class__.__name__ == "HumanMessage":
+                    human_content = msg.content
+                    break
             
-        # Create a mock local Ollama model client
-        self.mock_client = ChatOpenAI(
-            base_url=ollama_url,
-            api_key="ollama",  # dummy key for local Ollama
-            model="qwen2.5:3b",
-            temperature=0.2,
-            max_retries=1
-        )
+            if "TIKTOK" in human_content.upper():
+                content = '{"adapted_copy": "[Visual] Show badminton player playing. [Audio] Vợt TOPVNSPORT V200i cực kỳ chất lượng", "angle_name": "Fear", "tone_markers": ["hào hứng"]}'
+            else:
+                content = '{"adapted_copy": "Vợt TOPVNSPORT V200i cực kỳ chất lượng - hàng chính hãng 100%!", "angle_name": "Fear", "tone_markers": ["chuyên nghiệp"]}'
+                
+            return AIMessage(
+                content=content,
+                response_metadata={"token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}}
+            )
+            
+        self.mock_client.invoke.side_effect = mock_invoke
         
         # Apply patch to replace get_dynamic_llm_client with our mock local client
         # MUST patch the original source in 'core.ai_clients.llm_client' to intercept 

@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 # Add project root to sys.path for direct execution
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from db.connection import  is_mock
 from core.dependencies import get_session
 from core.models import User, Workspace, BrandIdentity, CustomerPersona, ProductService, RAGDocument, RAGChunk, IntentRoutingKnowledge
+from core.auth import hash_password
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_seeder")
@@ -21,12 +21,15 @@ def seed_database(db: Session):
     
     # 1. Seed Default User
     admin_user = db.query(User).filter_by(email="admin@marketingos.com").first()
+    admin_password = os.getenv("ADMIN_SEED_PASSWORD", "admin123")
+    hashed_pw = hash_password(admin_password)
+    
     if not admin_user:
         admin_user = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
             name="CMO Admin",
             email="admin@marketingos.com",
-            password_hash="pbkdf2:sha256:default_hashed_password_for_testing",
+            password_hash=hashed_pw,
             role="admin"
         )
         db.add(admin_user)
@@ -34,37 +37,41 @@ def seed_database(db: Session):
         db.refresh(admin_user)
         logger.info(f"Seeded User: {admin_user.email}")
     else:
-        logger.info("Admin User already exists.")
+        admin_user.password_hash = hashed_pw
+        db.commit()
+        logger.info("Admin User already exists. Updated password hash to bcrypt.")
 
     # 2. Seed Default Workspace
     default_ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
     
-    # Safe settings for testing to prevent cloud token burning
-    safe_settings = {
+    # Real settings using SiliconFlow cloud configurations and supplied key
+    real_settings = {
         "currency": "VND", 
         "timezone": "Asia/Ho_Chi_Minh",
-        "ai_api_url": "http://localhost:11434/v1",
-        "ai_model": "Qwen/Qwen2.5-7B-Instruct",
-        "siliconflow_api_key": "dummy_key_for_testing_do_not_use_cloud"
+        "ai_api_url": "https://api.siliconflow.com/v1",
+        "ai_model": "Qwen/Qwen3.6-35B-A3B",
+        "embed_model": "Qwen/Qwen3-Embedding-0.6B",
+        "rerank_model": "Qwen/Qwen3-Reranker-0.6B",
+        "siliconflow_api_key": os.getenv("SILICONFLOW_API_KEY", "your_api_key_here")
     }
 
     if not default_ws:
         default_ws = Workspace(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            id=uuid.uuid4(),
             name="Team Alpha Workspace",
             owner_id=admin_user.id,
-            members=[str(admin_user.id)],
-            settings=safe_settings
+            members=[admin_user.id],
+            settings=real_settings
         )
         db.add(default_ws)
         db.commit()
         db.refresh(default_ws)
         logger.info(f"Seeded Workspace: {default_ws.name}")
     else:
-        # Enforce safe settings even if workspace exists to avoid leaking real keys from prev environments
-        default_ws.settings = safe_settings
+        default_ws.settings = real_settings
+        default_ws.members = [admin_user.id]
         db.commit()
-        logger.info("Workspace already exists. Enforced safe test settings (Local Ollama).")
+        logger.info("Workspace already exists. Updated settings and members with native UUID.")
 
     # 2b. Seed RAG Access Tags (including market_intel for dashboard UI visibility)
     from sqlalchemy import text

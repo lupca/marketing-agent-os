@@ -363,8 +363,15 @@ def get_dashboard_analytics(db: Session) -> dict:
     winning_variants = []
     killed_variants = []
     fatigued_variants = []
+    generating_media_count = 0
+    video_failed_count = 0
     
     for v in all_variants:
+        if v.publish_status == "generating_media":
+            generating_media_count += 1
+        elif v.publish_status in ["video_generation_failed", "video_submission_failed"]:
+            video_failed_count += 1
+            
         meta = v.meta_data or {}
         spend = meta.get("spend", 0.0)
         convs = meta.get("conversions", 0)
@@ -514,6 +521,8 @@ def get_dashboard_analytics(db: Session) -> dict:
             "ltv_cac_health": ltv_cac_health,
             "cac_payback_period": cac_payback_period,
             "active_campaigns": active_campaigns,
+            "generating_media_count": generating_media_count,
+            "video_failed_count": video_failed_count,
             "engagement": {
                 "views": views,
                 "likes": likes,

@@ -298,5 +298,102 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         self.db.delete(tt_acc)
         self.db.commit()
 
+    def test_mab_baseline_copy_iteration(self):
+        """Verify that the MAB orchestrator extracts the best performing baseline variant copy and passes it to the generation node."""
+        print(f"\n[START MAB BASELINE COPY ITERATION TEST] Campaign ID: {self.camp.id}")
+        from core.models import CampaignAnalytics, MasterContent
+        
+        # 1. Seed a CampaignAnalytics record so that it is not a Cold Start
+        analytics = CampaignAnalytics(
+            id=uuid.uuid4(),
+            campaign_id=self.camp.id,
+            platform="facebook",
+            impressions=1000,
+            clicks=100,
+            conversions=10,
+            spend=100000.0,
+            cpc=1000.0,
+            cpa=10000.0,
+            cpm=100000.0,
+            ctr=0.1000
+        )
+        self.db.add(analytics)
+        self.db.commit()
+        
+        # 2. Determine which exploit angle is calculated based on hash of analytics.id
+        from core.bandit_orchestrator import compute_mab_beliefs
+        mab_res = compute_mab_beliefs(self.db, str(self.camp.id), "LEAD_GEN")
+        priors = mab_res["beliefs"]
+        best_angle = max(priors, key=priors.get)
+        self.assertFalse(mab_res["cold_start"])
+        
+        # 3. Create a MasterContent and a PlatformVariant with this exploit angle
+        master = MasterContent(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            campaign_id=self.camp.id,
+            core_message="Baseline Master Content Copy",
+            approval_status="approved"
+        )
+        self.db.add(master)
+        self.db.commit()
+        
+        baseline_text = "Nội dung quảng cáo V1 xuất sắc nhất hệ mặt trời!"
+        variant = PlatformVariant(
+            id=uuid.uuid4(),
+            workspace_id=self.ws.id,
+            master_content_id=master.id,
+            platform="facebook",
+            adapted_copy=baseline_text,
+            publish_status="published",
+            content_type="text",
+            meta_data={"angle_name": best_angle},
+            metric_views=100,
+            metric_likes=10
+        )
+        self.db.add(variant)
+        self.db.commit()
+        
+        # 4. Patch generate_platform_variant or generate_text to capture the baseline_copy parameter
+        from unittest.mock import patch
+        
+        captured_baselines = []
+        original_generate_platform_variant = sys.modules["graphs.autonomous.generation"].generate_platform_variant
+        
+        def spy_generate_platform_variant(*args, **kwargs):
+            # Capture baseline_copy
+            captured_baselines.append(kwargs.get("baseline_copy"))
+            return original_generate_platform_variant(*args, **kwargs)
+            
+        with patch("graphs.autonomous.generation.generate_platform_variant", side_effect=spy_generate_platform_variant):
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            task = trigger_autonomous_generation(
+                workspace_id=str(self.ws.id),
+                campaign_id=str(self.camp.id),
+                product_id=str(self.prod.id),
+                db=self.db
+            )
+            result_state = loop.run_until_complete(task)
+            
+        # 5. Assertions
+        # Check that baseline_copy was correctly loaded into the state
+        self.assertEqual(result_state["baseline_copy"], baseline_text)
+        
+        # Check that baseline_copy was passed to generate_platform_variant at least once (for the exploit angle)
+        self.assertIn(baseline_text, captured_baselines)
+        
+        print(" -> MAB baseline copy iteration successfully verified!")
+        
+        # Clean up
+        self.db.delete(master)
+        self.db.delete(analytics)
+        self.db.commit()
+
 if __name__ == "__main__":
     unittest.main()

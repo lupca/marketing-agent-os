@@ -216,6 +216,8 @@ CREATE TABLE platform_variants (
     metric_likes INTEGER DEFAULT 0,
     metric_shares INTEGER DEFAULT 0,
     metric_comments INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    sync_status VARCHAR(50) DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

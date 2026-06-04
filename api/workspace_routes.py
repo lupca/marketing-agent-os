@@ -17,7 +17,21 @@ def get_active_workspace_id(request: Request) -> uuid.UUID:
             return uuid.UUID(ws_id_str)
         except ValueError:
             pass
-    return uuid.UUID("00000000-0000-0000-0000-000000000002")
+            
+    from db.connection import SessionLocal
+    db = SessionLocal()
+    try:
+        ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
+        if not ws:
+            ws = db.query(Workspace).first()
+        if ws:
+            return ws.id
+    except Exception as e:
+        logger.error(f"Failed to dynamically query default workspace: {e}")
+    finally:
+        db.close()
+        
+    return uuid.UUID("00000000-0000-0000-0000-000000000002")  # absolute final fallback if DB empty
 
 workspace_router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
 
@@ -33,7 +47,7 @@ async def get_settings(request: Request, db: Session = Depends(get_db)):
 
 @workspace_router.post("/settings")
 async def update_settings(request: Request, db: Session = Depends(get_db)):
-    ALLOWED_SETTINGS = {"ai_model", "temperature", "max_tokens", "recursion_limit",
+    ALLOWED_SETTINGS = {"ai_model", "embed_model", "rerank_model", "temperature", "max_tokens", "recursion_limit",
                        "reranker_mode", "siliconflow_api_key", "enable_thinking", "ai_api_url"}
     try:
         body = await request.json()

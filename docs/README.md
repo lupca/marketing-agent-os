@@ -26,10 +26,16 @@ Hệ thống hoạt động dựa trên 3 trụ cột kỹ thuật:
 
 ---
 
-## 3. Cấu trúc Tài liệu Kỹ thuật Mới nhất
+Toàn bộ tài liệu quy hoạch kiến trúc mới nhất nằm trong thư mục **`docs/`** và **`docs/agentic ai/`**. Đây là Nguồn sự thật duy nhất (Single Source of Truth) cho đội ngũ phát triển:
 
-Toàn bộ tài liệu quy hoạch kiến trúc mới nhất nằm trong thư mục **`docs/agentic ai/`**. Đây là Nguồn sự thật duy nhất (Single Source of Truth) cho đội ngũ phát triển:
+### Tài liệu Cốt lõi (Core System Architecture)
+*   [01. System Prompt Thiết kế Đồ thị](01_SYSTEM_PROMPT.md)
+*   [02. Graph State & Schema](02_GRAPH_STATE_SCHEMA.md)
+*   [03. Hợp đồng API / Contracts](03_API_CONTRACTS.md)
+*   [04. Thiết kế Cơ sở Dữ liệu](04_DATABASE_SCHEMA.md)
+*   [05. Kiến trúc Kiểm thử Môi trường](05_TESTING_ARCHITECTURE.md)
 
+### Bản thiết kế Tự trị & AI Agent
 *   [Bản thiết kế cốt lõi & Vòng lặp Học tập](agentic%20ai/AUTONOMOUS_REFACTOR_PLAN.md)
 *   [Thiết kế Nghiệp vụ & Cân bằng Ngân sách Nội dung](agentic%20ai/CMO_CTO_ALIGNMENT.md)
 *   [Phân tích Tác động Hệ thống & Lộ trình đập đi xây lại](agentic%20ai/SYSTEM_IMPACT_REPORT.md)

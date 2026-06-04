@@ -303,23 +303,36 @@ def batch_create_creatives(api: Any, fb_account_id: str, workspace_id: str, vari
     token = api._session.access_token if hasattr(api, "_session") else None
     if not page_id and token and "dummy" not in token:
         logger.info("facebook_page_id không cấu hình. Bắt đầu phân giải động từ Meta API bằng tài khoản quảng cáo...")
-        # 1. Try Meta API /me/accounts
+        # 0. Check if token belongs to the page itself (Page Access Token)
         try:
-            resp = requests.get("https://graph.facebook.com/v19.0/me/accounts", params={"access_token": token}, timeout=20)
-            if resp.status_code == 200:
-                pages_data = resp.json()
-                pages = pages_data.get("data", [])
-                for p in pages:
-                    name = p.get("name", "").lower()
-                    if "top vn sport" in name or "topvnsport" in name:
-                        page_id = p.get("id")
-                        logger.info(f"Đã phân giải được page_id: {page_id} từ Meta /me/accounts.")
-                        break
-                if not page_id and pages:
-                    page_id = pages[0].get("id")
-                    logger.info(f"Fallback lấy page đầu tiên từ /me/accounts: {page_id}")
+            me_resp = requests.get("https://graph.facebook.com/v19.0/me", params={"access_token": token}, timeout=20)
+            if me_resp.status_code == 200:
+                me_data = me_resp.json()
+                me_name = me_data.get("name", "").lower()
+                if "top vn sport" in me_name or "topvnsport" in me_name:
+                    page_id = me_data.get("id")
+                    logger.info(f"Đã phân giải được page_id: {page_id} trực tiếp từ Meta /me (Page Token).")
         except Exception as e:
-            logger.warning(f"Lỗi khi gọi Meta /me/accounts: {e}")
+            logger.warning(f"Lỗi khi kiểm tra Meta /me: {e}")
+
+        # 1. Try Meta API /me/accounts if still unresolved
+        if not page_id:
+            try:
+                resp = requests.get("https://graph.facebook.com/v19.0/me/accounts", params={"access_token": token}, timeout=20)
+                if resp.status_code == 200:
+                    pages_data = resp.json()
+                    pages = pages_data.get("data", [])
+                    for p in pages:
+                        name = p.get("name", "").lower()
+                        if "top vn sport" in name or "topvnsport" in name:
+                            page_id = p.get("id")
+                            logger.info(f"Đã phân giải được page_id: {page_id} từ Meta /me/accounts.")
+                            break
+                    if not page_id and pages:
+                        page_id = pages[0].get("id")
+                        logger.info(f"Fallback lấy page đầu tiên từ /me/accounts: {page_id}")
+            except Exception as e:
+                logger.warning(f"Lỗi khi gọi Meta /me/accounts: {e}")
             
         # 2. Try Meta API /{ad_account_id}/promote_pages if still unresolved
         if not page_id and fb_account_id:

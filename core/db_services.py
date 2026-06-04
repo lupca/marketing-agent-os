@@ -247,18 +247,24 @@ def save_publisher_state(
     
     for v in variants:
         v_id = v["variant_id"]
+        # Determine metadata, preserving job ID and any existing metadata
+        metadata = {
+            "angle_name": v.get("angle_name"),
+            "destination_link": v.get("destination_link") or "https://shopee.vn/topvnsport",
+            **(v.get("meta_data") or {})
+        }
+        if "video_agent_job_id" in v:
+            metadata["video_agent_job_id"] = v["video_agent_job_id"]
+            
         pv = PlatformVariant(
             id=uuid.UUID(v_id),
             workspace_id=ws_id,
             master_content_id=master.id,
             platform=v.get("platform", "facebook"),
             adapted_copy=v.get("adapted_copy", ""),
-            publish_status="published",
+            publish_status=v.get("publish_status", "published"),
             content_type=v.get("content_type", "text"),
-            meta_data={
-                "angle_name": v.get("angle_name"),
-                "destination_link": v.get("destination_link") or "https://shopee.vn/topvnsport"
-            }
+            meta_data=metadata
         )
         db.add(pv)
         db.flush() # Force parent inserts to flush so Postgres registers and locks the foreign key before child insert

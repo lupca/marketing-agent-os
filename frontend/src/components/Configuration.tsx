@@ -106,10 +106,12 @@ export default function Configuration({
   // Global LLM Parameter States
   const [currentAiModel, setCurrentAiModel] = useState("Qwen/Qwen2.5-7B-Instruct");
   const [customModelId, setCustomModelId] = useState("");
+  const [embedModel, setEmbedModel] = useState("Qwen/Qwen3-Embedding-0.6B");
+  const [rerankModel, setRerankModel] = useState("Qwen/Qwen3-Reranker-0.6B");
   const [temperature, setTemperature] = useState(0.2);
   const [contextLimit, setContextLimit] = useState(14000);
   const [recursionLimit, setRecursionLimit] = useState(5);
-  const [rerankerMode, setRerankerMode] = useState("local");
+  const [rerankerMode, setRerankerMode] = useState("cloud");
   const [siliconFlowKey, setSiliconFlowKey] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("https://api.siliconflow.com/v1");
   const [enableThinking, setEnableThinking] = useState(false);
@@ -391,6 +393,8 @@ export default function Configuration({
       if (settings.max_tokens) setContextLimit(settings.max_tokens);
       if (settings.recursion_limit) setRecursionLimit(settings.recursion_limit);
       if (settings.reranker_mode) setRerankerMode(settings.reranker_mode);
+      if (settings.embed_model) setEmbedModel(settings.embed_model);
+      if (settings.rerank_model) setRerankModel(settings.rerank_model);
       if (settings.siliconflow_api_key) setSiliconFlowKey(settings.siliconflow_api_key);
       if (settings.ai_api_url) setApiBaseUrl(settings.ai_api_url);
       if (settings.enable_thinking !== undefined) setEnableThinking(settings.enable_thinking);
@@ -408,6 +412,8 @@ export default function Configuration({
 
     const payload = {
       ai_model: modelId,
+      embed_model: embedModel,
+      rerank_model: rerankModel,
       temperature,
       max_tokens: contextLimit,
       recursion_limit: recursionLimit,
@@ -448,23 +454,37 @@ export default function Configuration({
     }
   };
 
-  const handleActivateModel = async (modelId: string) => {
-    const predefined = [
-      "Qwen/Qwen3.6-35B-A3B",
-      "Qwen/Qwen3-32B",
-      "deepseek-ai/DeepSeek-V3",
-      "Qwen/Qwen2.5-7B-Instruct"
-    ];
+  const handleActivateModel = async (modelId: string, category: string = "Chat") => {
+    const m = modelsList.find(item => item.model_id === modelId);
+    const cat = m ? m.category : category;
+    
+    let newAiModel = currentAiModel;
+    let newEmbedModel = embedModel;
+    let newRerankModel = rerankModel;
 
-    let targetModel = modelId;
-    if (predefined.includes(modelId)) {
-      setCurrentAiModel(modelId);
+    if (cat === "Embedding") {
+      setEmbedModel(modelId);
+      newEmbedModel = modelId;
+    } else if (cat === "Reranker") {
+      setRerankModel(modelId);
+      newRerankModel = modelId;
     } else {
-      setCurrentAiModel("custom");
-      setCustomModelId(modelId);
+      const predefined = [
+        "Qwen/Qwen3.6-35B-A3B",
+        "Qwen/Qwen3-32B",
+        "deepseek-ai/DeepSeek-V3",
+        "Qwen/Qwen2.5-7B-Instruct"
+      ];
+      if (predefined.includes(modelId)) {
+        setCurrentAiModel(modelId);
+        newAiModel = modelId;
+      } else {
+        setCurrentAiModel("custom");
+        setCustomModelId(modelId);
+        newAiModel = modelId;
+      }
     }
 
-    const m = modelsList.find(item => item.model_id === modelId);
     if (m) {
       if (m.api_url) setApiBaseUrl(m.api_url);
       if (m.api_key) setSiliconFlowKey(m.api_key);
@@ -473,7 +493,9 @@ export default function Configuration({
     showToast(`Activating model: ${modelId}...`, "info");
     
     const payload = {
-      ai_model: modelId,
+      ai_model: newAiModel,
+      embed_model: newEmbedModel,
+      rerank_model: newRerankModel,
       temperature,
       max_tokens: contextLimit,
       recursion_limit: recursionLimit,
@@ -965,7 +987,10 @@ export default function Configuration({
                     return true;
                   })
                   .map((m) => {
-                    const isActivated = currentAiModel === m.model_id || (currentAiModel === "custom" && customModelId === m.model_id);
+                    const isActivated = 
+                      (m.category === "Embedding" && embedModel === m.model_id) ||
+                      (m.category === "Reranker" && rerankModel === m.model_id) ||
+                      (m.category !== "Embedding" && m.category !== "Reranker" && (currentAiModel === m.model_id || (currentAiModel === "custom" && customModelId === m.model_id)));
                     return (
                       <div key={m.id} className={`bg-slate-900/35 border rounded-xl p-4 flex flex-col justify-between gap-3 hover:border-slate-800/80 transition-all ${
                         isActivated ? "border-blue-500/60 shadow-[0_0_20px_rgba(59,130,246,0.1)]" : "border-slate-900"
@@ -977,7 +1002,7 @@ export default function Configuration({
                               <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-900/30 shrink-0 uppercase tracking-widest">Activated</span>
                             ) : (
                               <button
-                                onClick={() => handleActivateModel(m.model_id)}
+                                onClick={() => handleActivateModel(m.model_id, m.category)}
                                 className="text-[8px] font-mono font-bold bg-slate-800 text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded border border-slate-700 shrink-0 uppercase tracking-widest cursor-pointer"
                               >
                                 Activate
@@ -1049,6 +1074,58 @@ export default function Configuration({
                       placeholder="E.g. deepseek-reasoner..."
                       value={customModelId}
                       onChange={(e) => setCustomModelId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-3 py-2 text-slate-200 outline-none mt-2"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">🧠 Active Embed Model</label>
+                  <select
+                    value={modelsList.some(m => m.model_id === embedModel) ? embedModel : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") setEmbedModel(e.target.value);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 text-slate-200 outline-none rounded cursor-pointer"
+                  >
+                    <option value="Qwen/Qwen3-Embedding-0.6B">Qwen 3 Embedding 0.6B (Default)</option>
+                    {modelsList.filter(m => m.category === "Embedding").map(m => (
+                      <option key={m.id} value={m.model_id}>{m.name}</option>
+                    ))}
+                    <option value="custom">Custom model override...</option>
+                  </select>
+                  {(!modelsList.some(m => m.model_id === embedModel) && embedModel !== "Qwen/Qwen3-Embedding-0.6B") && (
+                    <input
+                      type="text"
+                      placeholder="Custom Embedding ID..."
+                      value={embedModel}
+                      onChange={(e) => setEmbedModel(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-3 py-2 text-slate-200 outline-none mt-2"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">🧠 Active Reranker Model</label>
+                  <select
+                    value={modelsList.some(m => m.model_id === rerankModel) ? rerankModel : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") setRerankModel(e.target.value);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 px-3 py-2 text-slate-200 outline-none rounded cursor-pointer"
+                  >
+                    <option value="Qwen/Qwen3-Reranker-0.6B">Qwen 3 Reranker 0.6B (Default)</option>
+                    {modelsList.filter(m => m.category === "Reranker").map(m => (
+                      <option key={m.id} value={m.model_id}>{m.name}</option>
+                    ))}
+                    <option value="custom">Custom model override...</option>
+                  </select>
+                  {(!modelsList.some(m => m.model_id === rerankModel) && rerankModel !== "Qwen/Qwen3-Reranker-0.6B") && (
+                    <input
+                      type="text"
+                      placeholder="Custom Reranker ID..."
+                      value={rerankModel}
+                      onChange={(e) => setRerankModel(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-3 py-2 text-slate-200 outline-none mt-2"
                     />
                   )}

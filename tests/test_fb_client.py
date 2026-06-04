@@ -428,7 +428,7 @@ class TestFacebookClientIntegration(unittest.TestCase):
         mock_resp_polling = MagicMock()
         mock_resp_polling.status_code = 200
         
-        mock_requests_get.side_effect = [mock_resp_meta, mock_resp_polling]
+        mock_requests_get.side_effect = [mock_resp_meta, mock_resp_meta, mock_resp_polling]
         
         def mock_creative_call(*args, **kwargs):
             if args:
@@ -442,7 +442,7 @@ class TestFacebookClientIntegration(unittest.TestCase):
         
         res = batch_create_creatives(mock_api, "act_123456", str(self.workspace_id), variants)
         
-        self.assertEqual(mock_requests_get.call_count, 2)
+        self.assertEqual(mock_requests_get.call_count, 3)
         mock_upload_text.assert_called_once_with(
             api_key="real_api_key_123",
             user="topvnsport",

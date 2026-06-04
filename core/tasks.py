@@ -760,3 +760,206 @@ def radar_market_first_cron(self):
             logger.error(f"[radar_market_first_cron] Cron task failed: {exc}", exc_info=True)
             db.rollback()
             raise self.retry(exc=exc)
+
+
+@celery_app.task(
+    name="core.tasks.poll_video_agent_jobs",
+    queue="video_polling",
+)
+def poll_video_agent_jobs():
+    """
+    Celery Beat task — chạy định kỳ.
+    Quét PlatformVariant có publish_status="generating_media",
+    poll Video Agent API, và trigger publish khi video sẵn sàng.
+    """
+    from core.integrations.video_client import get_job_status
+    from core.models import PlatformVariant
+    from datetime import datetime
+    
+    with get_session() as db:
+        pending_variants = db.query(PlatformVariant).filter(
+            PlatformVariant.publish_status == "generating_media"
+        ).all()
+        
+        for variant in pending_variants:
+            job_id = (variant.meta_data or {}).get("video_agent_job_id")
+            if not job_id:
+                continue
+                
+            try:
+                status = get_job_status(job_id)
+                
+                if status["status"] == "COMPLETED" and status["result_url"]:
+                    from core.models import MediaAsset
+                    import uuid
+                    
+                    file_url = status["result_url"]
+                    file_key = file_url.split("video-output/")[-1] if "video-output/" in file_url else f"job_{job_id}/final.mp4"
+                    
+                    # Create MediaAsset representing the rendered video
+                    media_asset = MediaAsset(
+                        id=uuid.uuid4(),
+                        workspace_id=variant.workspace_id,
+                        file_key=file_key,
+                        file_url=file_url,
+                        file_type="video",
+                        aspect_ratio="9:16",
+                        tags=["video_agent", "rendered"]
+                    )
+                    db.add(media_asset)
+                    db.flush()
+                    
+                    # Assign the MediaAsset UUID to the variant's platform_media_ids list
+                    variant.platform_media_ids = [media_asset.id]
+                    variant.publish_status = "ready_to_publish"
+                    variant.meta_data = {
+                        **(variant.meta_data or {}),
+                        "video_completed_at": datetime.utcnow().isoformat(),
+                    }
+                    db.commit()
+                    
+                    # Trigger social publishing
+                    celery_app.send_task(
+                        "core.tasks.publish_to_social",
+                        args=[str(variant.id)],
+                        queue="social_publisher",
+                    )
+                    logger.info(f"Video ready! Triggered publish for variant {variant.id}")
+                    
+                elif status["status"] == "FAILED":
+                    variant.publish_status = "video_generation_failed"
+                    variant.meta_data = {
+                        **(variant.meta_data or {}),
+                        "video_error": status.get("error", "Unknown error"),
+                    }
+                    db.commit()
+                    logger.error(f"Video generation FAILED for variant {variant.id}")
+                    
+                else:
+                    # Still processing — log progress
+                    logger.info(
+                        f"Video job {job_id} for variant {variant.id}: "
+                        f"{status['status']} ({status['progress']}%)"
+                    )
+            except Exception as e:
+                logger.error(f"Error polling video job {job_id}: {e}")
+# ============================================================
+# TASK 6: Paid Campaign Metrics Sync & Soft-Delete
+# ============================================================
+@celery_app.task(name="core.tasks.sync_paid_campaign_metrics_task")
+def sync_paid_campaign_metrics_task():
+    from core.models import PlatformVariant, CampaignAnalytics, MasterContent
+    from core.integrations.fb_client import fetch_campaign_metrics
+    import uuid
+    from datetime import datetime
+    
+    with get_session() as db:
+        variants = db.query(PlatformVariant).filter(
+            PlatformVariant.is_active == True,
+            PlatformVariant.publish_status == 'published'
+        ).all()
+        
+        for variant in variants:
+            try:
+                # We assume platform_post_id holds the Meta ad_id or campaign_id for paid ads
+                metrics = fetch_campaign_metrics(variant.platform_post_id)
+                # If success, insert into campaign_analytics
+                master = db.query(MasterContent).filter_by(id=variant.master_content_id).first()
+                if master and master.campaign_id:
+                    analytics = CampaignAnalytics(
+                        campaign_id=master.campaign_id,
+                        platform=variant.platform,
+                        impressions=metrics.get('impressions', 0),
+                        clicks=metrics.get('clicks', 0),
+                        spend=metrics.get('spend', 0.0),
+                        conversions=metrics.get('conversions', 0)
+                    )
+                    db.add(analytics)
+                variant.sync_status = "synced"
+            except Exception as e:
+                error_str = str(e)
+                # Meta API commonly returns HTTP 400 subcode 100 or DEL for deleted objects
+                if "100" in error_str or "Does Not Exist" in error_str or "DEL" in error_str:
+                    logger.warning(f"[SOFT DELETE] Variant {variant.id} returned API error: {e}. Deactivating.")
+                    variant.is_active = False
+                    variant.sync_status = "failed_deleted"
+                else:
+                    logger.error(f"Sync failed for variant {variant.id}: {e}")
+                    variant.sync_status = "failed"
+        db.commit()
+
+
+# ============================================================
+# TASK 7: Master Orchestrator Cronjob (Dynamic State Machine)
+# ============================================================
+@celery_app.task(name="core.tasks.state_orchestrator_cron")
+def state_orchestrator_cron():
+    from core.models import Workspace, PlatformVariant, MarketingCampaign
+    from core.bandit_orchestrator import trigger_autonomous_generation
+    import asyncio
+    
+    with get_session() as db:
+        workspaces = db.query(Workspace).all()
+        for ws in workspaces:
+            settings = ws.settings or {}
+            
+            # Count Active
+            count_active = db.query(PlatformVariant).filter(
+                PlatformVariant.workspace_id == ws.id,
+                PlatformVariant.is_active == True
+            ).count()
+            
+            logger.info(f"[ORCHESTRATOR] Workspace {ws.id} - Active Variants: {count_active}")
+            
+            MAX_LIMIT = settings.get("orchestrator_max_active_limit", 5)
+            
+            # Find an active campaign to trigger (heuristic)
+            camp = db.query(MarketingCampaign).filter(
+                MarketingCampaign.workspace_id == ws.id,
+                MarketingCampaign.status == "active"
+            ).first()
+            if not camp:
+                continue
+                
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+            if count_active == 0:
+                logger.info(f"[IGNITION PROTOCOL] Triggering 100% Explore for Workspace {ws.id}")
+                # Force Explore & Generator
+                loop.run_until_complete(
+                    trigger_autonomous_generation(
+                        workspace_id=str(ws.id),
+                        campaign_id=str(camp.id),
+                        product_id=str(camp.product_id),
+                        db=db,
+                        epsilon_override=1.0,
+                        skip_generation=False
+                    )
+                )
+            elif count_active > MAX_LIMIT:
+                logger.info(f"[DARWIN PRUNING] Triggering 100% Exploit for Workspace {ws.id}")
+                # Force Exploit & Skip Gen
+                loop.run_until_complete(
+                    trigger_autonomous_generation(
+                        workspace_id=str(ws.id),
+                        campaign_id=str(camp.id),
+                        product_id=str(camp.product_id),
+                        db=db,
+                        epsilon_override=0.0,
+                        skip_generation=True
+                    )
+                )
+            else:
+                logger.info(f"[BALANCED MAB] Normal operations for Workspace {ws.id}")
+                loop.run_until_complete(
+                    trigger_autonomous_generation(
+                        workspace_id=str(ws.id),
+                        campaign_id=str(camp.id),
+                        product_id=str(camp.product_id),
+                        db=db
+                    )
+                )

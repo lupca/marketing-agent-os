@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Column, String, Text, Numeric, Integer, Boolean, DateTime, Date, ForeignKey, JSON, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
 from sqlalchemy.sql import func
-from db.connection import Base, IS_MOCK_DATABASE
+from db.connection import Base
 
 # Resolve cross-database data types - PostgreSQL Native & pgvector Type Anchor
 UUID_TYPE = UUID(as_uuid=True)

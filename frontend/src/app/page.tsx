@@ -31,9 +31,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function Dashboard() {
   return (
-    <ToastProvider>
-      <DashboardContent />
-    </ToastProvider>
+    <AuthGuard>
+      <ToastProvider>
+        <DashboardContent />
+      </ToastProvider>
+    </AuthGuard>
   );
 }
 
@@ -67,7 +69,7 @@ function DashboardContent() {
   // Workspaces and Campaigns states
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("00000000-0000-0000-0000-000000000002");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
 
   // Tab: Deadlock State Shared with ErrorManagement
   const [isLockReleased, setIsLockReleased] = useState(false);
@@ -142,8 +144,10 @@ function DashboardContent() {
       try {
         const wsRes = await fetch(`${API_BASE}/api/workspace/list`);
         const wsData = await wsRes.json();
-        if (wsData.status === "success") {
-          setWorkspaces(wsData.data || []);
+        if (wsData.status === "success" && wsData.data && wsData.data.length > 0) {
+          setWorkspaces(wsData.data);
+          const teamAlpha = wsData.data.find((w: any) => w.name === "Team Alpha Workspace");
+          setSelectedWorkspaceId(teamAlpha ? teamAlpha.id : wsData.data[0].id);
         }
         const campRes = await fetch(`${API_BASE}/api/workspace/campaigns`);
         const campData = await campRes.json();

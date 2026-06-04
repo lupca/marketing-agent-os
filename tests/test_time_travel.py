@@ -45,6 +45,7 @@ class TestTimeTravelAndTransformation(LocalOllamaTestCase):
         self.db.close()
         super().tearDown()
         
+    @unittest.skip("Obsolete in feature/v4 100% stateless architecture without checkpointers or negotiator nodes")
     def test_draft_negotiation_and_time_travel(self):
         """Verify the draft negotiation loop, checkpointer history, and fork-based Time Travel."""
         print(f"\n[START TIME TRAVEL TEST] Thread ID: {self.thread_id}")

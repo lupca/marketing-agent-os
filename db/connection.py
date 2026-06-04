@@ -38,7 +38,6 @@ PSYCOPG_CONNINFO = _RAW_URL  # keep as plain postgresql:// for native psycopg
 
 engine = None
 SessionLocal = None
-IS_MOCK_DATABASE = False
 
 # Attempt connecting to PostgreSQL
 # NOTE: pool_pre_ping=True validates the connection before each use (lazy).
@@ -62,6 +61,3 @@ def get_db():
     finally:
         db.close()
 
-def is_mock():
-    """Helper to check if currently running on SQLite mock fallback. Always returns False."""
-    return False

@@ -10,9 +10,21 @@ import type {
   PaginatedQuarantinedTasks,
   KillSwitchStatus,
   AgencyState,
+  User,
+  AuthResponse,
+  RegisterPayload,
+  LoginPayload,
 } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+// ─── Logout Callback Registry ──────────────────────────────────────────────────
+
+let logoutHandler: (() => void) | null = null;
+
+export function registerLogoutHandler(callback: () => void) {
+  logoutHandler = callback;
+}
 
 // ─── Generic Fetch Helper ─────────────────────────────────────────────────────
 
@@ -20,16 +32,43 @@ async function apiFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  const headers: Record<string, string> = {};
+
+  const isFormData = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (options?.headers) {
+    Object.assign(headers, options.headers);
+  }
+
+  // Automatically append stored token if execution occurs in browser context
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers,
   });
+
+  if (res.status === 401) {
+    if (logoutHandler) {
+      logoutHandler();
+    }
+  }
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`API Error ${res.status}: ${err}`);
   }
   return res.json() as Promise<T>;
 }
+
 
 // ─── Execution Mode ───────────────────────────────────────────────────────────
 
@@ -100,3 +139,19 @@ export const cockpitApi = {
       body: JSON.stringify(payload ?? {}),
     }),
 };
+
+export const authApi = {
+  register: (payload: RegisterPayload) =>
+    apiFetch<AuthResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  login: (payload: LoginPayload) =>
+    apiFetch<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getMe: () =>
+    apiFetch<User>('/api/auth/me'),
+};
+

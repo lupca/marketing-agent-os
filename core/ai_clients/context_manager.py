@@ -1,7 +1,6 @@
 # core/ai_clients/context_manager.py
 import uuid
 import logging
-from transformers import AutoTokenizer
 from langchain_core.messages import trim_messages
 from core.dependencies import get_session
 from core.models import Workspace
@@ -12,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Qwen Tokenizer locally for 100% accurate Vietnamese token counting
 logger.info("Initializing Qwen Tokenizer for Vietnamese token counting...")
 try:
+    from transformers import AutoTokenizer
     qwen_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-7B-Instruct", use_fast=True)
     logger.info("Successfully loaded Qwen Tokenizer!")
 except Exception as e:

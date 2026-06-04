@@ -20,7 +20,7 @@ import uuid
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from core.models import MarketingCampaign, CampaignAnalytics, AIInsightPending
+from core.models import MarketingCampaign, CampaignAnalytics, AIInsightPending, MasterContent, PlatformVariant
 from core import pipeline_tracker
 from graphs.main_router import graph
 
@@ -178,7 +178,9 @@ async def trigger_autonomous_generation(
     workspace_id: str,
     campaign_id: str,
     product_id: str,
-    db: Session
+    db: Session,
+    epsilon_override: float = None,
+    skip_generation: bool = False
 ) -> Dict[str, Any]:
     """
     Orchestration layer. Computes MAB beliefs, creates a pipeline run record, triggers
@@ -231,9 +233,45 @@ async def trigger_autonomous_generation(
         objective = "LEAD_GEN"
         
     # ── Compute MAB Priors ─────────────────────────────────────────────────────
-    mab_result = compute_mab_beliefs(db, campaign_id, objective)
+    epsilon_to_use = epsilon_override if epsilon_override is not None else 0.2
+    mab_result = compute_mab_beliefs(db, campaign_id, objective, epsilon=epsilon_to_use)
     priors = mab_result["beliefs"]
     metrics = mab_result["metrics"]
+    
+    # Extract baseline copy from the best performing variant of the exploit angle (if not cold start)
+    baseline_copy = None
+    if not mab_result.get("cold_start") and priors:
+        try:
+            best_angle = max(priors, key=priors.get)
+            campaign_variants = (
+                db.query(PlatformVariant)
+                .join(MasterContent, PlatformVariant.master_content_id == MasterContent.id)
+                .filter(MasterContent.campaign_id == uuid.UUID(campaign_id))
+                .all()
+            )
+            
+            angle_variants = []
+            for v in campaign_variants:
+                meta = v.meta_data or {}
+                if meta.get("angle_name") == best_angle:
+                    angle_variants.append(v)
+            
+            if angle_variants:
+                def get_variant_score(var):
+                    views = var.metric_views or 0
+                    likes = var.metric_likes or 0
+                    comments = var.metric_comments or 0
+                    shares = var.metric_shares or 0
+                    engagement = views + likes * 2 + comments * 3 + shares * 5
+                    created_time = var.created_at.timestamp() if var.created_at else 0
+                    return (engagement, created_time)
+                
+                angle_variants.sort(key=get_variant_score, reverse=True)
+                best_var = angle_variants[0]
+                baseline_copy = best_var.adapted_copy
+                logger.info(f"Found best performing baseline variant for exploit angle '{best_angle}': ID={best_var.id}")
+        except Exception as e:
+            logger.error(f"Error querying baseline variant: {e}")
     
     # ── Build Initial State ────────────────────────────────────────────────────
     initial_state = {
@@ -243,12 +281,14 @@ async def trigger_autonomous_generation(
         "campaign_objective": objective,
         "current_metrics": metrics,
         "current_beliefs": priors,
+        "baseline_copy": baseline_copy,
         "sop_stage": "scoring",
         "selected_actions": [],
         "generated_variants": [],
         "sandbox_feedbacks": [],
         # Cockpit fields — consumed by autonomous_nodes.py for run tracking
         "_execution_mode": execution_mode,
+        "_skip_generation": skip_generation,
     }
 
     # ── Create Pipeline Run Record ─────────────────────────────────────────────
