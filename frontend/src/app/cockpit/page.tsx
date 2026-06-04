@@ -1,4 +1,5 @@
 import CockpitLayout from '@/components/cockpit/CockpitLayout';
+import AuthGuard from '@/components/AuthGuard';
 
 export const metadata = {
   title: 'The Autopilot Cockpit | Marketing Agent OS',
@@ -6,5 +7,10 @@ export const metadata = {
 };
 
 export default function CockpitPage() {
-  return <CockpitLayout />;
+  return (
+    <AuthGuard>
+      <CockpitLayout />
+    </AuthGuard>
+  );
 }
+

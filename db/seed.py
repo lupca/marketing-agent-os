@@ -52,7 +52,7 @@ def seed_database(db: Session):
         "ai_model": "Qwen/Qwen3.6-35B-A3B",
         "embed_model": "Qwen/Qwen3-Embedding-0.6B",
         "rerank_model": "Qwen/Qwen3-Reranker-0.6B",
-        "siliconflow_api_key": os.getenv("SILICONFLOW_API_KEY", "your_api_key_here")
+        "siliconflow_api_key": "xx"
     }
 
     if not default_ws:

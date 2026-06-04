@@ -10,6 +10,7 @@ import Configuration from "@/components/Configuration";
 import ExecuteAgentDialog from "@/components/ExecuteAgentDialog";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import Link from "next/link";
+import AuthGuard from "@/components/AuthGuard";
 import {
   LayoutDashboard,
   Play,
