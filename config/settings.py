@@ -1,5 +1,8 @@
 # config/settings.py
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MAX_CONTEXT_TOKENS = 14000
 LLM_CTX_WINDOW = 16384

@@ -21,16 +21,31 @@ Nếu bạn (AI) cần tìm hiểu sâu hơn về kiến trúc ban đầu, cách
   - `02_architecture/FACEBOOK_INTEGRATION_GUIDE.md`
   - `03_design/` (Các thiết kế chi tiết về RAG, Bi Dashboard, MarkItDown)
 
+## Cấu hình Hạ tầng (Infrastructure Setup)
+
+Hạ tầng cơ sở dữ liệu và lưu trữ đã được chuyển lên remote server (`192.168.0.200`) sử dụng Docker:
+- **PostgreSQL (pgvector)**: Cổng `5432`
+- **Redis**: Cổng `6379`
+- **MinIO**: Cổng `9000` & `9001`
+
+Các file cấu hình và dữ liệu trên server được lưu trữ tại thư mục `/home/tung/app-infra/`.
+
 ## Khởi động hệ thống (System Start)
 
 1. **Backend (FastAPI)**:
    ```bash
    python app.py
    ```
-2. **Frontend (Next.js)**:
+2. **Celery Workers (Worker & Beat)**:
+   Chạy script khởi động các workers song song dưới Ubuntu:
+   ```bash
+   ./start_workers.sh
+   ```
+3. **Frontend (Next.js)**:
    ```bash
    cd frontend
    npm run dev
    ```
 
-*Lưu ý: Yêu cầu Docker chạy các container `agent_postgres` và `agent_minio` cùng Ollama.*
+*Lưu ý: Đảm bảo đã khai báo các biến môi trường chính xác trong tệp `.env` hướng tới IP của server `192.168.0.200` trước khi khởi chạy.*
+
