@@ -1,18 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Database,
   Eye,
   EyeOff,
   Search,
   Plus,
-  Filter,
-  X,
-  Settings,
-  Sliders,
-  Cpu,
-  Layers
+  Filter
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
@@ -60,12 +55,11 @@ interface SocialAccountRecord {
 
 interface ConfigurationProps {
   selectedWorkspaceId: string;
-  workspaces: any[];
+  workspaces?: unknown[];
 }
 
 export default function Configuration({
-  selectedWorkspaceId,
-  workspaces
+  selectedWorkspaceId
 }: ConfigurationProps) {
   const { showToast } = useToast();
   const [configSubTab, setConfigSubTab] = useState("integrations");
@@ -132,16 +126,8 @@ export default function Configuration({
   const [formModelApiKey, setFormModelApiKey] = useState("");
   const [formModelDescription, setFormModelDescription] = useState("");
 
-  // Load configuration details
-  useEffect(() => {
-    fetchIntegrations();
-    fetchSocialAccounts();
-    fetchModelsList();
-    fetchAISettings();
-  }, [selectedWorkspaceId]);
-
   // API - Integrations
-  const fetchIntegrations = async () => {
+  const fetchIntegrations = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`);
       const res = await response.json();
@@ -151,9 +137,85 @@ export default function Configuration({
         showToast("Error loading integrations: " + (res.error || "Unknown"), "error");
       }
     } catch (e) {
+      console.error(e);
       showToast("Connection to backend workspace integrations failed.", "error");
     }
-  };
+  }, [selectedWorkspaceId, showToast]);
+
+  // API - Social Accounts
+  const fetchSocialAccounts = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
+      const res = await response.json();
+      if (res.status === "success") {
+        setSocialAccounts(res.data || []);
+      } else {
+        showToast("Error loading social accounts: " + (res.error || "Unknown"), "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Connection to backend social accounts failed.", "error");
+    }
+  }, [selectedWorkspaceId, showToast]);
+
+  // API - AI parameters and models
+  const fetchAISettings = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
+      const settings = await response.json();
+      
+      if (settings.ai_model) {
+        const predefined = [
+          "Qwen/Qwen3.6-35B-A3B",
+          "Qwen/Qwen3-32B",
+          "deepseek-ai/DeepSeek-V3",
+          "Qwen/Qwen2.5-7B-Instruct"
+        ];
+        
+        if (predefined.includes(settings.ai_model)) {
+          setCurrentAiModel(settings.ai_model);
+        } else {
+          setCurrentAiModel("custom");
+          setCustomModelId(settings.ai_model);
+        }
+      }
+      
+      if (settings.temperature !== undefined) setTemperature(settings.temperature);
+      if (settings.max_tokens) setContextLimit(settings.max_tokens);
+      if (settings.recursion_limit) setRecursionLimit(settings.recursion_limit);
+      if (settings.reranker_mode) setRerankerMode(settings.reranker_mode);
+      if (settings.embed_model) setEmbedModel(settings.embed_model);
+      if (settings.rerank_model) setRerankModel(settings.rerank_model);
+      if (settings.siliconflow_api_key) setSiliconFlowKey(settings.siliconflow_api_key);
+      if (settings.ai_api_url) setApiBaseUrl(settings.ai_api_url);
+      if (settings.enable_thinking !== undefined) setEnableThinking(settings.enable_thinking);
+    } catch (e) {
+      console.error("Failed to load workspace settings from backend.", e);
+    }
+  }, [selectedWorkspaceId]);
+
+  const fetchModelsList = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
+      const res = await response.json();
+      if (res.status === "success") {
+        setModelsList(res.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load models catalog.", e);
+    }
+  }, [selectedWorkspaceId]);
+
+  // Load configuration details
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchIntegrations();
+      fetchSocialAccounts();
+      fetchModelsList();
+      fetchAISettings();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedWorkspaceId, fetchAISettings, fetchIntegrations, fetchModelsList, fetchSocialAccounts]);
 
   const handleSaveIntegration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +224,7 @@ export default function Configuration({
       return;
     }
 
-    const payload: any = {
+    const payload: Partial<IntegrationRecord> & { id?: string } = {
       platform_name: formIntPlatform.trim().toLowerCase(),
       config_key: formIntKey.trim().toLowerCase(),
       config_value: formIntValue.trim(),
@@ -186,7 +248,7 @@ export default function Configuration({
       } else {
         showToast("Error saving integration: " + res.message, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("Integration API connection failed.", "error");
     }
   };
@@ -216,7 +278,7 @@ export default function Configuration({
       } else {
         showToast("Failed to toggle status: " + res.message, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("API connectivity failure.", "error");
     }
   };
@@ -237,7 +299,7 @@ export default function Configuration({
       } else {
         showToast("Delete failure: " + res.error, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("API deletion failure.", "error");
     }
   };
@@ -270,21 +332,6 @@ export default function Configuration({
     setVisibleKeyIds(updated);
   };
 
-  // API - Social Accounts
-  const fetchSocialAccounts = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
-      const res = await response.json();
-      if (res.status === "success") {
-        setSocialAccounts(res.data || []);
-      } else {
-        showToast("Error loading social accounts: " + (res.error || "Unknown"), "error");
-      }
-    } catch (e) {
-      showToast("Connection to backend social accounts failed.", "error");
-    }
-  };
-
   const handleSaveSocialAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSocialPlatform || !formSocialAccountName || !formSocialAccountId) {
@@ -292,7 +339,7 @@ export default function Configuration({
       return;
     }
 
-    const payload: any = {
+    const payload: Partial<SocialAccountRecord> & { id?: string } = {
       platform: formSocialPlatform.trim().toLowerCase(),
       account_name: formSocialAccountName.trim(),
       account_id: formSocialAccountId.trim(),
@@ -319,7 +366,7 @@ export default function Configuration({
       } else {
         showToast("Error saving social account: " + res.message, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("Social account API connection failed.", "error");
     }
   };
@@ -338,7 +385,7 @@ export default function Configuration({
       } else {
         showToast("Delete failure: " + res.error, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("API deletion failure.", "error");
     }
   };
@@ -367,41 +414,7 @@ export default function Configuration({
     setFormSocialStatus("active");
   };
 
-  // API - AI parameters and models
-  const fetchAISettings = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
-      const settings = await response.json();
-      
-      if (settings.ai_model) {
-        const predefined = [
-          "Qwen/Qwen3.6-35B-A3B",
-          "Qwen/Qwen3-32B",
-          "deepseek-ai/DeepSeek-V3",
-          "Qwen/Qwen2.5-7B-Instruct"
-        ];
-        
-        if (predefined.includes(settings.ai_model)) {
-          setCurrentAiModel(settings.ai_model);
-        } else {
-          setCurrentAiModel("custom");
-          setCustomModelId(settings.ai_model);
-        }
-      }
-      
-      if (settings.temperature !== undefined) setTemperature(settings.temperature);
-      if (settings.max_tokens) setContextLimit(settings.max_tokens);
-      if (settings.recursion_limit) setRecursionLimit(settings.recursion_limit);
-      if (settings.reranker_mode) setRerankerMode(settings.reranker_mode);
-      if (settings.embed_model) setEmbedModel(settings.embed_model);
-      if (settings.rerank_model) setRerankModel(settings.rerank_model);
-      if (settings.siliconflow_api_key) setSiliconFlowKey(settings.siliconflow_api_key);
-      if (settings.ai_api_url) setApiBaseUrl(settings.ai_api_url);
-      if (settings.enable_thinking !== undefined) setEnableThinking(settings.enable_thinking);
-    } catch (e) {
-      console.error("Failed to load workspace settings from backend.");
-    }
-  };
+  // AI parameters and models actions
 
   const handleSaveAISettings = async (showNotification = true) => {
     const modelId = currentAiModel === "custom" ? customModelId.trim() : currentAiModel;
@@ -437,22 +450,12 @@ export default function Configuration({
       } else {
         showToast("Error saving LLM settings: " + res.message, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("Failed to connect to LLM settings API.", "error");
     }
   };
 
-  const fetchModelsList = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
-      const res = await response.json();
-      if (res.status === "success") {
-        setModelsList(res.data || []);
-      }
-    } catch (e) {
-      console.error("Failed to load models catalog.");
-    }
-  };
+  // Models actions
 
   const handleActivateModel = async (modelId: string, category: string = "Chat") => {
     const m = modelsList.find(item => item.model_id === modelId);
@@ -515,7 +518,7 @@ export default function Configuration({
       if (res.status === "success") {
         showToast(`Model ${modelId} activated and saved successfully!`, "success");
       }
-    } catch (e) {
+    } catch {
       showToast("Autosave activation connection failed.", "error");
     }
   };
@@ -601,7 +604,7 @@ export default function Configuration({
       } else {
         showToast("Error: " + res.error, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("API models saving failure.", "error");
     }
   };
@@ -620,7 +623,7 @@ export default function Configuration({
       } else {
         showToast("Delete failed: " + res.error, "error");
       }
-    } catch (e) {
+    } catch {
       showToast("API models deletion failure.", "error");
     }
   };

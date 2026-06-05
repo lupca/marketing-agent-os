@@ -1,19 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp,
-  TrendingDown,
-  Database,
-  Sparkles,
-  Sliders,
   Cpu,
-  AlertTriangle,
   RefreshCw,
-  FileText,
   Layers,
-  Check,
-  X,
   Activity,
   DollarSign,
   HelpCircle,
@@ -61,6 +53,42 @@ interface ChannelData {
   cpa: number;
 }
 
+interface FatigueAlert {
+  platform: string;
+  angle_name: string;
+  cpa_3d: number;
+  cpa_7d: number;
+  ratio: number;
+}
+
+interface WinningBoardItem {
+  platform: string;
+  cpa: number;
+  angle_name: string;
+  adapted_copy: string;
+  spend: number;
+  conversions: number;
+}
+
+interface KilledBoardItem {
+  platform: string;
+  failed_cpa: number;
+  angle_name: string;
+  adapted_copy: string;
+  reason_killed: string;
+  spend: number;
+}
+
+interface AntiPattern {
+  content: string;
+  source_name: string;
+}
+
+interface AuditLog {
+  action: string;
+  metadata: string | Record<string, unknown> | null | undefined;
+}
+
 export default function BiDashboard() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -79,20 +107,20 @@ export default function BiDashboard() {
     cost: 1500000,
     target_cpa: 1050000
   });
-  const [fatigueAlerts, setFatigueAlerts] = useState<any[]>([]);
-  const [winningBoard, setWinningBoard] = useState<any[]>([]);
-  const [killedBoard, setKilledBoard] = useState<any[]>([]);
-  const [antiPatterns, setAntiPatterns] = useState<any[]>([]);
+  const [fatigueAlerts, setFatigueAlerts] = useState<FatigueAlert[]>([]);
+  const [winningBoard, setWinningBoard] = useState<WinningBoardItem[]>([]);
+  const [killedBoard, setKilledBoard] = useState<KilledBoardItem[]>([]);
+  const [antiPatterns, setAntiPatterns] = useState<AntiPattern[]>([]);
   const [trendChart, setTrendChart] = useState<{ labels: string[]; values: number[] }>({ labels: [], values: [] });
   const [channelData, setChannelData] = useState<ChannelData[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // What-If Simulator Inputs
   const [simBudget, setSimBudget] = useState(10000000);
   const [simPrice, setSimPrice] = useState(5000000);
   const [simCost, setSimCost] = useState(1500000);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/dashboard/metrics`);
@@ -125,7 +153,7 @@ export default function BiDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const handleSyncMetrics = async () => {
     setSyncing(true);
@@ -136,6 +164,7 @@ export default function BiDashboard() {
       const data = await response.json();
       showToast(data.message || "Đã gửi yêu cầu đồng bộ thành công!", "success");
     } catch (error) {
+      console.error(error);
       showToast("Không thể đồng bộ số liệu quảng cáo.", "error");
     } finally {
       setSyncing(false);
@@ -143,8 +172,11 @@ export default function BiDashboard() {
   };
 
   useEffect(() => {
-    fetchMetrics();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchMetrics();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchMetrics]);
 
   // Format currency in VND
   const formatVND = (value: number) => {
@@ -387,7 +419,7 @@ export default function BiDashboard() {
                   <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" stroke="#64748b" fontSize={10} fontStyle="mono" tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={10} fontStyle="mono" tickLine={false} tickFormatter={value => formatVND(value).replace("đ", "")} />
-                  <RechartsTooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", color: "#f1f5f9", fontSize: "11px", fontFamily: "monospace" }} formatter={(value: any) => [formatVND(value), "Blended CPA"]} />
+                  <RechartsTooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", color: "#f1f5f9", fontSize: "11px", fontFamily: "monospace" }} formatter={(value) => [formatVND(Number(value || 0)), "Blended CPA"]} />
                   <Line type="monotone" dataKey="CPA" stroke="#6366f1" strokeWidth={3} activeDot={{ r: 6 }} dot={{ fill: "#818cf8", strokeWidth: 1.5, r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -685,11 +717,11 @@ export default function BiDashboard() {
                 <YAxis stroke="#64748b" fontSize={10} fontStyle="mono" tickLine={false} tickFormatter={value => value.toLocaleString()} />
                 <RechartsTooltip
                   contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", color: "#f1f5f9", fontSize: "11px", fontFamily: "monospace" }}
-                  formatter={(value: any, name: any) => {
+                  formatter={(value, name) => {
                     if (name === "Prompt Tokens" || name === "Completion Tokens") {
-                      return [value.toLocaleString(), name];
+                      return [Number(value || 0).toLocaleString(), name];
                     }
-                    return [value, name];
+                    return [value || "", name];
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: "10px" }} />

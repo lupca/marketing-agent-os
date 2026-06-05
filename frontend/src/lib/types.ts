@@ -220,3 +220,15 @@ export interface LoginPayload {
   password?: string;
 }
 
+export interface Workspace {
+  id: string;
+  name: string;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  workspace_id: string;
+  campaign_type?: string;
+}
+

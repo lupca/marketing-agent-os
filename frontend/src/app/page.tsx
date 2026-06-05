@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import BiDashboard from "@/components/BiDashboard";
 import KnowledgeBase from "@/components/KnowledgeBase";
 import ScriptVault from "@/components/ScriptVault";
@@ -11,22 +11,22 @@ import ExecuteAgentDialog from "@/components/ExecuteAgentDialog";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
-  Play,
   AlertTriangle,
   FileText,
-  Terminal,
   Settings,
   Zap,
   BookOpen,
   Cpu,
   PanelLeftClose,
   PanelLeftOpen,
-  ArrowRight,
   Sliders,
-  Radio
+  Radio,
+  LogOut
 } from "lucide-react";
+import type { GeneratedVariant, Campaign, Workspace } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -42,6 +42,7 @@ export default function Dashboard() {
 
 function DashboardContent() {
   const { showToast } = useToast();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
@@ -54,8 +55,7 @@ function DashboardContent() {
   const [productId, setProductId] = useState("prod_topvnsport_shoe_88");
   
   // Live output variables from DB
-  const [generatedVariants, setGeneratedVariants] = useState<any[]>([]);
-  const [sandboxFeedbacks, setSandboxFeedbacks] = useState<any[]>([]);
+  const [generatedVariants, setGeneratedVariants] = useState<GeneratedVariant[]>([]);
 
   // Telemetry fluctuation states
   const [indexingSpeed, setIndexingSpeed] = useState(45);
@@ -63,13 +63,12 @@ function DashboardContent() {
   const [quotaUsed, setQuotaUsed] = useState(78);
 
   // Live WebSocket Telemetry state
-  const [logs, setLogs] = useState<any[]>([
+  const [logs, setLogs] = useState<Array<{ time: string; tag: string; src: string; msg: string }>>([
     { time: "System", tag: "INFO", src: "init", msg: "Telemetry channel ready. Waiting for backend connection..." }
   ]);
 
-  // Workspaces and Campaigns states
-  const [workspaces, setWorkspaces] = useState<any[]>([]);
-  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
 
   // Tab: Deadlock State Shared with ErrorManagement
@@ -115,7 +114,7 @@ function DashboardContent() {
         }
       };
 
-      ws.onerror = (error) => {
+      ws.onerror = () => {
         // Silently log websocket status to console log state in UI instead of console.error to prevent Turbopack overlays
         setLogs(prev => [
           ...prev,
@@ -144,14 +143,14 @@ function DashboardContent() {
     const fetchWorkspacesAndCampaigns = async () => {
       try {
         const wsRes = await fetch(`${API_BASE}/api/workspace/list`);
-        const wsData = await wsRes.json();
+        const wsData = (await wsRes.json()) as { status: string; data: Workspace[] };
         if (wsData.status === "success" && wsData.data && wsData.data.length > 0) {
           setWorkspaces(wsData.data);
-          const teamAlpha = wsData.data.find((w: any) => w.name === "Team Alpha Workspace");
+          const teamAlpha = wsData.data.find((w) => w.name === "Team Alpha Workspace");
           setSelectedWorkspaceId(teamAlpha ? teamAlpha.id : wsData.data[0].id);
         }
         const campRes = await fetch(`${API_BASE}/api/workspace/campaigns`);
-        const campData = await campRes.json();
+        const campData = (await campRes.json()) as { status: string; data: Campaign[] };
         if (campData.status === "success") {
           setCampaigns(campData.data || []);
         }
@@ -191,16 +190,16 @@ function DashboardContent() {
       
       if (finalState && finalState.sop_stage === "completed") {
         setGeneratedVariants(finalState.generated_variants || []);
-        setSandboxFeedbacks(finalState.sandbox_feedbacks || []);
         setIsExecuting(false);
         setIsExecuteOpen(false);
         showToast(`Stateless execution successfully finished for '${campaignName}'!`, "success");
       } else {
         throw new Error(finalState?.detail || "Execution interrupted before completion.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       setIsExecuting(false);
-      showToast("MAB Pipeline Error: " + error.message, "error");
+      showToast("MAB Pipeline Error: " + err.message, "error");
     }
   };
 
@@ -324,6 +323,25 @@ function DashboardContent() {
                 <span className="text-[9px] text-slate-500 font-mono">Status: AUTONOMOUS</span>
               </div>
             </div>
+
+            <button
+              onClick={logout}
+              className="w-full bg-slate-950 hover:bg-slate-900/60 text-slate-400 hover:text-rose-450 text-[10px] font-bold uppercase tracking-widest py-2 rounded-lg border border-slate-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" /> LOG OUT
+            </button>
+          </div>
+        )}
+
+        {!isSidebarOpen && (
+          <div className="p-4 border-t border-slate-900 flex flex-col items-center gap-4">
+            <button
+              onClick={logout}
+              title="Log Out"
+              className="h-8 w-8 rounded-lg bg-slate-950 border border-slate-900 flex items-center justify-center text-slate-500 hover:text-rose-450 hover:border-rose-900/30 transition-all cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         )}
       </aside>

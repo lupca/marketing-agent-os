@@ -35,3 +35,18 @@ Quản lý vector database và upload tài liệu.
 
 - **Method**: GET
 - Kiểm tra toàn bộ hệ thống (DB, LLM, Redis/MinIO) trước khi cho phép chạy Pipeline. Trả về JSON chứa trạng thái từng hệ thống con.
+
+## 5. User Authentication (`/api/auth/...`)
+
+Routes for user registration, login, session validation.
+- `POST /api/auth/register`:
+  - **Body (JSON)**: `{"name": "...", "email": "...", "password": "..."}`
+  - **Response (JSON)**: `{"access_token": "...", "token_type": "bearer", "user": {"id": "...", "name": "...", "email": "...", "role": "..."}}`
+  - *Note*: Automatically creates user workspace.
+- `POST /api/auth/login`:
+  - Accepts standard OAuth2 `OAuth2PasswordRequestForm` (Form data: `username`, `password`) or JSON `UserLoginSchema` (JSON data: `email`, `password`).
+  - **Response (JSON)**: `{"access_token": "...", "token_type": "bearer", "user": {"id": "...", "name": "...", "email": "...", "role": "..."}}`
+- `GET /api/auth/me`:
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Response (JSON)**: `{"id": "...", "name": "...", "email": "...", "role": "..."}`
+

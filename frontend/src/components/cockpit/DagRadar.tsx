@@ -242,6 +242,14 @@ function RunSelector({
   );
 }
 
+interface RawDagNode {
+  node_name: string;
+  node_order: number;
+  status: string;
+  duration_ms: number;
+  error_message: string | null;
+}
+
 // ─── Main DagRadar Component ───────────────────────────────────────────────────
 
 export default function DagRadar() {
@@ -253,6 +261,16 @@ export default function DagRadar() {
   const [loading, setLoading] = useState(true);
   const [dagLoading, setDagLoading] = useState(false);
   const dagRef = useRef<DagVisualization | null>(null);
+
+  const refreshDag = async (runId: string) => {
+    try {
+      const dagData = await cockpitApi.getDag(runId);
+      setDag(dagData);
+      dagRef.current = dagData;
+      const runData = await cockpitApi.getRun(runId);
+      setExecutions(runData.nodes ?? []);
+    } catch { /* ignore */ }
+  };
 
   // WebSocket for live updates
   const { connectionState } = useCockpitWebSocket(
@@ -289,25 +307,15 @@ export default function DagRadar() {
     )
   );
 
-  const refreshDag = async (runId: string) => {
-    try {
-      const dagData = await cockpitApi.getDag(runId);
-      setDag(dagData);
-      dagRef.current = dagData;
-      const runData = await cockpitApi.getRun(runId);
-      setExecutions(runData.nodes ?? []);
-    } catch { /* ignore */ }
-  };
-
   useEffect(() => {
     const fetchRuns = async () => {
       try {
         const res = await cockpitApi.getRuns({ page_size: 50 });
         setRuns(res.runs ?? []);
         // Auto-select latest run
-        if (res.runs?.length > 0 && !selectedRunId) {
+        if (res.runs?.length > 0) {
           const latest = res.runs[0];
-          setSelectedRunId(latest.id);
+          setSelectedRunId(prev => prev || latest.id);
         }
       } catch (err) {
         console.error(err);
@@ -320,9 +328,12 @@ export default function DagRadar() {
 
   useEffect(() => {
     if (!selectedRunId) return;
-    setDagLoading(true);
-    setSelectedNode(null);
-    refreshDag(selectedRunId).finally(() => setDagLoading(false));
+    const timer = setTimeout(() => {
+      setDagLoading(true);
+      setSelectedNode(null);
+      refreshDag(selectedRunId).finally(() => setDagLoading(false));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedRunId]);
 
   const getExecution = (node: DagNode) =>
@@ -332,7 +343,7 @@ export default function DagRadar() {
 
   // Build node list from dag or default pending nodes
   const nodes: DagNode[] = dag?.nodes?.length
-    ? (dag.nodes as any[]).map((node) => {
+    ? (dag.nodes as unknown as RawDagNode[]).map((node) => {
         const name = node.node_name as NodeName;
         const execution = executions.find((e) => e.node_name === name) ?? null;
         return {

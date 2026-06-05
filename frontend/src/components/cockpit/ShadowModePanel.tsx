@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, Clock, Target, DollarSign, CheckCircle
 } from 'lucide-react';
 import { cockpitApi } from '@/lib/api';
-import type { ExecutionMode, PipelineRun, ShadowDecision } from '@/lib/types';
+import type { ExecutionMode, PipelineRun } from '@/lib/types';
 
 interface MABBar {
   angle: string;
@@ -272,14 +272,24 @@ export default function ShadowModePanel() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    const interval = setInterval(() => {
+      fetchData();
+    }, 10000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchData]);
 
   // Sync listTab with active mode
   useEffect(() => {
-    setListTab(mode);
+    const timer = setTimeout(() => {
+      setListTab(mode);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [mode]);
 
   const handleToggle = async () => {

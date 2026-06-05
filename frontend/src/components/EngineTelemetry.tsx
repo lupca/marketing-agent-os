@@ -43,15 +43,24 @@ const sparklineData = [
   { val: 40 }, { val: 42 }, { val: 45 }, { val: 41 }, { val: 48 }, { val: 44 }, { val: 45 }
 ];
 
+import { GeneratedVariant } from "../lib/types";
+
+interface TelemetryLog {
+  time: string;
+  tag: string;
+  src: string;
+  msg: string;
+}
+
 interface EngineTelemetryProps {
   indexingSpeed: number;
   mutationRate: number;
   quotaUsed: number;
-  generatedVariants: any[];
+  generatedVariants: GeneratedVariant[];
   objective: string;
   campaignName: string;
-  logs: any[];
-  setLogs: React.Dispatch<React.SetStateAction<any[]>>;
+  logs: TelemetryLog[];
+  setLogs: React.Dispatch<React.SetStateAction<TelemetryLog[]>>;
 }
 
 export default function EngineTelemetry({
@@ -154,7 +163,7 @@ export default function EngineTelemetry({
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-widest font-mono">Execution Performance Timeline</h2>
-            <p className="text-xs text-slate-500 font-sans">Real-time aggregate comparison of successful autonomous executions vs edge-case triggers.</p>
+            <p className="text-xs text-slate-500 font-sans">Real-time aggregate comparison of successful autonomous executions vs edge-case triggers for {campaignName}.</p>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono">
             <div className="flex items-center gap-1.5">
@@ -212,7 +221,7 @@ export default function EngineTelemetry({
                   <span className="font-bold uppercase tracking-wider text-blue-400">{v.platform || "Platform"} variant</span>
                   <span>ID: {v.variant_id}</span>
                 </div>
-                <p className="text-xs text-slate-200 font-sans whitespace-pre-wrap leading-relaxed">{v.adapted_copy || v.copy}</p>
+                <p className="text-xs text-slate-200 font-sans whitespace-pre-wrap leading-relaxed">{v.adapted_copy}</p>
                 <div className="flex justify-between items-center border-t border-slate-900/80 pt-2 text-[9px] text-slate-500">
                   <span>Objective: {objective}</span>
                   <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">ADMAPPER_LINKED</span>

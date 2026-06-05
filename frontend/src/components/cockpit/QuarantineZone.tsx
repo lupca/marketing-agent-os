@@ -316,9 +316,16 @@ export default function QuarantineZone() {
   }, []);
 
   useEffect(() => {
-    fetchTasks();
-    const interval = setInterval(fetchTasks, 15000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      fetchTasks();
+    }, 0);
+    const interval = setInterval(() => {
+      fetchTasks();
+    }, 15000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchTasks]);
 
   const handleResume = async (taskId: string) => {

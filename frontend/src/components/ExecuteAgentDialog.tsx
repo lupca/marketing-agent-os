@@ -3,6 +3,8 @@
 import React from "react";
 import { Zap, X, Loader2 } from "lucide-react";
 
+import { Workspace, Campaign } from "../lib/types";
+
 interface ExecuteAgentDialogProps {
   isExecuteOpen: boolean;
   setIsExecuteOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -17,8 +19,8 @@ interface ExecuteAgentDialogProps {
   setProductId: React.Dispatch<React.SetStateAction<string>>;
   selectedWorkspaceId: string;
   setSelectedWorkspaceId: React.Dispatch<React.SetStateAction<string>>;
-  workspaces: any[];
-  campaigns: any[];
+  workspaces: Workspace[];
+  campaigns: Campaign[];
   handleExecuteAgentLive: (e: React.FormEvent) => Promise<void>;
 }
 

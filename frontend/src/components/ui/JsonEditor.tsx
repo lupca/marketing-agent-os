@@ -13,24 +13,7 @@ interface JsonEditorProps {
   label?: string;
 }
 
-function syntaxHighlight(json: string): string {
-  return json
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(
-      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-      (match) => {
-        let cls = 'text-sky-300'; // number
-        if (/^"/.test(match)) {
-          if (/:$/.test(match)) cls = 'text-violet-300'; // key
-          else cls = 'text-emerald-300'; // string
-        } else if (/true|false/.test(match)) cls = 'text-amber-300'; // boolean
-        else if (/null/.test(match)) cls = 'text-slate-500'; // null
-        return `<span class="${cls}">${match}</span>`;
-      }
-    );
-}
+
 
 export default function JsonEditor({
   value,
@@ -44,9 +27,12 @@ export default function JsonEditor({
   const [isValid, setIsValid] = useState(true);
 
   useEffect(() => {
-    setRaw(JSON.stringify(value, null, 2));
-    setError(null);
-    setIsValid(true);
+    const timer = setTimeout(() => {
+      setRaw(JSON.stringify(value, null, 2));
+      setError(null);
+      setIsValid(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [value]);
 
   const handleChange = useCallback(

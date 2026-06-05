@@ -17,7 +17,7 @@ import core.dependencies
 # ==========================================
 # DATABASE FIXTURES (Nested Transactions)
 # ==========================================
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def db_engine():
     """Create test engine and tables once per session."""
     url = os.getenv("DATABASE_URL")
@@ -61,17 +61,39 @@ def mock_rerank_documents(query: str, documents: list, workspace_id: str = None)
 
 def mock_generate_text(prompt: str, system_prompt: str = None, json_format: bool = False, workspace_id: str = None) -> str:
     if json_format:
+        if "tiktok" in prompt.lower() or "video" in prompt.lower():
+            return '{"angle_name": "Logic", "adapted_copy": "[Visual] Show badminton player playing. [Audio] Vợt TOPVNSPORT V200i cực kỳ chất lượng", "tone_markers": ["hào hứng"]}'
         return '{"angle_name": "Logic", "adapted_copy": "Mocked test response content for creative engines in JSON"}'
     return "Mocked test response content for creative engines"
 
 @pytest.fixture(scope="session", autouse=True)
 def auto_mock_cloud_clients():
     """Automatically mock all expensive cloud AI calls globally."""
-    patch_embed = patch("core.ai_clients.embeddings.get_embedding", side_effect=mock_get_embedding)
-    patch_rerank = patch("core.ai_clients.reranker.rerank_documents", side_effect=mock_rerank_documents)
-    patch_llm = patch("core.ai_clients.llm_client.generate_text", side_effect=mock_generate_text)
+    patches = [
+        patch("core.ai_clients.embeddings.get_embedding", side_effect=mock_get_embedding),
+        patch("core.ollama_client.get_embedding", side_effect=mock_get_embedding),
+        patch("core.rag.get_embedding", side_effect=mock_get_embedding),
+        patch("core.tasks.get_embedding", side_effect=mock_get_embedding),
+        
+        patch("core.ai_clients.reranker.rerank_documents", side_effect=mock_rerank_documents),
+        patch("core.ollama_client.rerank_documents", side_effect=mock_rerank_documents),
+        patch("core.rag.rerank_documents", side_effect=mock_rerank_documents),
+        
+        patch("core.ai_clients.llm_client.generate_text", side_effect=mock_generate_text),
+        patch("core.ollama_client.generate_text", side_effect=mock_generate_text),
+        patch("core.market_intelligence.generate_text", side_effect=mock_generate_text),
+        patch("core.tasks.generate_text", side_effect=mock_generate_text),
+        patch("graphs.autonomous.generation.generate_text", side_effect=mock_generate_text),
+        patch("graphs.autonomous.guardian.generate_text", side_effect=mock_generate_text),
+        patch("graphs.autonomous.insight.generate_text", side_effect=mock_generate_text),
+    ]
     
-    # Also block unexpected HTTP requests by enabling responses
-    # but not adding any passthru by default.
-    with patch_embed, patch_rerank, patch_llm:
-        yield
+    # Enter all patches
+    for p in patches:
+        p.start()
+        
+    yield
+    
+    # Stop all patches
+    for p in reversed(patches):
+        p.stop()

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Search, RefreshCw, Copy, Check, FileText, Calendar, Award } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Search, RefreshCw, Copy, Check, Calendar, Award } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -35,7 +35,7 @@ export default function ScriptVault() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadVaultContents = async () => {
+  const loadVaultContents = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/vault/contents`);
@@ -55,11 +55,14 @@ export default function ScriptVault() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadVaultContents();
-  }, []);
+    const timer = setTimeout(() => {
+      loadVaultContents();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadVaultContents]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text).then(() => {

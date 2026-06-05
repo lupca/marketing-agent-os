@@ -62,12 +62,15 @@ export default function ErrorManagement({
     if (isBackoffActive && backoffCountdown > 0 && errorTab === "backoff") {
       timer = setTimeout(() => setBackoffCountdown(prev => prev - 1), 1000);
     } else if (backoffCountdown === 0 && isBackoffActive) {
-      setIsBackoffActive(false);
-      setBackoffAttempts(prev => [
-        ...prev.slice(0, 2),
-        { id: 3, type: "Ollama Connection Established", delay: "8s", status: "SUCCESS" }
-      ]);
-      showToast("Rate limit timeout cleared. Execution finished.", "success");
+      const resetTimer = setTimeout(() => {
+        setIsBackoffActive(false);
+        setBackoffAttempts(prev => [
+          ...prev.slice(0, 2),
+          { id: 3, type: "Ollama Connection Established", delay: "8s", status: "SUCCESS" }
+        ]);
+        showToast("Rate limit timeout cleared. Execution finished.", "success");
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
     return () => clearTimeout(timer);
   }, [backoffCountdown, isBackoffActive, errorTab, showToast]);
@@ -207,6 +210,9 @@ export default function ErrorManagement({
             <p className="text-xs text-slate-400 leading-relaxed font-sans max-w-3xl">
               LLM models frequently hallucinate raw markdown formatting (such as wrapping objects with ` ```json ` tags) which throws severe `JSONDecodeError` during relational database parsing operations. 
               Our robust Regex and regex-stripper filters isolate the JSON payload cleanly.
+            </p>
+            <p className="text-xs text-slate-450 font-mono">
+              Current observed format mutation rate: <span className="text-rose-455 font-bold">{mutationRate}%</span> (Immunology threshold: 5.0%)
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">

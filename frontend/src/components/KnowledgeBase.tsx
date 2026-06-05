@@ -1,25 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
-  Plus,
-  Filter,
-  Check,
   FileText,
-  BookOpen,
   Trash2,
   Edit,
   Loader2,
-  AlertCircle,
-  HelpCircle,
-  Clock,
-  Sparkles,
-  ChevronRight,
-  Database,
-  ArrowRight,
-  Maximize2,
-  X
+  ArrowRight
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
@@ -45,10 +33,25 @@ interface DocRecord {
   created_at?: string;
 }
 
+interface RagChunk {
+  document_id: string;
+  chunk_id?: string;
+  similarity_score: number;
+  content_full?: string;
+  content_preview?: string;
+  access_tags?: string[];
+}
+
+interface StudioLog {
+  title: string;
+  time: string;
+  text: string;
+}
+
 interface ChatBubble {
   sender: "user" | "ai";
   text: string;
-  results?: any[];
+  results?: RagChunk[];
 }
 
 export default function KnowledgeBase() {
@@ -83,14 +86,14 @@ export default function KnowledgeBase() {
   const [querying, setQuerying] = useState(false);
 
   // Studio logs
-  const [studioLogs, setStudioLogs] = useState<any[]>([
+  const [studioLogs, setStudioLogs] = useState<StudioLog[]>([
     { title: "Tổng quan tài liệu nguồn", time: "5 phút trước", text: "Tóm tắt tổng quan RAG toàn bộ nguồn tài liệu đang có trong workspace" },
     { title: "Quy chuẩn nội dung & luật cấm", time: "15 phút trước", text: "Trích xuất các quy chuẩn viết kịch bản và luật cấm quảng cáo của nền tảng" }
   ]);
 
   // Modals
   const [readerDoc, setReaderDoc] = useState<DocRecord | null>(null);
-  const [readerChunks, setReaderChunks] = useState<any[]>([]);
+  const [readerChunks, setReaderChunks] = useState<RagChunk[]>([]);
   const [loadingChunks, setLoadingChunks] = useState(false);
 
   const [editDoc, setEditDoc] = useState<DocRecord | null>(null);
@@ -143,7 +146,9 @@ export default function KnowledgeBase() {
   };
 
   // API calls
-  const loadTags = async () => {
+  const loadDocumentsRef = useRef<() => Promise<void>>(async () => {});
+
+  const loadTags = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/rag/tags`);
       const data = await response.json();
@@ -155,9 +160,41 @@ export default function KnowledgeBase() {
       console.error(error);
       showToast("Lỗi tải Access Tags RAG.", "error");
     }
-  };
+  }, [showToast]);
 
-  const loadDocuments = async () => {
+  const startPolling = useCallback((docId: string) => {
+    if (pollIntervals.current[docId]) return;
+    
+    let attempts = 0;
+    pollIntervals.current[docId] = setInterval(async () => {
+      attempts++;
+      if (attempts > 30) {
+        clearInterval(pollIntervals.current[docId]);
+        delete pollIntervals.current[docId];
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/rag/documents/${docId}/status`);
+        const statusData = await response.json();
+        if (statusData.upload_status === "ready" && statusData.sync_status === "synced") {
+          clearInterval(pollIntervals.current[docId]);
+          delete pollIntervals.current[docId];
+          showToast(`✅ Tài liệu "${statusData.file_name}" đã băm thành công ${statusData.chunk_count} chunks!`, "success");
+          loadDocumentsRef.current();
+        } else if (statusData.upload_status === "failed") {
+          clearInterval(pollIntervals.current[docId]);
+          delete pollIntervals.current[docId];
+          showToast(`❌ Băm vector thất bại cho tệp: "${statusData.file_name}"`, "error");
+          loadDocumentsRef.current();
+        }
+      } catch {
+        // Silent error on polling
+      }
+    }, 4000);
+  }, [showToast]);
+
+  const loadDocuments = useCallback(async () => {
     setLoadingDocs(true);
     try {
       let allDocs: DocRecord[] = [];
@@ -191,51 +228,28 @@ export default function KnowledgeBase() {
     } finally {
       setLoadingDocs(false);
     }
-  };
+  }, [showToast, startPolling]);
 
-  const startPolling = (docId: string) => {
-    if (pollIntervals.current[docId]) return;
-    
-    let attempts = 0;
-    pollIntervals.current[docId] = setInterval(async () => {
-      attempts++;
-      if (attempts > 30) {
-        clearInterval(pollIntervals.current[docId]);
-        delete pollIntervals.current[docId];
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/rag/documents/${docId}/status`);
-        const statusData = await response.json();
-        if (statusData.upload_status === "ready" && statusData.sync_status === "synced") {
-          clearInterval(pollIntervals.current[docId]);
-          delete pollIntervals.current[docId];
-          showToast(`✅ Tài liệu "${statusData.file_name}" đã băm thành công ${statusData.chunk_count} chunks!`, "success");
-          loadDocuments();
-        } else if (statusData.upload_status === "failed") {
-          clearInterval(pollIntervals.current[docId]);
-          delete pollIntervals.current[docId];
-          showToast(`❌ Băm vector thất bại cho tệp: "${statusData.file_name}"`, "error");
-          loadDocuments();
-        }
-      } catch (e) {
-        // Silent error on polling
-      }
-    }, 4000);
-  };
+  // Keep ref updated
+  useEffect(() => {
+    loadDocumentsRef.current = loadDocuments;
+  }, [loadDocuments]);
 
   useEffect(() => {
-    loadTags();
-    loadDocuments();
+    const timer = setTimeout(() => {
+      loadTags();
+      loadDocuments();
+    }, 0);
 
+    const currentPolls = pollIntervals.current;
     return () => {
+      clearTimeout(timer);
       // Clean pollings on unmount
-      Object.keys(pollIntervals.current).forEach(k => {
-        clearInterval(pollIntervals.current[k]);
+      Object.keys(currentPolls).forEach(k => {
+        clearInterval(currentPolls[k]);
       });
     };
-  }, []);
+  }, [loadDocuments, loadTags]);
 
   // Upload Logic
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -271,8 +285,9 @@ export default function KnowledgeBase() {
       if (resData.document_id) {
         startPolling(resData.document_id);
       }
-    } catch (error: any) {
-      showToast(`❌ Tải lên thất bại: ${error.message}`, "error");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      showToast(`❌ Tải lên thất bại: ${msg}`, "error");
     } finally {
       setUploading(false);
     }
@@ -325,7 +340,7 @@ export default function KnowledgeBase() {
       if (!response.ok) throw new Error("Delete failed");
       showToast(`🗑️ Đã kích hoạt yêu cầu xóa "${name}"...`, "info");
       loadDocuments();
-    } catch (e) {
+    } catch {
       showToast("Lỗi xóa tài liệu.", "error");
     }
   };
@@ -352,9 +367,9 @@ export default function KnowledgeBase() {
       const data = await response.json();
       
       // Filter matching only this doc ID
-      const matched = (data.results || []).filter((r: any) => r.document_id === doc.document_id);
+      const matched = (data.results || []).filter((r: RagChunk) => r.document_id === doc.document_id);
       setReaderChunks(matched);
-    } catch (error) {
+    } catch {
       showToast("Lỗi trích xuất phân đoạn tri thức.", "error");
     } finally {
       setLoadingChunks(false);
@@ -390,7 +405,7 @@ export default function KnowledgeBase() {
       showToast("Đã lưu thay đổi! Hệ thống đang cập nhật...", "success");
       setEditDoc(null);
       loadDocuments();
-    } catch (e) {
+    } catch {
       showToast("Lỗi lưu thông tin tài liệu.", "error");
     } finally {
       setSavingEdit(false);
@@ -435,7 +450,7 @@ export default function KnowledgeBase() {
       };
 
       setChatHistory(prev => [...prev, aiMsg]);
-    } catch (error) {
+    } catch {
       const errorMsg: ChatBubble = {
         sender: "ai",
         text: "Lỗi kết nối: Không thể thực hiện RAG Vector search. Vui lòng kiểm tra cổng API nhúng."
@@ -461,7 +476,10 @@ export default function KnowledgeBase() {
 
   // Reset page when filters change
   useEffect(() => {
-    setCurrentPage(1);
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [searchQuery, statusFilter, tagFilter]);
 
   // Paginated slice
@@ -564,7 +582,7 @@ export default function KnowledgeBase() {
                               key={t}
                               className="h-1.5 w-1.5 rounded-full"
                               style={{ backgroundColor: tg?.color || "#6366f1" }}
-                              title={`Access Tag: ${t}`}
+                              title={`Access Tag: ${t} - ${getAgentAccessExplanation(t)}`}
                             ></span>
                           );
                         })}
@@ -753,7 +771,7 @@ export default function KnowledgeBase() {
                     <div className="mt-4 border-t border-slate-900/60 pt-3 space-y-2 shrink-0">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Trích dẫn tài liệu nguồn ({msg.results.length})</span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
-                        {msg.results.map((citation: any, cidx: number) => {
+                        {msg.results.map((citation: RagChunk, cidx: number) => {
                           const pct = Math.round(citation.similarity_score * 100);
                           return (
                             <div

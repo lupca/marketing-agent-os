@@ -198,9 +198,16 @@ export default function KillSwitch() {
   }, []);
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      fetchStatus();
+    }, 0);
+    const interval = setInterval(() => {
+      fetchStatus();
+    }, 5000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchStatus]);
 
   // Real-time WebSocket updates
