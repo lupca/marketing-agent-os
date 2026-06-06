@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.INFO)
 # Configure CORS Middleware
 fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -152,4 +152,4 @@ async def readiness(request: Request):
         db.close()
 
 if __name__ == "__main__":
-    uvicorn.run("app:fastapi_app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:fastapi_app", host="0.0.0.0", port=8005, reload=True)
