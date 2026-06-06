@@ -419,7 +419,7 @@ def batch_create_creatives(api: Any, fb_account_id: str, workspace_id: str, vari
                 if not token or "dummy" in token:
                     raise ValueError("Thiếu Native Access Token hợp lệ để đăng bài lên Meta API.")
                 url = f"https://graph.facebook.com/v19.0/{var_page_id}/feed"
-                res = requests.post(url, data={"access_token": token, "message": copy, "link": link_url}, timeout=60)
+                res = requests.post(url, data={"access_token": token, "message": copy, "link": link_url, "published": "false"}, timeout=60)
                 if res.status_code >= 400:
                     raise RuntimeError(f"Native Meta API đăng bài thất bại: {res.text}")
                 post_id = res.json().get("id")

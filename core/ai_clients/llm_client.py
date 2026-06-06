@@ -97,6 +97,7 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
                     model=local_model,
                     temperature=temperature,
                     max_retries=3,
+                    timeout=60,
                     model_kwargs=model_kwargs
                 )
             
@@ -119,6 +120,7 @@ def get_dynamic_llm_client(workspace_id_str: str, json_format: bool = False):
                 model=model_name,
                 temperature=temperature,
                 max_retries=3,
+                timeout=60,
                 model_kwargs=model_kwargs
             )
         except Exception as e:

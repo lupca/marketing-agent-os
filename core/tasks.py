@@ -406,14 +406,14 @@ def publish_to_social(self, variant_id: str):
                 if is_video_post and photos:
                     url = f"https://graph.facebook.com/v19.0/{fb_page_id}/videos"
                     with open(photos[0], "rb") as f:
-                        res = requests.post(url, data={"access_token": token, "description": title}, files={"source": f}, timeout=120)
+                        res = requests.post(url, data={"access_token": token, "description": title, "published": "false"}, files={"source": f}, timeout=120)
                 elif photos:
                     url = f"https://graph.facebook.com/v19.0/{fb_page_id}/photos"
                     with open(photos[0], "rb") as f:
-                        res = requests.post(url, data={"access_token": token, "message": title}, files={"source": f}, timeout=90)
+                        res = requests.post(url, data={"access_token": token, "message": title, "published": "false"}, files={"source": f}, timeout=90)
                 else:
                     url = f"https://graph.facebook.com/v19.0/{fb_page_id}/feed"
-                    res = requests.post(url, data={"access_token": token, "message": title, "link": link_url}, timeout=60)
+                    res = requests.post(url, data={"access_token": token, "message": title, "link": link_url, "published": "false"}, timeout=60)
                 
                 if res.status_code >= 400:
                     raise UploadPostServerError(f"Native Meta API error: {res.text}")
