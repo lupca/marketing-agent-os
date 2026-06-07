@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.ai_clients.upload_post_client import upload_photos, UploadPostValidationError
-from core.tasks import publish_to_social
+from workers.social_worker.tasks import publish_to_social
 
 class TestSocialPublisherRefinements(unittest.TestCase):
     

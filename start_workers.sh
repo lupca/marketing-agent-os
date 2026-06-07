@@ -3,7 +3,7 @@
 # Script to start Celery worker and beat concurrently under Ubuntu
 
 echo "Starting Celery Worker..."
-python3 -m celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade,video_polling,social_publisher &
+python3 -m celery -A core.celery_app worker --loglevel=info --concurrency=2 -Q rag_ingestion,rag_cascade,video_polling,social_publisher,orchestrator &
 WORKER_PID=$!
 
 echo "Starting Celery Beat..."

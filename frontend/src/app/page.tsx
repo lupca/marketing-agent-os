@@ -27,6 +27,7 @@ import {
   LogOut
 } from "lucide-react";
 import type { GeneratedVariant, Campaign, Workspace } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -42,7 +43,7 @@ export default function Dashboard() {
 
 function DashboardContent() {
   const { showToast } = useToast();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
@@ -142,15 +143,22 @@ function DashboardContent() {
   useEffect(() => {
     const fetchWorkspacesAndCampaigns = async () => {
       try {
-        const wsRes = await fetch(`${API_BASE}/api/workspace/list`);
-        const wsData = (await wsRes.json()) as { status: string; data: Workspace[] };
+        const wsData = await apiFetch<{ status: string; data: Workspace[] }>("/api/workspace/list");
         if (wsData.status === "success" && wsData.data && wsData.data.length > 0) {
           setWorkspaces(wsData.data);
+          // Look for user-specific workspace first
+          const userWorkspace = user ? wsData.data.find((w) => w.name === `${user.name}'s Workspace`) : null;
           const teamAlpha = wsData.data.find((w) => w.name === "Team Alpha Workspace");
-          setSelectedWorkspaceId(teamAlpha ? teamAlpha.id : wsData.data[0].id);
+          
+          if (userWorkspace) {
+            setSelectedWorkspaceId(userWorkspace.id);
+          } else if (teamAlpha) {
+            setSelectedWorkspaceId(teamAlpha.id);
+          } else {
+            setSelectedWorkspaceId(wsData.data[0].id);
+          }
         }
-        const campRes = await fetch(`${API_BASE}/api/workspace/campaigns`);
-        const campData = (await campRes.json()) as { status: string; data: Campaign[] };
+        const campData = await apiFetch<{ status: string; data: Campaign[] }>("/api/workspace/campaigns");
         if (campData.status === "success") {
           setCampaigns(campData.data || []);
         }
@@ -159,7 +167,7 @@ function DashboardContent() {
       }
     };
     fetchWorkspacesAndCampaigns();
-  }, []);
+  }, [user]);
 
   // Telemetry fluctuation intervals
   useEffect(() => {
@@ -319,7 +327,7 @@ function DashboardContent() {
                 <Sliders className="h-4 w-4 text-slate-400" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-slate-300 font-mono truncate">CMO Strategic OS</span>
+                <span className="text-[10px] font-bold text-slate-300 font-mono truncate">{user?.name || "CMO Strategic OS"}</span>
                 <span className="text-[9px] text-slate-500 font-mono">Status: AUTONOMOUS</span>
               </div>
             </div>

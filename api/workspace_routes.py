@@ -3,23 +3,93 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 import uuid
 import logging
-from core.dependencies import get_db
-from core.models import Workspace, WorkspaceIntegration, AIModel, SocialAccount, MarketingCampaign
+from core.dependencies import get_db, get_current_user
+from core.models import User, Workspace, WorkspaceIntegration, AIModel, SocialAccount, MarketingCampaign
 from core.schemas import WorkspaceIntegrationSchema, AIModelSchema
 from typing import List
 
 logger = logging.getLogger("workspace_routes")
 
-def get_active_workspace_id(request: Request) -> uuid.UUID:
+def get_active_workspace_id(request: Request, db: Session = None) -> uuid.UUID:
     ws_id_str = request.query_params.get("workspace_id") or request.headers.get("x-workspace-id")
+    
+    # Extract authenticated user UUID if present
+    auth_header = request.headers.get("authorization")
+    user_uuid = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        from core.auth import decode_access_token
+        payload = decode_access_token(token)
+        if payload:
+            user_id_str = payload.get("sub")
+            if user_id_str:
+                try:
+                    user_uuid = uuid.UUID(user_id_str)
+                except ValueError:
+                    pass
+
+    # Resolve workspace ID
+    resolved_ws_uuid = None
     if ws_id_str:
         try:
-            return uuid.UUID(ws_id_str)
+            resolved_ws_uuid = uuid.UUID(ws_id_str)
         except ValueError:
             pass
-            
-    from db.connection import SessionLocal
-    db = SessionLocal()
+
+    # If workspace ID is explicitly resolved, verify authorization
+    if resolved_ws_uuid:
+        if user_uuid:
+            close_db = False
+            if db is None:
+                from db.connection import SessionLocal
+                db = SessionLocal()
+                close_db = True
+            try:
+                ws = db.query(Workspace).filter(Workspace.id == resolved_ws_uuid).first()
+                if ws:
+                    is_owner = (ws.owner_id == user_uuid)
+                    is_member = (str(user_uuid) in [str(m) for m in (ws.members or [])])
+                    if not (is_owner or is_member):
+                        raise HTTPException(status_code=403, detail="Access to this workspace is forbidden")
+                    return resolved_ws_uuid
+            finally:
+                if close_db:
+                    db.close()
+        else:
+            return resolved_ws_uuid
+
+    # If no workspace ID was passed, find a default workspace associated with the authenticated user
+    if user_uuid:
+        close_db = False
+        if db is None:
+            from db.connection import SessionLocal
+            db = SessionLocal()
+            close_db = True
+        try:
+            # 1. Search for a workspace owned by this user
+            ws = db.query(Workspace).filter(Workspace.owner_id == user_uuid).first()
+            if not ws:
+                # 2. Check if the user is a member of any workspace
+                workspaces = db.query(Workspace).all()
+                for w in workspaces:
+                    if str(user_uuid) in [str(m) for m in (w.members or [])]:
+                        ws = w
+                        break
+            if ws:
+                return ws.id
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to query workspace for authorized user: {e}")
+        finally:
+            if close_db:
+                db.close()
+
+    close_db = False
+    if db is None:
+        from db.connection import SessionLocal
+        db = SessionLocal()
+        close_db = True
     try:
         ws = db.query(Workspace).filter_by(name="Team Alpha Workspace").first()
         if not ws:
@@ -29,7 +99,8 @@ def get_active_workspace_id(request: Request) -> uuid.UUID:
     except Exception as e:
         logger.error(f"Failed to dynamically query default workspace: {e}")
     finally:
-        db.close()
+        if close_db:
+            db.close()
         
     return uuid.UUID("00000000-0000-0000-0000-000000000002")  # absolute final fallback if DB empty
 
@@ -38,9 +109,11 @@ workspace_router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
 @workspace_router.get("/settings")
 async def get_settings(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         ws = db.query(Workspace).filter_by(id=ws_id).first()
         return ws.settings if (ws and ws.settings) else {}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching workspace settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -64,7 +137,7 @@ async def update_settings(request: Request, db: Session = Depends(get_db)):
         if "enable_thinking" in filtered:
             filtered["enable_thinking"] = bool(filtered["enable_thinking"])
             
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         ws = db.query(Workspace).filter_by(id=ws_id).first()
         if ws:
             current_settings = dict(ws.settings) if ws.settings else {}
@@ -83,7 +156,7 @@ async def update_settings(request: Request, db: Session = Depends(get_db)):
 @workspace_router.get("/integrations")
 async def get_integrations(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         integrations = db.query(WorkspaceIntegration).filter_by(workspace_id=ws_id).order_by(
             WorkspaceIntegration.platform_name, WorkspaceIntegration.config_key
         ).all()
@@ -98,6 +171,8 @@ async def get_integrations(request: Request, db: Session = Depends(get_db)):
                 "created_at": i.created_at.strftime('%Y-%m-%d %H:%M:%S') if i.created_at else None
             })
         return {"status": "success", "data": data}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching workspace integrations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -106,7 +181,7 @@ async def get_integrations(request: Request, db: Session = Depends(get_db)):
 async def update_integration(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
     
         record_id = body.get("id")
         platform_name = body.get("platform_name")
@@ -150,6 +225,8 @@ async def update_integration(request: Request, db: Session = Depends(get_db)):
             db.add(new_integration)
             db.commit()
             return {"status": "success", "message": "Created successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error saving workspace integration: {e}", exc_info=True)
@@ -163,9 +240,15 @@ async def delete_integration(request: Request, db: Session = Depends(get_db)):
         if not integration_id:
             raise HTTPException(status_code=400, detail="Missing integration id")
         
-        db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(integration_id)).delete()
+        ws_id = get_active_workspace_id(request, db)
+        integration = db.query(WorkspaceIntegration).filter_by(id=uuid.UUID(integration_id), workspace_id=ws_id).first()
+        if not integration:
+            raise HTTPException(status_code=404, detail="Integration not found or access denied")
+        db.delete(integration)
         db.commit()
         return {"status": "success", "message": "Deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting workspace integration: {e}", exc_info=True)
@@ -174,7 +257,7 @@ async def delete_integration(request: Request, db: Session = Depends(get_db)):
 @workspace_router.get("/models")
 async def get_models(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         models = db.query(AIModel).filter_by(workspace_id=ws_id).order_by(AIModel.created_at.desc()).all()
         # Note: Logic to seed default models could be moved to a service or seed script.
         # For now, let's keep it here but using the new response model.
@@ -187,6 +270,8 @@ async def get_models(request: Request, db: Session = Depends(get_db)):
             
         return {"status": "success", "data": data}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching workspace models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -195,7 +280,7 @@ async def get_models(request: Request, db: Session = Depends(get_db)):
 async def add_model(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         
         new_model = AIModel(
             workspace_id=ws_id,
@@ -217,6 +302,8 @@ async def add_model(request: Request, db: Session = Depends(get_db)):
         db.add(new_model)
         db.commit()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error adding custom model: {e}", exc_info=True)
@@ -226,7 +313,8 @@ async def add_model(request: Request, db: Session = Depends(get_db)):
 async def update_model(model_uuid: str, request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid)).first()
+        ws_id = get_active_workspace_id(request, db)
+        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid), workspace_id=ws_id).first()
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         
@@ -246,21 +334,26 @@ async def update_model(model_uuid: str, request: Request, db: Session = Depends(
         
         db.commit()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating model: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.delete("/models/{model_uuid}")
-async def delete_model(model_uuid: str, db: Session = Depends(get_db)):
+async def delete_model(model_uuid: str, request: Request, db: Session = Depends(get_db)):
     try:
-        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid)).first()
+        ws_id = get_active_workspace_id(request, db)
+        model = db.query(AIModel).filter_by(id=uuid.UUID(model_uuid), workspace_id=ws_id).first()
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         
         db.delete(model)
         db.commit()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting model: {e}", exc_info=True)
@@ -269,7 +362,7 @@ async def delete_model(model_uuid: str, db: Session = Depends(get_db)):
 @workspace_router.get("/social-accounts")
 async def get_social_accounts(request: Request, db: Session = Depends(get_db)):
     try:
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         accounts = db.query(SocialAccount).filter_by(workspace_id=ws_id).order_by(
             SocialAccount.platform, SocialAccount.account_name
         ).all()
@@ -287,6 +380,8 @@ async def get_social_accounts(request: Request, db: Session = Depends(get_db)):
                 "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S') if a.created_at else None
             })
         return {"status": "success", "data": data}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching social accounts: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -295,7 +390,7 @@ async def get_social_accounts(request: Request, db: Session = Depends(get_db)):
 async def save_social_account(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
-        ws_id = get_active_workspace_id(request)
+        ws_id = get_active_workspace_id(request, db)
         
         record_id = body.get("id")
         platform = body.get("platform")
@@ -348,42 +443,56 @@ async def save_social_account(request: Request, db: Session = Depends(get_db)):
             db.add(new_social)
             db.commit()
             return {"status": "success", "message": "Created successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error saving social account: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.delete("/social-accounts/{account_uuid}")
-async def delete_social_account(account_uuid: str, db: Session = Depends(get_db)):
+async def delete_social_account(account_uuid: str, request: Request, db: Session = Depends(get_db)):
     try:
-        account = db.query(SocialAccount).filter_by(id=uuid.UUID(account_uuid)).first()
+        ws_id = get_active_workspace_id(request, db)
+        account = db.query(SocialAccount).filter_by(id=uuid.UUID(account_uuid), workspace_id=ws_id).first()
         if not account:
             raise HTTPException(status_code=404, detail="Social Account not found")
             
         db.delete(account)
         db.commit()
         return {"status": "success", "message": "Deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting social account: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.get("/list")
-async def list_workspaces(db: Session = Depends(get_db)):
+async def list_workspaces(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        workspaces = db.query(Workspace).order_by(Workspace.name).all()
-        data = [{"id": str(w.id), "name": w.name} for w in workspaces]
+        workspaces = db.query(Workspace).all()
+        data = []
+        for w in workspaces:
+            is_owner = (w.owner_id == current_user.id)
+            user_uuid_str = str(current_user.id)
+            members_str_list = [str(m) for m in (w.members or [])]
+            is_member = (user_uuid_str in members_str_list)
+            
+            if is_owner or is_member:
+                data.append({"id": str(w.id), "name": w.name})
+                
+        data.sort(key=lambda x: x["name"])
         return {"status": "success", "data": data}
     except Exception as e:
         logger.error(f"Error listing workspaces: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @workspace_router.get("/campaigns")
-async def list_campaigns(workspace_id: str = None, db: Session = Depends(get_db)):
+async def list_campaigns(request: Request, db: Session = Depends(get_db)):
     try:
-        query = db.query(MarketingCampaign)
-        if workspace_id:
-            query = query.filter_by(workspace_id=uuid.UUID(workspace_id))
+        ws_id = get_active_workspace_id(request, db)
+        query = db.query(MarketingCampaign).filter_by(workspace_id=ws_id)
         campaigns = query.order_by(MarketingCampaign.name).all()
         data = [{
             "id": str(c.id),
@@ -393,6 +502,8 @@ async def list_campaigns(workspace_id: str = None, db: Session = Depends(get_db)
             "campaign_type": c.campaign_type
         } for c in campaigns]
         return {"status": "success", "data": data}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing campaigns: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

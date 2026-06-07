@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -150,8 +151,7 @@ export default function KnowledgeBase() {
 
   const loadTags = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/rag/tags`);
-      const data = await response.json();
+      const data = await apiFetch<any>(`/api/rag/tags`);
       setTags(data.tags || []);
       if (data.workspace_id) {
         setWorkspaceId(data.workspace_id);
@@ -175,8 +175,7 @@ export default function KnowledgeBase() {
       }
 
       try {
-        const response = await fetch(`${API_BASE}/api/rag/documents/${docId}/status`);
-        const statusData = await response.json();
+        const statusData = await apiFetch<any>(`/api/rag/documents/${docId}/status`);
         if (statusData.upload_status === "ready" && statusData.sync_status === "synced") {
           clearInterval(pollIntervals.current[docId]);
           delete pollIntervals.current[docId];
@@ -202,8 +201,7 @@ export default function KnowledgeBase() {
       let hasMore = true;
 
       while (hasMore && page <= 10) {
-        const response = await fetch(`${API_BASE}/api/rag/documents?page=${page}&limit=100`);
-        const data = await response.json();
+        const data = await apiFetch<any>(`/api/rag/documents?page=${page}&limit=100`);
         const docs = data.documents || [];
         allDocs = [...allDocs, ...docs];
 
@@ -268,17 +266,11 @@ export default function KnowledgeBase() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/rag/upload`, {
+      const resData = await apiFetch<any>(`/api/rag/upload`, {
         method: "POST",
         body: formData
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Upload error");
-      }
-
-      const resData = await response.json();
       showToast(`✅ File "${uploadFile.name}" đã tải lên! Đang băm vector...`, "success");
       setUploadFile(null);
       loadDocuments();
@@ -334,10 +326,9 @@ export default function KnowledgeBase() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/rag/documents/${id}`, {
+      await apiFetch<any>(`/api/rag/documents/${id}`, {
         method: "DELETE"
       });
-      if (!response.ok) throw new Error("Delete failed");
       showToast(`🗑️ Đã kích hoạt yêu cầu xóa "${name}"...`, "info");
       loadDocuments();
     } catch {
@@ -359,12 +350,10 @@ export default function KnowledgeBase() {
         limit: 10
       };
 
-      const response = await fetch(`${API_BASE}/api/rag/test-retrieval`, {
+      const data = await apiFetch<any>(`/api/rag/test-retrieval`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await response.json();
       
       // Filter matching only this doc ID
       const matched = (data.results || []).filter((r: RagChunk) => r.document_id === doc.document_id);
@@ -392,16 +381,14 @@ export default function KnowledgeBase() {
 
     setSavingEdit(true);
     try {
-      const response = await fetch(`${API_BASE}/api/rag/documents/${editDoc.document_id}`, {
+      await apiFetch<any>(`/api/rag/documents/${editDoc.document_id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           file_name: editDocName.trim(),
           access_tags: editDocTags
         })
       });
 
-      if (!response.ok) throw new Error("Save edit failed");
       showToast("Đã lưu thay đổi! Hệ thống đang cập nhật...", "success");
       setEditDoc(null);
       loadDocuments();
@@ -432,12 +419,10 @@ export default function KnowledgeBase() {
         workspace_id: workspaceId
       };
 
-      const response = await fetch(`${API_BASE}/api/rag/test-retrieval`, {
+      const data = await apiFetch<any>(`/api/rag/test-retrieval`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await response.json();
 
       setRetrievalStats(`⚡ Truy vấn: ${data.elapsed_ms}ms | Phân đoạn khớp: ${data.result_count}`);
       

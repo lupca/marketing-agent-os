@@ -21,8 +21,12 @@ import core.dependencies
 def db_engine():
     """Create test engine and tables once per session."""
     url = os.getenv("DATABASE_URL")
-    from sqlalchemy import create_engine
+    if url and url.startswith("postgresql://") and "+psycopg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    from sqlalchemy import create_engine, text
     test_engine = create_engine(url, pool_pre_ping=True)
+    with test_engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=test_engine)
     yield test_engine
     test_engine.dispose()
@@ -70,22 +74,22 @@ def mock_generate_text(prompt: str, system_prompt: str = None, json_format: bool
 def auto_mock_cloud_clients():
     """Automatically mock all expensive cloud AI calls globally."""
     patches = [
-        patch("core.ai_clients.embeddings.get_embedding", side_effect=mock_get_embedding),
-        patch("core.ollama_client.get_embedding", side_effect=mock_get_embedding),
-        patch("core.rag.get_embedding", side_effect=mock_get_embedding),
-        patch("core.tasks.get_embedding", side_effect=mock_get_embedding),
+        patch("core.ai_clients.embeddings.get_embedding", side_effect=mock_get_embedding, create=True),
+        patch("core.ollama_client.get_embedding", side_effect=mock_get_embedding, create=True),
+        patch("core.rag.get_embedding", side_effect=mock_get_embedding, create=True),
+        patch("core.tasks.get_embedding", side_effect=mock_get_embedding, create=True),
         
-        patch("core.ai_clients.reranker.rerank_documents", side_effect=mock_rerank_documents),
-        patch("core.ollama_client.rerank_documents", side_effect=mock_rerank_documents),
-        patch("core.rag.rerank_documents", side_effect=mock_rerank_documents),
+        patch("core.ai_clients.reranker.rerank_documents", side_effect=mock_rerank_documents, create=True),
+        patch("core.ollama_client.rerank_documents", side_effect=mock_rerank_documents, create=True),
+        patch("core.rag.rerank_documents", side_effect=mock_rerank_documents, create=True),
         
-        patch("core.ai_clients.llm_client.generate_text", side_effect=mock_generate_text),
-        patch("core.ollama_client.generate_text", side_effect=mock_generate_text),
-        patch("core.market_intelligence.generate_text", side_effect=mock_generate_text),
-        patch("core.tasks.generate_text", side_effect=mock_generate_text),
-        patch("graphs.autonomous.generation.generate_text", side_effect=mock_generate_text),
-        patch("graphs.autonomous.guardian.generate_text", side_effect=mock_generate_text),
-        patch("graphs.autonomous.insight.generate_text", side_effect=mock_generate_text),
+        patch("core.ai_clients.llm_client.generate_text", side_effect=mock_generate_text, create=True),
+        patch("core.ollama_client.generate_text", side_effect=mock_generate_text, create=True),
+        patch("core.market_intelligence.generate_text", side_effect=mock_generate_text, create=True),
+        patch("core.tasks.generate_text", side_effect=mock_generate_text, create=True),
+        patch("graphs.autonomous.generation.generate_text", side_effect=mock_generate_text, create=True),
+        patch("graphs.autonomous.guardian.generate_text", side_effect=mock_generate_text, create=True),
+        patch("graphs.autonomous.insight.generate_text", side_effect=mock_generate_text, create=True),
     ]
     
     # Enter all patches

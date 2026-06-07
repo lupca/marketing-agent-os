@@ -15,7 +15,7 @@ from db.seed import seed_database
 from core.models import Workspace, ProductService, RAGDocument, RAGChunk, AgentDecision
 from core.ai_clients.serpapi_client import search_youtube, get_youtube_transcript, get_youtube_comments
 from core.market_intelligence import fetch_and_process_market_data
-from core.tasks import radar_market_first_cron
+from workers.radar_worker.tasks import radar_market_first_cron
 
 # --- Setup Test DB connection ---
 base_url = POSTGRES_URL.rsplit('/', 1)[0]
@@ -121,9 +121,9 @@ class TestMarketIntelligence(unittest.TestCase):
         self.assertIn("market_intel", doc.access_tags)
         self.assertEqual(doc.meta_data.get("hook"), "Giải pháp AI đột phá giảm 50% CPA")
         
-    @patch("core.tasks.get_session")
-    @patch("core.tasks.generate_text")
-    @patch("core.tasks.search_youtube")
+    @patch("workers.radar_worker.tasks.get_session")
+    @patch("workers.radar_worker.tasks.generate_text")
+    @patch("workers.radar_worker.tasks.search_youtube")
     def test_radar_market_first_cron(self, mock_search, mock_generate, mock_get_session):
         """Verify that the daily radar cron job successfully scans competitor channels, triggers alerts and logs decisions."""
         from contextlib import contextmanager

@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db.connection import SessionLocal
 from core.models import Workspace, ProductService, MarketingCampaign, PlatformVariant, BrandIdentity, MasterContent, MediaAsset
 from core.integrations.video_client import submit_video_job, get_job_status
-from core.tasks import poll_video_agent_jobs
+from workers.video_worker.tasks import poll_video_agent_jobs
 from graphs.autonomous.publisher import publisher_node
 from core import pipeline_tracker
 
@@ -232,8 +232,8 @@ class TestVideoIntegration(unittest.TestCase):
     # 3. COMPONENT TESTS: CELERY POLLING TASK
     # =====================================================================
 
-    @patch("core.integrations.video_client.get_job_status")
-    @patch("core.tasks.celery_app.send_task")
+    @patch("workers.video_worker.tasks.get_job_status")
+    @patch("workers.video_worker.tasks.celery_app.send_task")
     def test_poll_video_agent_jobs_completed_trigger(self, mock_send_task, mock_get_status):
         """Verify polling task processes COMPLETED video jobs and triggers publish_to_social."""
         # Create MasterContent first to satisfy ForeignKey constraint
@@ -288,13 +288,13 @@ class TestVideoIntegration(unittest.TestCase):
 
         # Verify social publishing task was triggered
         mock_send_task.assert_called_once_with(
-            "core.tasks.publish_to_social",
+            "workers.social_worker.tasks.publish_to_social",
             args=[str(v_id)],
             queue="social_publisher"
         )
 
-    @patch("core.integrations.video_client.get_job_status")
-    @patch("core.tasks.celery_app.send_task")
+    @patch("workers.video_worker.tasks.get_job_status")
+    @patch("workers.video_worker.tasks.celery_app.send_task")
     def test_poll_video_agent_jobs_failed(self, mock_send_task, mock_get_status):
         """Verify polling task handles failed video jobs and saves error reason."""
         # Create MasterContent first to satisfy ForeignKey constraint

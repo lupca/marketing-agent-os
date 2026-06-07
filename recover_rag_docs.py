@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), ".")))
 
 from db.connection import SessionLocal
 from core.models import Workspace, RAGDocument
-from core.tasks import ingest_document
+from workers.rag_worker.tasks import ingest_document
 
 def recover_files():
     db = SessionLocal()

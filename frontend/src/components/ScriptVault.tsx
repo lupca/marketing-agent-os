@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Search, RefreshCw, Copy, Check, Calendar, Award } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -38,9 +39,7 @@ export default function ScriptVault() {
   const loadVaultContents = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/vault/contents`);
-      if (!response.ok) throw new Error("HTTP error " + response.status);
-      const data = await response.json();
+      const data = await apiFetch<VaultContent[]>(`/api/vault/contents`);
       setContents(data);
       
       // Auto initialize first platform index as active tab for each card

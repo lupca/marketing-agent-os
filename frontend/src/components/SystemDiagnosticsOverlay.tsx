@@ -18,7 +18,14 @@ export default function SystemDiagnosticsOverlay() {
   useEffect(() => {
     const checkReadiness = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/diagnostics/readiness`);
+        const headers: Record<string, string> = {};
+        if (typeof window !== "undefined") {
+          const token = localStorage.getItem("token");
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+        }
+        const res = await fetch(`${API_BASE}/api/diagnostics/readiness`, { headers });
         if (res.ok) {
           const data = await res.json();
           setStatus(data);

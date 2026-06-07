@@ -28,7 +28,7 @@ export function registerLogoutHandler(callback: () => void) {
 
 // ─── Generic Fetch Helper ─────────────────────────────────────────────────────
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {

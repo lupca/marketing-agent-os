@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -129,8 +130,9 @@ export default function Configuration({
   // API - Integrations
   const fetchIntegrations = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`);
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; data?: IntegrationRecord[]; error?: string }>(
+        `/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`
+      );
       if (res.status === "success") {
         setIntegrations(res.data || []);
       } else {
@@ -145,8 +147,9 @@ export default function Configuration({
   // API - Social Accounts
   const fetchSocialAccounts = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`);
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; data?: SocialAccountRecord[]; error?: string }>(
+        `/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`
+      );
       if (res.status === "success") {
         setSocialAccounts(res.data || []);
       } else {
@@ -161,8 +164,9 @@ export default function Configuration({
   // API - AI parameters and models
   const fetchAISettings = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/settings?workspace_id=${selectedWorkspaceId}`);
-      const settings = await response.json();
+      const settings = await apiFetch<Record<string, any>>(
+        `/api/workspace/settings?workspace_id=${selectedWorkspaceId}`
+      );
       
       if (settings.ai_model) {
         const predefined = [
@@ -196,8 +200,9 @@ export default function Configuration({
 
   const fetchModelsList = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/models?workspace_id=${selectedWorkspaceId}`);
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; data?: AIModelRecord[] }>(
+        `/api/workspace/models?workspace_id=${selectedWorkspaceId}`
+      );
       if (res.status === "success") {
         setModelsList(res.data || []);
       }
@@ -235,12 +240,13 @@ export default function Configuration({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; message?: string }>(
+        `/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         showToast("Third-party integration synchronized successfully.", "success");
         handleCancelEditInt();
@@ -266,12 +272,13 @@ export default function Configuration({
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; message?: string }>(
+        `/api/workspace/integrations?workspace_id=${selectedWorkspaceId}`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         showToast("Integration active status updated successfully.", "success");
         fetchIntegrations();
@@ -287,12 +294,13 @@ export default function Configuration({
     if (!confirm("Are you sure you want to permanently delete this credential?")) return;
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/integrations/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; error?: string }>(
+        `/api/workspace/integrations/delete`,
+        {
+          method: "POST",
+          body: JSON.stringify({ id })
+        }
+      );
       if (res.status === "success") {
         showToast("Integration removed successfully.", "success");
         fetchIntegrations();
@@ -353,12 +361,13 @@ export default function Configuration({
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; message?: string }>(
+        `/api/workspace/social-accounts?workspace_id=${selectedWorkspaceId}`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         showToast("Social account synchronized successfully.", "success");
         handleCancelEditSocial();
@@ -375,10 +384,12 @@ export default function Configuration({
     if (!confirm("Are you sure you want to permanently delete this social account credential?")) return;
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/social-accounts/${id}`, {
-        method: "DELETE"
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; error?: string }>(
+        `/api/workspace/social-accounts/${id}`,
+        {
+          method: "DELETE"
+        }
+      );
       if (res.status === "success") {
         showToast("Social account removed successfully.", "success");
         fetchSocialAccounts();
@@ -437,12 +448,13 @@ export default function Configuration({
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; message?: string }>(
+        `/api/workspace/settings?workspace_id=${selectedWorkspaceId}`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         if (showNotification) {
           showToast("Global System LLM Settings saved to database.", "success");
@@ -509,12 +521,13 @@ export default function Configuration({
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/settings?workspace_id=${selectedWorkspaceId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string }>(
+        `/api/workspace/settings?workspace_id=${selectedWorkspaceId}`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         showToast(`Model ${modelId} activated and saved successfully!`, "success");
       }
@@ -587,16 +600,17 @@ export default function Configuration({
     };
 
     const url = formModelUuid 
-      ? `${API_BASE}/api/workspace/models/${formModelUuid}`
-      : `${API_BASE}/api/workspace/models?workspace_id=${selectedWorkspaceId}`;
+      ? `/api/workspace/models/${formModelUuid}`
+      : `/api/workspace/models?workspace_id=${selectedWorkspaceId}`;
 
     try {
-      const response = await fetch(url, {
-        method: formModelUuid ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; error?: string }>(
+        url,
+        {
+          method: formModelUuid ? "PUT" : "POST",
+          body: JSON.stringify(payload)
+        }
+      );
       if (res.status === "success") {
         showToast("Custom model configuration synced with database successfully.", "success");
         setIsModelModalOpen(false);
@@ -613,10 +627,12 @@ export default function Configuration({
     if (!confirm("Are you sure you want to permanently delete this model from library?")) return;
 
     try {
-      const response = await fetch(`${API_BASE}/api/workspace/models/${id}`, {
-        method: "DELETE"
-      });
-      const res = await response.json();
+      const res = await apiFetch<{ status: string; error?: string }>(
+        `/api/workspace/models/${id}`,
+        {
+          method: "DELETE"
+        }
+      );
       if (res.status === "success") {
         showToast("Model deleted from library.", "success");
         fetchModelsList();

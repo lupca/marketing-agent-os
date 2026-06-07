@@ -26,6 +26,7 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Slider } from "@/components/ui/Slider";
 import { useToast } from "@/components/ui/Toast";
+import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -123,9 +124,7 @@ export default function BiDashboard() {
   const fetchMetrics = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/metrics`);
-      if (!response.ok) throw new Error("HTTP error " + response.status);
-      const data = await response.json();
+      const data = await apiFetch<any>(`/api/dashboard/metrics`);
 
       if (data.error) {
         showToast("Lỗi tải báo cáo: " + data.error, "error");
@@ -158,10 +157,9 @@ export default function BiDashboard() {
   const handleSyncMetrics = async () => {
     setSyncing(true);
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/sync-metrics`, {
+      const data = await apiFetch<{ message?: string }>(`/api/dashboard/sync-metrics`, {
         method: "POST"
       });
-      const data = await response.json();
       showToast(data.message || "Đã gửi yêu cầu đồng bộ thành công!", "success");
     } catch (error) {
       console.error(error);

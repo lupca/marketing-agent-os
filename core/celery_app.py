@@ -14,7 +14,13 @@ celery_app = Celery(
     "marketing_agent",
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
-    include=["core.tasks"],
+    include=[
+        "workers.rag_worker.tasks",
+        "workers.social_worker.tasks",
+        "workers.radar_worker.tasks",
+        "workers.video_worker.tasks",
+        "workers.orchestrator_worker.tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -33,27 +39,29 @@ celery_app.conf.update(
 
     # Routing — tách 2 queue độc lập
     task_routes={
-        "core.tasks.ingest_document":      {"queue": "rag_ingestion"},
-        "core.tasks.cascade_update_tags":  {"queue": "rag_cascade"},
-        "core.tasks.cascade_soft_delete":  {"queue": "rag_cascade"},
-        "core.tasks.publish_to_social":    {"queue": "social_publisher"},
-        "core.tasks.poll_video_agent_jobs": {"queue": "video_polling"},
-        "core.tasks.sync_paid_campaign_metrics_task": {"queue": "orchestrator"},
-        "core.tasks.state_orchestrator_cron": {"queue": "orchestrator"},
+        "workers.rag_worker.tasks.ingest_document":      {"queue": "rag_ingestion"},
+        "workers.rag_worker.tasks.cascade_update_tags":  {"queue": "rag_cascade"},
+        "workers.rag_worker.tasks.cascade_soft_delete":  {"queue": "rag_cascade"},
+        "workers.social_worker.tasks.publish_to_social":    {"queue": "social_publisher"},
+        "workers.social_worker.tasks.sync_own_media_metrics": {"queue": "social_publisher"},
+        "workers.radar_worker.tasks.radar_market_first_cron": {"queue": "social_publisher"},
+        "workers.video_worker.tasks.poll_video_agent_jobs": {"queue": "video_polling"},
+        "workers.orchestrator_worker.tasks.sync_paid_campaign_metrics_task": {"queue": "orchestrator"},
+        "workers.orchestrator_worker.tasks.state_orchestrator_cron": {"queue": "orchestrator"},
     },
 
     # Periodic tasks (Celery Beat schedule configuration)
     beat_schedule={
         "poll-video-agent-jobs-every-60s": {
-            "task": "core.tasks.poll_video_agent_jobs",
+            "task": "workers.video_worker.tasks.poll_video_agent_jobs",
             "schedule": 60.0,  # Run every 60 seconds
         },
         "sync-paid-campaign-metrics-every-30m": {
-            "task": "core.tasks.sync_paid_campaign_metrics_task",
+            "task": "workers.orchestrator_worker.tasks.sync_paid_campaign_metrics_task",
             "schedule": 1800.0,  # Run every 30 minutes
         },
         "state-orchestrator-cron-every-60s": {
-            "task": "core.tasks.state_orchestrator_cron",
+            "task": "workers.orchestrator_worker.tasks.state_orchestrator_cron",
             "schedule": 60.0,  # Run every 60 seconds (Orchestrator ticks)
         },
     },

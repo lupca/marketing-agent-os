@@ -5,7 +5,7 @@ import uuid
 
 from db.connection import SessionLocal
 from core.models import PlatformVariant, SocialInteraction, Workspace, MarketingCampaign, MasterContent
-from core.tasks import sync_own_media_metrics
+from workers.social_worker.tasks import sync_own_media_metrics
 
 def test_sync_own_media_metrics_logic():
     db = SessionLocal()

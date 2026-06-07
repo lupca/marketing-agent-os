@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from core.models import RAGDocument
 from core.ollama_client import get_embedding, rerank_documents
-from core.tasks import ingest_document as ingest_document_task
+from workers.rag_worker.tasks import ingest_document as ingest_document_task
 from config.settings import RAG_RETRIEVAL_LIMIT, RAG_CANDIDATE_LIMIT
 
 logger = logging.getLogger("core_rag")

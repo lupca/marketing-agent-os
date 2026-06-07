@@ -29,7 +29,7 @@ async def sync_metrics():
     try:
         from core.celery_app import celery_app
         celery_app.send_task(
-            "core.tasks.sync_own_media_metrics",
+            "workers.social_worker.tasks.sync_own_media_metrics",
             queue="social_publisher"
         )
         return {"status": "success", "message": "Đã đẩy lệnh đồng bộ metrics vào hàng đợi ngầm. Vui lòng F5 sau ít phút."}

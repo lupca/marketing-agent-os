@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal
 from core.models import Workspace, MarketingCampaign, MasterContent, PlatformVariant, WorkspaceIntegration
-from core.tasks import publish_to_social
+from workers.social_worker.tasks import publish_to_social
 
 class TestSocialPublisher(unittest.TestCase):
     

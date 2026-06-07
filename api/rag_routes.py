@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from core.dependencies import get_db
 from core.rag import retrieve_chunks_reranked
-from core.tasks import cascade_update_tags, cascade_soft_delete
+from workers.rag_worker.tasks import cascade_update_tags, cascade_soft_delete
 
 logger = logging.getLogger("api_rag_routes")
 
