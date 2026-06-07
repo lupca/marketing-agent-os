@@ -28,7 +28,6 @@ class AgencyState(TypedDict):
 
     # Autopilot Cockpit observability fields (injected by bandit_orchestrator)
     _run_id: Optional[str]        # UUID of the active PipelineRun record (None if tracker unavailable)
-    _execution_mode: Optional[str]  # 'shadow' | 'live' — controls whether publisher calls real APIs
 ```
 
 ## 2. Graph Node Workflow
@@ -56,4 +55,4 @@ graph TD
 - `creative_generation_node`: Gọi LLM (Ollama) viết nội dung quảng cáo dựa trên các hướng đã chọn và `baseline_copy`.
 - `guardian_sandbox_node`: LLM chấm điểm an toàn thương hiệu (Brand Safety). Nếu lỗi -> push vào `sandbox_feedbacks` và route về `creative_generation`.
 - `insight_generator_node`: Đúc kết bài học (Insights) từ đợt chạy này, chuẩn bị lưu DB.
-- `publisher_node`: Đẩy nội dung đã duyệt lên nền tảng thật (nếu `_execution_mode` = live) hoặc log lại (shadow mode).
+- `publisher_node`: Đẩy nội dung đã duyệt lên nền tảng thật.

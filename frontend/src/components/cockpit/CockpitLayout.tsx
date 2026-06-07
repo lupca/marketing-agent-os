@@ -7,21 +7,15 @@ import Link from 'next/link';
 import { Eye, Radio, ShieldAlert, Zap, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { useCockpitWebSocket } from '@/hooks/useCockpitWebSocket';
 import { cockpitApi } from '@/lib/api';
-import ShadowModePanel from './ShadowModePanel';
+
 import DagRadar from './DagRadar';
 import QuarantineZone from './QuarantineZone';
 import KillSwitch from './KillSwitch';
 import type { CockpitWebSocketEvent } from '@/lib/types';
 
-type CockpitTab = 'shadow' | 'radar' | 'quarantine' | 'killswitch';
+type CockpitTab = 'radar' | 'quarantine' | 'killswitch';
 
 const TABS: { id: CockpitTab; label: string; icon: React.ReactNode; desc: string }[] = [
-  {
-    id: 'shadow',
-    label: 'Shadow Mode',
-    icon: <Eye size={16} />,
-    desc: 'AI decisions without real API calls',
-  },
   {
     id: 'radar',
     label: 'DAG Radar',
@@ -43,7 +37,7 @@ const TABS: { id: CockpitTab; label: string; icon: React.ReactNode; desc: string
 ];
 
 export default function CockpitLayout() {
-  const [activeTab, setActiveTab] = useState<CockpitTab>('shadow');
+  const [activeTab, setActiveTab] = useState<CockpitTab>('radar');
   const [killSwitchActive, setKillSwitchActive] = useState(false);
   const [quarantineCount, setQuarantineCount] = useState(0);
   const [liveRunActive, setLiveRunActive] = useState(false);
@@ -185,7 +179,6 @@ export default function CockpitLayout() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'shadow'     && <ShadowModePanel />}
         {activeTab === 'radar'      && <DagRadar />}
         {activeTab === 'quarantine' && <QuarantineZone />}
         {activeTab === 'killswitch' && <KillSwitch />}

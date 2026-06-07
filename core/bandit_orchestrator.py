@@ -10,9 +10,8 @@ Responsibilities:
 
 Cockpit Integration (Phase 6):
     - Kill switch is checked before graph.ainvoke() — raises if active.
-    - Execution mode (shadow / live) is read from pipeline_tracker and injected into state.
     - PipelineRun records are created, completed, or failed via pipeline_tracker.
-    - ``_run_id`` and ``_execution_mode`` are injected into initial_state for node tracking.
+    - ``_run_id`` is injected into initial_state for node tracking.
 """
 import random
 import logging
@@ -188,11 +187,10 @@ async def trigger_autonomous_generation(
 
     Cockpit Integration:
         1. Kill switch check: raises ``RuntimeError`` if the switch is active.
-        2. Reads current execution mode from ``pipeline_tracker.get_execution_mode()``.
-        3. Creates a ``PipelineRun`` record via ``pipeline_tracker.start_run()``.
-        4. Injects ``_run_id`` and ``_execution_mode`` into ``initial_state`` for node tracking.
-        5. Calls ``pipeline_tracker.complete_run()`` on success.
-        6. Calls ``pipeline_tracker.fail_run()`` on exception, then re-raises.
+        2. Creates a ``PipelineRun`` record via ``pipeline_tracker.start_run()``.
+        3. Injects ``_run_id`` into ``initial_state`` for node tracking.
+        4. Calls ``pipeline_tracker.complete_run()`` on success.
+        5. Calls ``pipeline_tracker.fail_run()`` on exception, then re-raises.
 
     Args:
         workspace_id: UUID string of the workspace.
@@ -219,9 +217,7 @@ async def trigger_autonomous_generation(
         logger.error(msg)
         raise RuntimeError(msg)
 
-    # ── Read Current Execution Mode ────────────────────────────────────────────
-    execution_mode = pipeline_tracker.get_execution_mode()
-    logger.info(f"[COCKPIT] Execution mode for this run: {execution_mode.upper()}")
+
 
     # ── Fetch campaign metadata ────────────────────────────────────────────────
     campaign = db.query(MarketingCampaign).filter_by(id=uuid.UUID(campaign_id)).first()
@@ -286,16 +282,12 @@ async def trigger_autonomous_generation(
         "selected_actions": [],
         "generated_variants": [],
         "sandbox_feedbacks": [],
-        # Cockpit fields — consumed by autonomous_nodes.py for run tracking
-        "_execution_mode": execution_mode,
         "_skip_generation": skip_generation,
     }
 
-    # ── Create Pipeline Run Record ─────────────────────────────────────────────
     run_id = pipeline_tracker.start_run(
         workspace_id=workspace_id,
         campaign_id=campaign_id,
-        execution_mode=execution_mode,
         initial_state=initial_state,
     )
     # Inject run_id so every node can call pipeline_tracker.start_node(run_id, ...)

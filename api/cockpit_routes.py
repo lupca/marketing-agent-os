@@ -3,7 +3,6 @@
 Autopilot Cockpit API Routes — FastAPI router for the Cockpit monitoring dashboard.
 
 Provides:
-    - Execution mode management (shadow / live toggle)
     - Pipeline run listing and detail view
     - DAG node-status visualization endpoint
     - Quarantined task management (list, view, edit state, resume, discard)
@@ -38,14 +37,7 @@ cockpit_router = APIRouter(prefix="/api/cockpit", tags=["Cockpit"])
 # Pydantic Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ExecutionModeResponse(BaseModel):
-    """Current execution mode state."""
-    mode: str = Field(..., description="'shadow' or 'live'")
 
-
-class SetExecutionModeRequest(BaseModel):
-    """Request body for changing execution mode."""
-    mode: str = Field(..., description="Must be 'shadow' or 'live'")
 
 
 class NodeExecutionSchema(BaseModel):
@@ -69,7 +61,6 @@ class NodeExecutionSchema(BaseModel):
 class PipelineRunSummary(BaseModel):
     """Lightweight run summary for list endpoints."""
     id: str
-    execution_mode: str
     status: str
     campaign_id: Optional[str]
     workspace_id: Optional[str]
@@ -84,7 +75,6 @@ class PipelineRunSummary(BaseModel):
 class PipelineRunDetail(BaseModel):
     """Full run detail including all node executions."""
     id: str
-    execution_mode: str
     status: str
     campaign_id: Optional[str]
     workspace_id: Optional[str]
@@ -213,7 +203,6 @@ def _dt_str(dt: Optional[datetime]) -> Optional[str]:
 def _run_to_summary(run: PipelineRun) -> PipelineRunSummary:
     return PipelineRunSummary(
         id=str(run.id),
-        execution_mode=run.execution_mode,
         status=run.status,
         campaign_id=str(run.campaign_id) if run.campaign_id else None,
         workspace_id=str(run.workspace_id) if run.workspace_id else None,
@@ -266,39 +255,7 @@ def _qt_to_detail(qt: QuarantinedTask) -> QuarantinedTaskDetail:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Execution Mode Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
 
-@cockpit_router.get(
-    "/execution-mode",
-    response_model=ExecutionModeResponse,
-    summary="Get current execution mode",
-    description=(
-        "Returns the current global execution mode. "
-        "'shadow' means the pipeline runs without publishing to external APIs. "
-        "'live' enables full autonomous publishing."
-    ),
-)
-async def get_execution_mode() -> ExecutionModeResponse:
-    return ExecutionModeResponse(mode=pipeline_tracker.get_execution_mode())
-
-
-@cockpit_router.post(
-    "/execution-mode",
-    response_model=ExecutionModeResponse,
-    summary="Set execution mode (shadow / live)",
-    description=(
-        "Toggle between 'shadow' (dry-run) and 'live' (full publishing) modes. "
-        "This change takes effect immediately for all subsequent pipeline runs."
-    ),
-)
-async def set_execution_mode(body: SetExecutionModeRequest) -> ExecutionModeResponse:
-    try:
-        pipeline_tracker.set_execution_mode(body.mode)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    return ExecutionModeResponse(mode=pipeline_tracker.get_execution_mode())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -370,7 +327,6 @@ async def get_run(
 
     return PipelineRunDetail(
         id=str(run.id),
-        execution_mode=run.execution_mode,
         status=run.status,
         campaign_id=str(run.campaign_id) if run.campaign_id else None,
         workspace_id=str(run.workspace_id) if run.workspace_id else None,

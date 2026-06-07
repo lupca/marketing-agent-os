@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
     campaign_id UUID REFERENCES marketing_campaigns(id) ON DELETE SET NULL,
-    execution_mode VARCHAR(20) NOT NULL DEFAULT 'shadow' CHECK (execution_mode IN ('shadow', 'live')),
     status VARCHAR(30) NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'quarantined')),
     initial_state JSONB DEFAULT '{}',
     final_state JSONB DEFAULT '{}',

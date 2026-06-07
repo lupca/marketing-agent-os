@@ -1,7 +1,6 @@
 // src/lib/types.ts
 // Shared TypeScript interfaces for The Autopilot Cockpit
 
-export type ExecutionMode = 'shadow' | 'live';
 export type RunStatus = 'running' | 'completed' | 'failed' | 'quarantined';
 export type NodeStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 export type ResolutionStatus = 'pending' | 'resumed' | 'discarded';
@@ -12,7 +11,6 @@ export interface PipelineRun {
   id: string;
   workspace_id: string | null;
   campaign_id: string | null;
-  execution_mode: ExecutionMode;
   status: RunStatus;
   initial_state: AgencyState;
   final_state: AgencyState | null;
@@ -81,7 +79,6 @@ export interface AgencyState {
   generated_variants?: GeneratedVariant[];
   sandbox_feedbacks?: SandboxFeedback[];
   _run_id?: string;
-  _execution_mode?: string;
   [key: string]: unknown;
 }
 
@@ -140,8 +137,7 @@ export type CockpitEventType =
   | 'node_complete'
   | 'node_fail'
   | 'quarantine'
-  | 'kill_switch'
-  | 'mode_change';
+  | 'kill_switch';
 
 export interface CockpitWebSocketEvent {
   type: CockpitEventType;
@@ -165,17 +161,11 @@ export interface PaginatedQuarantinedTasks {
   page_size: number;
 }
 
-export interface ExecutionModeResponse {
-  mode: ExecutionMode;
-  shadow_run_count?: number;
-}
-
 export interface DagVisualization {
   run_id: string;
   status: RunStatus;
   nodes: DagNode[];
   edges: DagEdge[];
-  execution_mode: ExecutionMode;
 }
 
 // ─── Shadow Decision ──────────────────────────────────────────────────────────

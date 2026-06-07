@@ -14,14 +14,12 @@ from core.models import Workspace, ProductService, MarketingCampaign, PlatformVa
 from core.integrations.video_client import submit_video_job, get_job_status
 from workers.video_worker.tasks import poll_video_agent_jobs
 from graphs.autonomous.publisher import publisher_node
-from core import pipeline_tracker
 
 class TestVideoIntegration(unittest.TestCase):
     
     def setUp(self):
         super().setUp()
         self.db = SessionLocal()
-        pipeline_tracker.set_execution_mode("live")
         
         # Setup mock test data
         self.ws_id = uuid.uuid4()
@@ -58,7 +56,6 @@ class TestVideoIntegration(unittest.TestCase):
         self.db.commit()
 
     def tearDown(self):
-        pipeline_tracker.set_execution_mode("shadow")
         self._cleanup_db()
         self.db.close()
         super().tearDown()
@@ -226,7 +223,7 @@ class TestVideoIntegration(unittest.TestCase):
         self.assertEqual(tiktok_var.publish_status, "generating_media")
         self.assertEqual(tiktok_var.meta_data["video_agent_job_id"], 555)
 
-        self.assertEqual(fb_var.publish_status, "shadow" if pipeline_tracker.get_execution_mode() == "shadow" else "published")
+        self.assertEqual(fb_var.publish_status, "published")
 
     # =====================================================================
     # 3. COMPONENT TESTS: CELERY POLLING TASK

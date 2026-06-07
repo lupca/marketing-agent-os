@@ -20,16 +20,11 @@ def publisher_node(state: AgencyState) -> dict:
         If the kill switch is active, all external API publishing is skipped entirely.
         The pipeline returns a clean completion state indicating the reason.
         Internal DB writes (PlatformVariant records) are still performed for audit.
-
-    Execution Mode Guard:
-        In 'shadow' mode (``state.get("_execution_mode") == "shadow"``), real Facebook API
-        calls are also skipped even if the kill switch is not active.
     """
     logger.info("Executing Publisher Node...")
     workspace_id = state.get("workspace_id")
     campaign_id = state.get("campaign_id")
     variants = state.get("generated_variants") or []
-    execution_mode = state.get("_execution_mode", "shadow")
 
     # ── Kill Switch Guard ──────────────────────────────────────────────────
     if pipeline_tracker.is_kill_switch_active(workspace_id=workspace_id):
@@ -128,23 +123,16 @@ def publisher_node(state: AgencyState) -> dict:
             # 2b. Publish TEXT Facebook variants if any
             fb_variants = [v for v in text_variants if v.get("platform", "facebook") == "facebook"]
             tiktok_text_variants = [v for v in text_variants if v.get("platform") == "tiktok"]
-            
             if fb_variants:
                 # Resolve and initialize Facebook Client
                 api, fb_account_id, use_real_fb = init_facebook_client(workspace_id, db, campaign_id=campaign_id)
                 
-                if execution_mode == "shadow":
-                    logger.info("[SHADOW MODE] Overriding Facebook publishing to mock mode.")
-                    use_real_fb = False
- 
                 if use_real_fb:
                     logger.info(f"Starting batch publishing of {len(fb_variants)} Facebook variants to Facebook Ads API...")
                     creative_responses = batch_create_creatives(api, fb_account_id, workspace_id, fb_variants)
                     ad_mappings.update(batch_create_ads(api, fb_account_id, camp_uuid, creative_responses, db))
-                elif execution_mode == "shadow":
-                    logger.info(f"Shadow mode active: {len(fb_variants)} Facebook variants skipped publishing.")
                 else:
-                    raise RuntimeError("Facebook real publishing is disabled but execution mode is not shadow.")
+                    logger.info(f"Facebook real publishing is disabled: {len(fb_variants)} Facebook variants skipped publishing.")
                         
             # 3. Publish TikTok text variants if any (Mocked as requested)
             if tiktok_text_variants:
@@ -205,8 +193,4 @@ def publisher_node(state: AgencyState) -> dict:
             raise
             
     logger.info("Stateless execution loop finished! Releasing system resources.")
-    result = {"sop_stage": "completed"}
-    if execution_mode == "shadow":
-        result["_shadow_mode"] = True
-
-    return result
+    return {"sop_stage": "completed"}

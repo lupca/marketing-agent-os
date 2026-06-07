@@ -47,8 +47,7 @@ logger = logging.getLogger("pipeline_tracker")
 # Set by app.py startup event via set_cockpit_broadcaster()
 _cockpit_broadcaster = None
 
-# In-process execution mode — persisted to DB on every change
-_execution_mode_cache: Dict[str, str] = {"mode": "live"}
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -133,38 +132,7 @@ def broadcast_event_sync(event_type: str, data: Dict[str, Any]) -> None:
         logger.warning(f"[COCKPIT] Sync broadcast failed for '{event_type}': {exc}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Execution Mode
-# ─────────────────────────────────────────────────────────────────────────────
 
-def get_execution_mode() -> str:
-    """
-    Return the current global execution mode.
-
-    Returns:
-        'shadow' — pipeline runs but no external publishing occurs.
-        'live'   — full autonomous publishing to Facebook Ads / social platforms.
-    """
-    return _execution_mode_cache.get("mode", "shadow")
-
-
-def set_execution_mode(mode: str) -> None:
-    """
-    Change the global execution mode for all subsequent pipeline runs.
-
-    Args:
-        mode: Must be either 'shadow' or 'live'.
-
-    Raises:
-        ValueError: If an invalid mode string is provided.
-    """
-    if mode not in ("shadow", "live"):
-        raise ValueError(
-            f"Invalid execution mode '{mode}'. Accepted values: 'shadow', 'live'."
-        )
-    _execution_mode_cache["mode"] = mode
-    logger.info(f"[COCKPIT] Execution mode changed → {mode.upper()}")
-    broadcast_event_sync("mode_change", {"mode": mode})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -290,7 +258,6 @@ def deactivate_kill_switch(
 def start_run(
     workspace_id: Optional[str],
     campaign_id: Optional[str],
-    execution_mode: str,
     initial_state: Dict[str, Any],
 ) -> str:
     """
@@ -299,7 +266,6 @@ def start_run(
     Args:
         workspace_id:    UUID string of the workspace (may be None).
         campaign_id:     UUID string of the campaign (may be None).
-        execution_mode:  'shadow' or 'live'.
         initial_state:   The AgencyState dict passed to graph.ainvoke().
 
     Returns:
@@ -309,7 +275,6 @@ def start_run(
         run = PipelineRun(
             workspace_id=uuid.UUID(workspace_id) if workspace_id else None,
             campaign_id=uuid.UUID(campaign_id) if campaign_id else None,
-            execution_mode=execution_mode,
             status="running",
             initial_state=_sanitize_state(initial_state),
         )
@@ -319,13 +284,12 @@ def start_run(
         run_id = str(run.id)
 
     logger.info(
-        f"[COCKPIT] 🚀 Pipeline run started: {run_id} (mode={execution_mode})"
+        f"[COCKPIT] 🚀 Pipeline run started: {run_id}"
     )
     broadcast_event_sync(
         "run_start",
         {
             "run_id": run_id,
-            "execution_mode": execution_mode,
             "campaign_id": campaign_id,
             "workspace_id": workspace_id,
         },

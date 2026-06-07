@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from db.connection import SessionLocal
-from core import pipeline_tracker
+
 from core.models import (
     Workspace, ProductService, MarketingCampaign,
     PlatformVariant, AdMapper, AIInsightPending, RAGChunk,
@@ -24,8 +24,7 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         super().setUp()
         self.db = SessionLocal()
         
-        # Explicitly set execution mode to live for workflow tests to trigger publisher DB writes
-        pipeline_tracker.set_execution_mode("live")
+
         
         # Verify that the database is already seeded with "TOPVNSPORT Workspace"
         self.ws = self.db.query(Workspace).filter_by(name="TOPVNSPORT Workspace").first()
@@ -103,8 +102,7 @@ class TestAutonomousCreativeEngine(LocalOllamaTestCase):
         self.db.commit()
         
     def tearDown(self):
-        # Restore default shadow mode
-        pipeline_tracker.set_execution_mode("shadow")
+
         
         # Clean up campaign and generated variants
         self.db.query(AdMapper).delete()

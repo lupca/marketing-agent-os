@@ -234,7 +234,7 @@ function RunSelector({
       <option value="">— Select a Pipeline Run —</option>
       {runs.map((r) => (
         <option key={r.id} value={r.id}>
-          {r.id.slice(0, 8)}… · {r.execution_mode} · {r.status} ·{' '}
+          {r.id.slice(0, 8)}… · {r.status} ·{' '}
           {new Date(r.started_at).toLocaleString()}
         </option>
       ))}
@@ -291,7 +291,6 @@ export default function DagRadar() {
               if (!exists) {
                 const newRun = {
                   id: runId,
-                  execution_mode: event.data.execution_mode as 'shadow' | 'live',
                   status: 'running',
                   started_at: event.timestamp,
                   campaign_id: event.data.campaign_id as string ?? null,
@@ -476,19 +475,7 @@ export default function DagRadar() {
         )}
       </div>
 
-      {/* Mode badge */}
-      {dag && (
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>Mode:</span>
-          <span className={`px-2 py-0.5 rounded font-medium ${
-            dag.execution_mode === 'live'
-              ? 'bg-emerald-500/15 text-emerald-400'
-              : 'bg-violet-500/15 text-violet-400'
-          }`}>
-            {dag.execution_mode?.toUpperCase()}
-          </span>
-        </div>
-      )}
+
 
       {/* Node detail side panel */}
       {selectedNode && (

@@ -13,13 +13,12 @@ from db.connection import Base
 class PipelineRun(Base):
     """
     Records each invocation of the autonomous LangGraph pipeline.
-    Captures the full initial/final state and execution mode (shadow vs live).
+    Captures the full initial/final state.
 
     Attributes:
         id:             Primary key UUID.
         workspace_id:   FK to workspaces table.
         campaign_id:    FK to marketing_campaigns table (nullable — may not always have a campaign).
-        execution_mode: 'shadow' (dry-run, no external publishing) or 'live' (full publishing enabled).
         status:         Lifecycle state: running → completed | failed | quarantined.
         initial_state:  JSONB snapshot of the state passed into graph.ainvoke().
         final_state:    JSONB snapshot of the state returned from graph.ainvoke().
@@ -33,7 +32,6 @@ class PipelineRun(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
     campaign_id = Column(UUID(as_uuid=True), ForeignKey("marketing_campaigns.id", ondelete="SET NULL"), nullable=True)
-    execution_mode = Column(String(20), nullable=False, default="shadow")  # 'shadow' | 'live'
     status = Column(String(30), nullable=False, default="running")  # 'running' | 'completed' | 'failed' | 'quarantined'
     initial_state = Column(JSONB, default=dict)
     final_state = Column(JSONB, default=dict)

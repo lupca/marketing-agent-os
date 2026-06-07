@@ -2,7 +2,6 @@
 // Centralized API client for The Autopilot Cockpit
 
 import type {
-  ExecutionModeResponse,
   PaginatedRuns,
   PipelineRun,
   DagVisualization,
@@ -70,18 +69,7 @@ export async function apiFetch<T>(
 }
 
 
-// ─── Execution Mode ───────────────────────────────────────────────────────────
-
 export const cockpitApi = {
-  getExecutionMode: () =>
-    apiFetch<ExecutionModeResponse>('/api/cockpit/execution-mode'),
-
-  setExecutionMode: (mode: 'shadow' | 'live') =>
-    apiFetch<ExecutionModeResponse>('/api/cockpit/execution-mode', {
-      method: 'POST',
-      body: JSON.stringify({ mode }),
-    }),
-
   // ─── Pipeline Runs ────────────────────────────────────────────────────────
 
   getRuns: (params?: { page?: number; page_size?: number; status?: string }) => {
